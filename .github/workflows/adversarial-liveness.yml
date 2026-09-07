@@ -1,0 +1,23 @@
+name: adversarial-liveness
+
+on:
+  pull_request:
+    paths:
+      - 'src/rules_beyond/liveness_experiment.py'
+      - 'tests/test_liveness_experiment.py'
+      - '.github/workflows/adversarial-liveness.yml'
+      - 'docs/experiments/ADVERSARIAL_LIVENESS_2026-09-07.md'
+      - 'docs/handoffs/2026-09-07-adversarial-liveness.md'
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install project
+        run: python -m pip install -e '.[dev]'
+      - name: Run adversarial liveness comparison
+        run: python -m rules_beyond.liveness_experiment --matches-per-cell 500
