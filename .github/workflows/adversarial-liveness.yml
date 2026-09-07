@@ -20,4 +20,4 @@ jobs:
       - name: Install project
         run: python -m pip install -e '.[dev]'
       - name: Run adversarial liveness comparison
-        run: python -m rules_beyond.liveness_experiment --matches-per-cell 500
+        run: python -m rules_beyond.liveness_experiment --matches-per-cell 1000
