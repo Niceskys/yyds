@@ -1,6 +1,17 @@
+from dataclasses import replace
+
 import pytest
 
-from rules_beyond import Action, RuleEffectType, Team
+from rules_beyond import (
+    Action,
+    GameConfig,
+    Position,
+    RuleEffectType,
+    RuleValidator,
+    Team,
+    UnitState,
+    Weapon,
+)
 from rules_beyond.dynamic_rule_controller import DynamicRuleController
 
 
@@ -20,6 +31,16 @@ def bow_range_plus_one():
 
 def move_range_plus_one():
     return candidate("MOVE_RANGE_ADD", delta=1)
+
+
+def repeat_bow_cooldown():
+    return {
+        "version": "v0.1",
+        "target": "ALL_UNITS",
+        "conditions": [{"type": "CONSECUTIVE_SAME_WEAPON_USE_GTE", "value": 2}],
+        "effect": {"type": "WEAPON_COOLDOWN", "weapon": "BOW", "rounds": 1},
+        "duration": "UNTIL_REPLACED",
+    }
 
 
 def empty_actions():
@@ -153,3 +174,64 @@ def test_invalid_pregame_submission_starts_without_active_player_rule() -> None:
     assert started.phase.accepted is False
     assert started.state.active_rule is None
     assert any(event.kind == "PLAYER_RULE_REJECTED" for event in started.events)
+
+
+def test_terminal_round_three_does_not_open_another_rule_phase() -> None:
+    controller = DynamicRuleController()
+    started = controller.start_match()
+    terminal_setup = replace(
+        started.state.game_state,
+        round_no=3,
+        units={
+            Team.RED: UnitState(Team.RED, Position(3, 2), 1),
+            Team.BLUE: UnitState(Team.BLUE, Position(3, 3), 1),
+        },
+    )
+    state = replace(started.state, game_state=terminal_setup)
+
+    resolved = controller.resolve_round(
+        state,
+        {
+            Team.RED: Action((), Weapon.KNIFE),
+            Team.BLUE: Action((), Weapon.KNIFE),
+        },
+        match_seed=601,
+    )
+
+    assert resolved.state.game_state.is_terminal is True
+    assert resolved.state.rule_phase_due is False
+    assert not any(event.kind == "RULE_PHASE_DUE" for event in resolved.events)
+
+
+def test_public_rule_history_survives_rule_replacement() -> None:
+    controller = DynamicRuleController()
+    state = controller.start_match(bow_range_plus_one()).state
+    bow_actions = {
+        Team.RED: Action((), Weapon.BOW),
+        Team.BLUE: Action((), Weapon.BOW),
+    }
+
+    for round_no in range(1, 4):
+        state = controller.resolve_round(state, bow_actions, match_seed=700 + round_no).state
+
+    assert state.rule_phase_due is True
+    assert state.histories[Team.RED].consecutive_same_weapon_use == 3
+    assert state.histories[Team.BLUE].consecutive_same_weapon_use == 3
+    history_before_replacement = state.histories
+
+    replaced = controller.apply_due_rule_phase(state, repeat_bow_cooldown())
+    assert replaced.state.histories == history_before_replacement
+
+    round_four = controller.resolve_round(replaced.state, bow_actions, match_seed=704)
+    assert Weapon.BOW in round_four.resolution.modifiers[Team.RED].cooldown_weapons
+    assert Weapon.BOW in round_four.resolution.modifiers[Team.BLUE].cooldown_weapons
+    invalid_bows = [event for event in round_four.events if event.kind == "INVALID_ATTACK"]
+    assert {event.actor for event in invalid_bows} == {Team.RED, Team.BLUE}
+
+
+def test_validator_config_must_match_controller_config() -> None:
+    controller_config = GameConfig(initial_hp=4)
+    mismatched_validator = RuleValidator(GameConfig(initial_hp=5))
+
+    with pytest.raises(ValueError, match="validator.config"):
+        DynamicRuleController(controller_config, validator=mismatched_validator)
