@@ -24,6 +24,13 @@ from .rule_dsl import (
     RuleTarget,
     RuleWeapon,
 )
+from .rule_runtime import (
+    PublicRuleHistory,
+    RuleEvaluator,
+    RuleModifiers,
+    initial_public_rule_histories,
+    update_public_rule_histories,
+)
 from .rule_validator import RuleValidator, ValidationIssue, ValidationResult
 
 __all__ = [
@@ -34,6 +41,7 @@ __all__ = [
     "GameState",
     "MatchResult",
     "Position",
+    "PublicRuleHistory",
     "RoundResolution",
     "RuleAST",
     "RuleCondition",
@@ -41,6 +49,8 @@ __all__ = [
     "RuleDuration",
     "RuleEffect",
     "RuleEffectType",
+    "RuleEvaluator",
+    "RuleModifiers",
     "RuleTarget",
     "RuleValidator",
     "RuleWeapon",
@@ -49,6 +59,8 @@ __all__ = [
     "ValidationIssue",
     "ValidationResult",
     "Weapon",
+    "initial_public_rule_histories",
     "initial_state",
     "terminal_utility",
+    "update_public_rule_histories",
 ]
