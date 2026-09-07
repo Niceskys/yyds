@@ -79,6 +79,9 @@ class DynamicRuleController:
       - an accepted rule replaces the previous player rule;
       - no submission or an invalid submission carries the previous rule;
       - rules do not expire automatically after three rounds.
+
+    PublicRuleHistory is match-global public battle history. Replacing a rule
+    changes only active_rule; it does not reset already resolved public facts.
     """
 
     def __init__(
@@ -91,6 +94,8 @@ class DynamicRuleController:
         if engine is not None and config is not None and engine.config != config:
             raise ValueError("engine.config must match controller config")
         self.config = config or (engine.config if engine is not None else GameConfig())
+        if validator is not None and validator.config != self.config:
+            raise ValueError("validator.config must match controller config")
         self.engine = engine or RuleAwareGameEngine(self.config)
         self.validator = validator or RuleValidator(self.config)
 
