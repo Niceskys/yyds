@@ -2,7 +2,7 @@
 
 > 日期：2026-09-08  
 > 分支：`feat/dynamic-rule-controller`  
-> 状态：实现完成；等待 PR CI / dynamic regression。
+> 状态：**Controller / tests / 4×500 paired experiment PASS；等待最终 PR CI 后合并。**
 
 ## 1. 前置状态
 
@@ -14,7 +14,7 @@ no_damage_streak 3/6/9/12 escalation
 Round >= 24 -> Hard Liveness
 ```
 
-因此可以进入此前被 liveness blocker 阻塞的动态规则替换阶段。
+因此此前被 liveness blocker 阻塞的动态规则替换可以继续。
 
 ## 2. 当前实现
 
@@ -51,11 +51,11 @@ Round 6 后：phase 2
 规则 TTL = 3 回合
 ```
 
-当前规则是 `UNTIL_REPLACED`。
+当前规则仍是 `UNTIL_REPLACED`。
 
 没有新合法规则时，旧规则继续存在。
 
-## 4. Controller 状态
+## 4. Controller 状态与强制 Gate
 
 `DynamicMatchState` 保存：
 
@@ -74,6 +74,8 @@ pending_rule_phase_after_round != None
 ```
 
 在处理该规则阶段前，Controller 拒绝继续 resolve 下一回合。
+
+如果该边界回合已经终局，则**不会**再打开规则阶段。
 
 ## 5. Rule phase 处理
 
@@ -106,9 +108,36 @@ RuleValidator.accepted
 active_rule = None
 ```
 
-## 6. 事件
+## 6. PublicRuleHistory 不随规则替换重置
 
-新增 Controller-level events：
+`docs/PUBLIC_RULE_HISTORY_V0.1.md` 定义的是每方持续保存的、由 Engine 已结算公开事实构成的战斗历史。
+
+因此 replacement 只改变：
+
+```text
+active_rule
+```
+
+不会重置：
+
+```text
+moved_last_round
+last_attack_weapon
+consecutive_bow_miss
+consecutive_same_weapon_use
+```
+
+已经增加回归测试：前三回合连续使用 Bow 后，在 Round 3 后发布基于 `CONSECUTIVE_SAME_WEAPON_USE_GTE(2)` 的 Bow cooldown，Round 4 会直接读取此前公开历史并生效。
+
+## 7. 依赖配置一致性
+
+Controller、RuleAwareGameEngine、RuleValidator 必须使用同一 `GameConfig`。
+
+如果外部注入的 Engine / Validator 配置与 Controller 不一致，立即拒绝构造，避免一个模块按 HP=4/边界 A 验证，另一个模块按另一配置执行。
+
+## 8. Controller-level events
+
+新增：
 
 ```text
 RULE_PHASE_OPENED
@@ -118,22 +147,25 @@ PLAYER_RULE_REJECTED
 PLAYER_RULE_CARRIED_FORWARD
 ```
 
-这些事件用于后续 Replay / UI / 审计，但不改变 Engine combat semantics。
+这些事件用于后续 Replay / UI / 审计，不修改 combat semantics。
 
-## 7. 关键测试
+## 9. 单元测试覆盖
 
-覆盖：
+当前覆盖：
 
 - 开局规则在 Round 1 前生效；
 - Round 3 仍使用旧规则；
-- Round 3 后替换的新规则从 Round 4 生效；
+- Round 3 后新规则从 Round 4 生效；
 - 无提交不会导致规则自动过期；
 - 非法提交保留旧规则；
 - due rule phase 不能被跳过；
 - 非规则阶段不能任意替换规则；
-- 非法开局规则不会产生 active_rule。
+- 非法开局规则不会产生 active_rule；
+- Round 3 若已经终局，不再打开规则阶段；
+- PublicRuleHistory 跨 replacement 连续；
+- Validator config 必须与 Controller config 一致。
 
-## 8. Dynamic paired experiment
+## 10. Dynamic paired experiment
 
 固定 dynamic schedule：
 
@@ -154,17 +186,24 @@ phase0 Bow Range +1
 
 四种 Attack/Kite pairing，每组 500 paired seeds。
 
-Gate：
+结果：
+
+| Pairing | Outcome change | Mean replacements | Round4 action change | Static mean rounds | Dynamic mean rounds | TIMEOUT |
+|---|---:|---:|---:|---:|---:|---:|
+| Attack-first vs Attack-first | 49.6% | 3.888 | 58.0% | 22.364 | 11.188 | 0% |
+| Attack-first vs Kite | 31.8% | 4.652 | 0% | 15.278 | 15.226 | 0% |
+| Kite vs Attack-first | 28.8% | 4.656 | 0% | 15.586 | 15.396 | 0% |
+| Kite vs Kite | 32.4% | 4.572 | 0% | 11.242 | 14.344 | 0% |
+
+判定：
 
 ```text
-Dynamic TIMEOUT = 0
-有比赛经历 >1 replacement
-Round4 有 paired comparable matches
-第一次 replacement 后存在可观察 action change
-pytest PASS
+Dynamic replacement gate = PASS
 ```
 
-## 9. 明确未做
+注意：固定 dynamic schedule 只是机制探针，不是正式平衡方案。它在不同 pairing 中既可能缩短也可能延长战斗。
+
+## 11. 明确未做
 
 - GLM / LLM；
 - 自然语言；
@@ -174,7 +213,7 @@ pytest PASS
 - 规则自动 TTL；
 - 前端。
 
-## 10. 并行开发边界
+## 12. 并行开发边界
 
 本 PR 合并前，其他 AI / 开发者不要同时修改：
 
@@ -191,9 +230,9 @@ active_rule replacement semantics
 - 独立 PR code review；
 - 比赛材料整理。
 
-## 11. 下一步
+## 13. 下一步
 
-只有本 PR 的 pytest 和 dynamic regression 都通过后，才进入：
+只有本 PR 的最终 CI 全部通过并合并后，才进入：
 
 ```text
 Natural Language input
