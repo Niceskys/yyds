@@ -2,7 +2,7 @@
 
 > 日期：2026-09-08  
 > 分支：`feat/round24-hard-liveness`  
-> 状态：**Normative 候选实现；等待 PR CI / regression 后才能合并。**
+> 状态：**Normative 候选实现；等待最新 PR CI / regression 后才能合并。**
 
 ## 1. 这次与前面实验的区别
 
@@ -78,20 +78,37 @@ src/rules_beyond/engine.py
 src/rules_beyond/rule_engine.py
 ```
 
-历史实验可复现性：
+历史基线 / 实验可复现性：
 
 ```text
+src/rules_beyond/simulation.py
 src/rules_beyond/rule_experiment.py
 ```
 
-旧实验配置显式使用：
+旧的 12,000 局 baseline snapshot 与 PR #10/#11/#12 的实验都早于 Round-24 normative 规则，因此其配置显式使用：
 
 ```text
 late_game_hard_round = 31
 max_rounds = 30
 ```
 
-因此此前实验报告的 `CURRENT` baseline 不会因为产品默认变化而被悄悄改写。
+这样产品默认变化不会悄悄重写历史证据。
+
+### CI 中已捕获并修正的兼容性问题
+
+PR 首次 pytest 运行时，`test_12000_match_baseline_snapshot_is_reproducible` 正确失败，因为 `baseline_suite()` 仍使用新的默认 `GameConfig()`，使历史快照发生变化。
+
+处理方式不是更新旧 snapshot，而是把历史 baseline suite 显式绑定到旧配置：
+
+```text
+BASELINE_CONFIG = GameConfig(late_game_hard_round=31)
+```
+
+因此：
+
+- 旧 snapshot 继续表示 2026-09-07 的旧规则；
+- 新 Round-24 产品行为由新的 regression 单独验证；
+- 不混淆历史证据与当前产品规则。
 
 测试 / 回归：
 
@@ -128,6 +145,7 @@ vs
 
 - 再修改 `model.py` 的 liveness 配置；
 - 再修改 `engine.py` / `rule_engine.py` 的 Hard Liveness 入口；
+- 改写 `simulation.py` 的历史 baseline 配置；
 - 把 Pressure-12 或 Hybrid 另行写进正式 Engine；
 - 开始依赖 Round-24 已合并的 dynamic-rule controller。
 
@@ -145,7 +163,7 @@ vs
 ```text
 普通 pytest = PASS
 behavior diagnostics = PASS
-historical experiment compatibility = PASS
+historical baseline / experiment compatibility = PASS
 round24-regression = PASS
 ```
 
