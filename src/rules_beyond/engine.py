@@ -56,9 +56,10 @@ class GameEngine:
             raise ValueError("Cannot resolve a terminal game state")
 
         events: list[Event] = []
+        late_game_hard = state.round_no >= self.config.late_game_hard_round
         stats = self._effective_stats(
             state.no_damage_streak,
-            hard_liveness_active=state.hard_liveness_active,
+            hard_liveness_active=state.hard_liveness_active or late_game_hard,
         )
 
         normalized_actions: dict[Team, Action] = {}
