@@ -14,6 +14,17 @@ from .model import (
     initial_state,
     terminal_utility,
 )
+from .rule_dsl import (
+    RuleAST,
+    RuleCondition,
+    RuleConditionType,
+    RuleDuration,
+    RuleEffect,
+    RuleEffectType,
+    RuleTarget,
+    RuleWeapon,
+)
+from .rule_validator import RuleValidator, ValidationIssue, ValidationResult
 
 __all__ = [
     "Action",
@@ -24,8 +35,19 @@ __all__ = [
     "MatchResult",
     "Position",
     "RoundResolution",
+    "RuleAST",
+    "RuleCondition",
+    "RuleConditionType",
+    "RuleDuration",
+    "RuleEffect",
+    "RuleEffectType",
+    "RuleTarget",
+    "RuleValidator",
+    "RuleWeapon",
     "Team",
     "UnitState",
+    "ValidationIssue",
+    "ValidationResult",
     "Weapon",
     "initial_state",
     "terminal_utility",
