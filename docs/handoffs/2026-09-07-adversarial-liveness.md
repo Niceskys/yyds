@@ -2,41 +2,26 @@
 
 > 日期：2026-09-07  
 > 分支：`experiment/adversarial-liveness`  
-> 状态：候选 anti-stall 实验；**尚未修改正式/normative liveness 规则**。
+> 状态：候选 anti-stall 实验完成；**尚未修改正式/normative liveness 规则**。
 
-## 1. 为什么做这一步
+## 1. 背景
 
-上一轮 public-rule paired-seed 实验已经证明：
+上一轮 public-rule paired-seed 实验已经得到：
 
 ```text
 Core mechanic signal = PASS
-```
-
-公共规则可以明显改变动作、武器使用和终局。
-
-但同时发现：
-
-```text
 Liveness robustness = BLOCKER
 ```
 
-低命中/远程规则可以偶尔造成一点伤害，反复把 `no_damage_streak` 清零，从而长期避免触发 Hard Liveness，最终把 TIMEOUT 推到 10%~33%。
+低命中/远程规则可以偶尔造成一点伤害，反复把 `no_damage_streak` 清零，从而长期避免 Hard Liveness。由于真人玩家目标就是延长战斗，这个漏洞与玩家激励同方向。
 
-因为真人玩家目标就是延长战斗，这不是边缘问题，而是与玩家激励同方向的可利用漏洞。
-
-## 2. 本分支只比较候选方案
-
-正式 `GameEngine` / `RuleAwareGameEngine` 的 anti-stall 语义暂时不改。
-
-实验层比较：
+## 2. 本轮比较的候选
 
 ### CURRENT
 
-现有方案，无额外干预。
+现有逻辑，无额外干预。
 
 ### PRESSURE_12
-
-维护实验压力值：
 
 ```text
 无伤害回合：pressure += 1
@@ -44,113 +29,142 @@ Liveness robustness = BLOCKER
 pressure >= 12：进入 Hard Liveness
 ```
 
-与当前“任意伤害直接清零”相比，零星伤害只能减缓压力，而不能完全洗掉长期拖延记录。
-
 ### ROLLING_10_LOW_DAMAGE
 
-查看最近 10 个完整回合：
-
 ```text
-总实际伤害 <= 1
-→ 进入 Hard Liveness
+最近10个完整回合总实际伤害 <= 1
+→ Hard Liveness
 ```
-
-测试“滚动窗口低 DPS”是否比连续无伤害更能识别稀疏攻击。
 
 ### HARD_AT_ROUND_24
 
-绝对晚局兜底：
-
 ```text
 Round >= 24 且仍未终局
-→ 进入 Hard Liveness
+→ Hard Liveness
 ```
 
-优点是简单、可解释；风险是可能机械截断本来合理的长局。
+所有候选都只存在于实验控制器中，正式 `GameEngine` / `RuleAwareGameEngine` 未改。
 
-## 3. 实验方法
+## 3. 最终样本
 
-使用上一轮同一候选参数：
+CI 已扩大到：
 
 ```text
-HP=5
-Knife Damage=2
+1,000 paired seeds / cell
 ```
 
-不会修改正式默认 HP=4。
+普通 tests、behavior diagnostics、adversarial-liveness workflow 全部通过。
 
-对两类场景同时测试。
-
-### 已知 exploit 场景
-
-- Bow Range +1 / Attack-first mirror；
-- Distance>=3, Bow Hit×0.5 / Attack-first vs Kite；
-- 同规则 / Kite vs Attack-first；
-- 同规则 / Kite mirror。
-
-### healthy 对照
-
-- 无规则 / Attack-first mirror；
-- 无规则 / Attack-first vs Kite；
-- HP<=2, Bow Damage+1 / Attack-first vs Kite；
-- repeat Bow cooldown / Attack-first vs Kite。
-
-目的：不能只看谁最能压 TIMEOUT，还要看它是否过度干扰原本正常的比赛。
-
-## 4. 主要指标
-
-每个候选与 CURRENT 使用相同 seed 比较：
-
-- Timeout rate；
-- 平均回合；
-- outcome change rate vs CURRENT；
-- 候选触发率；
-- 平均触发回合；
-- Hard Liveness 实际进入率；
-- FORCED_BOW 数量。
-
-## 5. 当前代码边界
-
-新增：
+完整结果见：
 
 ```text
-src/rules_beyond/liveness_experiment.py
-tests/test_liveness_experiment.py
-.github/workflows/adversarial-liveness.yml
+docs/experiments/ADVERSARIAL_LIVENESS_2026-09-07.md
 ```
 
-实验策略通过在回合开始前对实验 state 设置 `hard_liveness_active=True` 来模拟候选方案。
+## 4. 主要结果
 
-这只是实验控制器，不代表产品 Engine 已采用该方案。
+四类已知 exploit 的 CURRENT timeout：
 
-## 6. 并行开发注意
+```text
+32.4%
+26.6%
+28.3%
+11.0%
+```
 
-在实验结果出来前，其他 AI / 开发者不要：
+### PRESSURE_12
 
-- 直接把 pressure/rolling/round24 任一方案写进 normative P0 文档；
-- 直接改 `engine.py` 的 no_damage_streak 语义；
-- 开始每3回合规则替换 controller；
-- 因为 core signal PASS 就开始 GLM Prompt 定稿。
+四类全部：
+
+```text
+TIMEOUT = 0%
+```
+
+典型在约第20~22回合识别并触发。
+
+Healthy 对照中：
+
+- 无规则 Attack-first mirror：0% 干扰；
+- 无规则 Attack-first vs Kite：4.5% trigger，2.2% outcome change；
+- Low HP Damage 规则：3.8% trigger，3.2% outcome change；
+- Bow cooldown：0% trigger，0% outcome change。
+
+### HARD_AT_ROUND_24
+
+四类 exploit 同样：
+
+```text
+TIMEOUT = 0%
+```
+
+Healthy 对照中：
+
+- 无规则 Attack-first mirror：0% 干扰；
+- 无规则 Attack-first vs Kite：5.5% trigger，2.4% outcome change；
+- Low HP Damage：2.0% trigger，1.5% outcome change；
+- Bow cooldown：0.2% trigger，0.1% outcome change。
+
+### ROLLING_10_LOW_DAMAGE
+
+Exploit TIMEOUT 仍残留约：
+
+```text
+1.7%~2.7%
+```
+
+且通常第16~17回合就介入；healthy distortion 也整体更高。
+
+因此它从主候选降级。
+
+## 5. 当前结论
+
+不能简单说 PRESSURE_12 或 ROUND_24 已经胜出。
+
+更合理的下一步是测试组合：
+
+```text
+pressure >= 12
+OR
+round >= 24
+→ Hard Liveness
+```
+
+设计意图：
+
+```text
+Pressure-12 = 自适应识别真正的长期拖延
+Round-24    = 无法绕过的绝对晚局 failsafe
+```
+
+## 6. 并行开发边界
+
+其他 AI / 开发者现在不要：
+
+- 把 PRESSURE_12 写进正式 P0；
+- 把 ROUND_24 写进正式 P0；
+- 改 `engine.py` / `rule_engine.py` 正式 anti-stall；
+- 因为 exploit 已有候选解就直接进入 GLM Prompt 定稿；
+- 再实现一套重复的 liveness benchmark。
 
 可以低冲突并行：
 
-- 对本实验设计做独立 code review；
-- 分析更多 stall exploit 思路；
-- 整理比赛/Replay/日志需求；
-- 提出候选 liveness 指标，但不要未经数据直接改正式规则。
+- 独立 review 实验设计；
+- 研究 Replay / 日志需求；
+- 整理正式产品技术栈；
+- 分析更多可能的 adversarial stall 策略。
 
 ## 7. 下一步 Gate
 
 ```text
-候选方案实验
+Hybrid: Pressure-12 OR Round-24
 ↓
-找到能显著压低 exploit TIMEOUT、且 healthy distortion 可接受的方案？
+paired regression（exploit + healthy）
+↓
+结果稳定且 healthy distortion 可接受？
 
 YES
-→ 做更大样本回归
-→ 再考虑 normative liveness 修订
+→ 才提出 normative anti-stall 修订 PR
 
 NO
-→ 不强行选一个
-→ 扩展方案/必要时做针对性深度研究
+→ 不修改正式规则，继续实验
 ```
