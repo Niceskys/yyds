@@ -24,6 +24,7 @@ from .rule_dsl import (
     RuleTarget,
     RuleWeapon,
 )
+from .rule_engine import RuleAwareGameEngine, RuleEffectiveStats, RuleRoundResolution
 from .rule_runtime import (
     PublicRuleHistory,
     RuleEvaluator,
@@ -44,13 +45,16 @@ __all__ = [
     "PublicRuleHistory",
     "RoundResolution",
     "RuleAST",
+    "RuleAwareGameEngine",
     "RuleCondition",
     "RuleConditionType",
     "RuleDuration",
     "RuleEffect",
     "RuleEffectType",
+    "RuleEffectiveStats",
     "RuleEvaluator",
     "RuleModifiers",
+    "RuleRoundResolution",
     "RuleTarget",
     "RuleValidator",
     "RuleWeapon",
