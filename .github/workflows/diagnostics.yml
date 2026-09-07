@@ -1,0 +1,21 @@
+name: behavior-diagnostics
+
+on:
+  pull_request:
+    paths:
+      - 'src/rules_beyond/**'
+      - 'tests/test_diagnostics.py'
+      - '.github/workflows/diagnostics.yml'
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install project
+        run: python -m pip install -e '.[dev]'
+      - name: Run 12,000-match behavior diagnosis
+        run: python -m rules_beyond.diagnostics --matches-per-pair 2000
