@@ -26,9 +26,18 @@ def rule(effect: RuleEffect, *conditions: RuleCondition) -> RuleAST:
     )
 
 
-def state_at(*, red_hp: int = 4, blue_hp: int = 4, red_col: int = 1, blue_col: int = 5, streak: int = 0, hard: bool = False) -> GameState:
+def state_at(
+    *,
+    red_hp: int = 4,
+    blue_hp: int = 4,
+    red_col: int = 1,
+    blue_col: int = 5,
+    streak: int = 0,
+    hard: bool = False,
+    round_no: int = 1,
+) -> GameState:
     return GameState(
-        round_no=1,
+        round_no=round_no,
         units={
             Team.RED: UnitState(Team.RED, Position(3, red_col), red_hp),
             Team.BLUE: UnitState(Team.BLUE, Position(3, blue_col), blue_hp),
@@ -180,6 +189,43 @@ def test_antistall_range_is_minimum_not_additive_double_bonus() -> None:
     )
     # Player changes 3 -> 4; Level 1 also guarantees at least 4. It does not become 5.
     assert stats.bow_range == 4
+
+
+def test_round_24_is_visible_to_rule_aware_planner_as_hard_liveness() -> None:
+    state = state_at(round_no=24, streak=0)
+    stats = RuleAwareGameEngine().effective_stats_for_team(
+        state,
+        Team.RED,
+        rule=None,
+    )
+    assert stats.hard_liveness is True
+    assert stats.conflict_level == 4
+    assert stats.bow_range == 8
+    assert stats.bow_hit_floor == 1.0
+
+
+def test_round_24_cooldown_cannot_block_system_forced_bow() -> None:
+    bow_cooldown = rule(
+        RuleEffect(
+            RuleEffectType.WEAPON_COOLDOWN,
+            weapon=RuleWeapon.BOW,
+            rounds=1,
+        )
+    )
+    state = state_at(round_no=24, streak=0)
+    resolution = RuleAwareGameEngine().resolve_rule_round(
+        state,
+        {Team.RED: Action((), Weapon.BOW), Team.BLUE: Action()},
+        rule=bow_cooldown,
+        match_seed=10,
+    )
+
+    red_event = attack_events(resolution, Team.RED)[0]
+    assert any(e.kind == "INVALID_ATTACK" and e.actor is Team.RED for e in resolution.events)
+    assert any(e.kind == "FORCED_BOW" and e.actor is Team.RED for e in resolution.events)
+    assert red_event.details["forced"] is True
+    assert red_event.details["probability"] == 1.0
+    assert resolution.state.hard_liveness_active is True
 
 
 def test_engine_rejects_directly_constructed_invalid_rule() -> None:
