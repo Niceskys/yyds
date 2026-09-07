@@ -2,109 +2,106 @@
 
 > 日期：2026-09-08  
 > 分支：`experiment/hybrid-liveness`  
-> 状态：实验中；**没有修改正式/normative anti-stall**。
+> 状态：实验完成；**Hybrid 被否决，正式/normative anti-stall 仍未修改。**
 
 ## 1. 前置结论
 
-`docs/experiments/ADVERSARIAL_LIVENESS_2026-09-07.md` 已记录 1,000 paired seeds / cell 的结果：
+上一轮 1,000 paired seeds / cell 已得到：
 
-- CURRENT 存在 11.0%~32.4% 的已知 exploit TIMEOUT；
-- PRESSURE_12 在四类 exploit 中均把 TIMEOUT 降到 0%；
-- HARD_AT_ROUND_24 同样均降到 0%；
-- ROLLING_10_LOW_DAMAGE 仍残留 1.7%~2.7% TIMEOUT，且 healthy distortion 更高，已降级。
+- CURRENT：已知 exploit TIMEOUT 11.0%~32.4%；
+- PRESSURE_12：四类 exploit TIMEOUT 均为 0%；
+- HARD_AT_ROUND_24：四类 exploit TIMEOUT 均为 0%；
+- ROLLING_10_LOW_DAMAGE：残留 1.7%~2.7% TIMEOUT，已降级。
 
-## 2. 为什么测试 Hybrid
-
-PRESSURE_12 与 ROUND_24 解决的是两个不同问题：
+## 2. 本轮测试
 
 ```text
-PRESSURE_12
-= 根据长期低输出/拖延行为自适应触发
-
-ROUND_24
-= 无论行为如何，提供绝对不可绕过的晚局 failsafe
-```
-
-本轮测试：
-
-```text
+HYBRID:
 pressure >= 12
 OR
 round >= 24
 → Hard Liveness
 ```
 
-## 3. 本分支改动
+仍使用 1,000 paired seeds / cell、相同 exploit + healthy 场景。
 
-只修改实验层：
+## 3. 结果
 
-```text
-src/rules_beyond/liveness_experiment.py
-tests/test_liveness_experiment.py
-```
+### Exploit
 
-新增：
+Hybrid 与 Pressure / Round24 一样，四类已知 exploit：
 
 ```text
-LivenessPolicy.HYBRID_PRESSURE_12_ROUND_24
+TIMEOUT = 0%
 ```
 
-并把实验主比较收敛为：
+因此它没有在最关键指标上提供额外收益。
+
+### Healthy distortion
+
+无规则 Attack-first vs Kite：
 
 ```text
-CURRENT
-PRESSURE_12
-HARD_AT_ROUND_24
-HYBRID_PRESSURE_12_ROUND_24
+Pressure-12: trigger 4.5%, outcome change 2.2%
+Round-24:    trigger 5.5%, outcome change 2.4%
+Hybrid:      trigger 6.9%, outcome change 3.3%
 ```
 
-Rolling Window 的实现保留用于历史复现，但不再进入默认主比较。
+Low-HP Damage：
 
-## 4. 保持不变
+```text
+Pressure-12: trigger 3.8%, outcome change 3.2%
+Round-24:    trigger 2.0%, outcome change 1.5%
+Hybrid:      trigger 4.1%, outcome change 3.3%
+```
 
-没有修改：
+Bow cooldown：Hybrid 与 Round24 基本一致，约 0.2% trigger / 0.1% outcome change。
 
-- `engine.py`
-- `rule_engine.py`
-- P0 normative anti-stall 文档
-- 默认 HP / Damage
-- GLM / Agent / rule replacement controller
+完整记录：
 
-## 5. 判定重点
+```text
+docs/experiments/HYBRID_LIVENESS_2026-09-08.md
+```
 
-Hybrid 不能只做到 TIMEOUT=0；因为单独 Pressure / Round24 已经能做到。
+## 4. 结论
 
-真正要看：
+```text
+Hybrid = REJECT
+```
 
-1. exploit 是否仍保持 0% TIMEOUT；
-2. 触发是否优先由 Pressure 在真实拖延局中提前识别；
-3. Round24 是否只承担尾部 failsafe；
-4. healthy outcome distortion 是否没有明显高于单独候选。
+原因：
 
-## 6. 并行边界
+- 没有比单独候选进一步降低 timeout；
+- 在部分 healthy 场景中反而叠加了干扰；
+- 增加规则复杂度却没有对应收益。
 
-其他 AI / 开发者当前不要：
+## 5. 当前推荐的下一 normative 候选
+
+优先测试/提出：
+
+```text
+保留现有 no_damage_streak anti-stall
++
+Round >= 24 → Hard Liveness
+```
+
+而不是 Pressure-12。
+
+理由：
+
+1. 四类 exploit timeout 同样降到 0%；
+2. 不需要新增长期 pressure 状态；
+3. 不重写现有 anti-stall 阶梯；
+4. 对 Low-HP healthy 场景干扰更低；
+5. 更符合玩家“尽量延长战斗”的目标——允许长局存在，只在晚局设置不可绕过的最终决战。
+
+## 6. 并行开发边界
+
+其他 AI / 开发者现在不要：
 
 - 把 Hybrid 写进正式 Engine；
-- 修改 normative P0；
-- 开始每3回合规则替换；
-- 重复实现另一套 hybrid benchmark。
+- 把 Pressure-12 写进正式 Engine；
+- 擅自修改 P0 anti-stall；
+- 开始每3回合规则替换 controller。
 
-可以并行：
-
-- 正式产品技术栈方案；
-- Replay/日志需求；
-- 独立 review；
-- 更多 adversarial 场景设计。
-
-## 7. 下一步 Gate
-
-```text
-Hybrid 1,000-seed regression PASS
-↓
-形成 normative anti-stall 修订提案
-↓
-单独 PR 修改正式规则 + Engine + 文档 + 回归测试
-```
-
-如果 Hybrid 没有明显价值，则不因为已经实现而强行采用。
+下一步应单独创建 normative PR，明确只增加 Round24 absolute fallback，并同时更新 Engine、RuleAwareEngine、规则文档和回归测试。
