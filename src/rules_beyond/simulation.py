@@ -84,6 +84,7 @@ def play_match(
             ),
         }
         resolution = engine.resolve_round(state, actions, match_seed=seed)
+        hard = hard or resolution.state.hard_liveness_active
 
         for event in resolution.events:
             if event.kind == "SAME_DESTINATION_CONFLICT":
@@ -92,15 +93,12 @@ def play_match(
                 swap += 1
             elif event.kind == "FORCED_BOW":
                 forced_bows += 1
-                hard = True
             elif event.kind == "ATTACK_RESOLVED":
                 attacks += 1
                 if event.details["weapon"] == "KNIFE":
                     knife_attacks += 1
                 elif event.details["weapon"] == "BOW":
                     bow_attacks += 1
-                if event.details.get("forced"):
-                    hard = True
             elif event.kind == "DAMAGE_APPLIED":
                 damage_events += 1
 
