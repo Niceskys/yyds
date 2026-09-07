@@ -282,6 +282,8 @@ class RuleAwareGameEngine(GameEngine):
                     )
                 weapon = None
 
+            # Cooldown and other player constraints apply to ordinary attacks.
+            # Hard Liveness only bypasses them through the system-generated FORCED_BOW.
             if team_stats.hard_liveness and weapon is None:
                 weapon = Weapon.BOW
                 forced = True
@@ -349,10 +351,7 @@ class RuleAwareGameEngine(GameEngine):
         if weapon is None or not isinstance(weapon, Weapon):
             return False
 
-        # Hard Liveness overrides player Bow cooldown.
-        if weapon in stats.cooldown_weapons and not (
-            stats.hard_liveness and weapon is Weapon.BOW
-        ):
+        if weapon in stats.cooldown_weapons:
             return False
 
         distance = units[team].position.manhattan_distance(units[team.opponent].position)
