@@ -21,6 +21,7 @@ class LivenessPolicy(str, Enum):
     PRESSURE_12 = "pressure_12"
     ROLLING_10_LOW_DAMAGE = "rolling_10_low_damage"
     HARD_AT_ROUND_24 = "hard_at_round_24"
+    HYBRID_PRESSURE_12_ROUND_24 = "hybrid_pressure_12_round_24"
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,8 +68,8 @@ class LivenessSummary:
 POLICIES: tuple[LivenessPolicy, ...] = (
     LivenessPolicy.CURRENT,
     LivenessPolicy.PRESSURE_12,
-    LivenessPolicy.ROLLING_10_LOW_DAMAGE,
     LivenessPolicy.HARD_AT_ROUND_24,
+    LivenessPolicy.HYBRID_PRESSURE_12_ROUND_24,
 )
 
 
@@ -102,6 +103,8 @@ def _should_force_hard(
         return len(damage_window) == 10 and sum(damage_window) <= 1
     if policy is LivenessPolicy.HARD_AT_ROUND_24:
         return round_no >= 24
+    if policy is LivenessPolicy.HYBRID_PRESSURE_12_ROUND_24:
+        return pressure >= 12 or round_no >= 24
     raise ValueError(f"Unsupported liveness policy: {policy}")
 
 
@@ -256,7 +259,7 @@ def summarize_policy(
     )
 
 
-def experiment_suite(matches_per_cell: int = 500) -> list[LivenessSummary]:
+def experiment_suite(matches_per_cell: int = 1000) -> list[LivenessSummary]:
     if matches_per_cell <= 0:
         raise ValueError("matches_per_cell must be positive")
 
@@ -280,7 +283,7 @@ def experiment_suite(matches_per_cell: int = 500) -> list[LivenessSummary]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Compare adversarial anti-stall candidates")
-    parser.add_argument("--matches-per-cell", type=int, default=500)
+    parser.add_argument("--matches-per-cell", type=int, default=1000)
     args = parser.parse_args()
     print(json.dumps([asdict(row) for row in experiment_suite(args.matches_per_cell)], indent=2, ensure_ascii=False))
 
