@@ -72,6 +72,7 @@ class GameConfig:
     cols: int = 5
     initial_hp: int = 4
     max_rounds: int = 30
+    late_game_hard_round: int = 24
     base_move_range: int = 1
     base_knife_range: int = 1
     base_bow_range: int = 3
