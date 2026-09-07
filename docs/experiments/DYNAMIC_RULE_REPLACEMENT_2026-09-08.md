@@ -1,6 +1,6 @@
 # Dynamic Public-Rule Replacement Experiment — 2026-09-08
 
-> 状态：实验设计已实现，等待 PR CI 结果。
+> 状态：**PASS — 4×500 paired seeds 已完成；等待最终 PR CI 后合并。**
 
 ## 1. 目标
 
@@ -54,8 +54,6 @@ Controller 只负责：
 
 ## 3. Off-by-one 约束
 
-这是本轮最重要的实现不变量之一：
-
 ```text
 Round 3 本身仍使用旧规则；
 Round 3 结算完成且比赛未终局后，才进入下一规则阶段；
@@ -64,28 +62,47 @@ Round 3 结算完成且比赛未终局后，才进入下一规则阶段；
 
 同理：Round 6 使用当前旧规则，新规则从 Round 7 开始。
 
-## 4. 强制阶段处理
-
-如果 Round 3/6/9... 结束后比赛仍未终局，Controller 会标记：
+如果 Round 3/6/9... 结束后比赛仍未终局，Controller 标记：
 
 ```text
 rule_phase_due = true
 ```
 
-在该阶段被处理前，禁止直接结算下一回合。
+该阶段未处理前禁止直接结算下一回合。
 
-目的是避免上层 UI / Agent orchestration 因集成 Bug 跳过玩家规则阶段。
+## 4. PublicRuleHistory 连续性
+
+`docs/PUBLIC_RULE_HISTORY_V0.1.md` 已把历史定义为每方持续保存的、由 Engine 已结算公开事实构成的战斗历史。
+
+因此规则替换只改变：
+
+```text
+active_rule
+```
+
+不会重置：
+
+```text
+moved_last_round
+last_attack_weapon
+consecutive_bow_miss
+consecutive_same_weapon_use
+```
+
+这意味着新发布的 history-based 规则可以读取发布前已经公开发生的战斗事实。
+
+例如前三回合连续使用 Bow 后，在 Round 3 后发布：
+
+```text
+CONSECUTIVE_SAME_WEAPON_USE_GTE(2)
+→ Bow cooldown 1 round
+```
+
+Round 4 可以立即满足条件。
 
 ## 5. 确定性实验
 
-新增：
-
-```text
-src/rules_beyond/dynamic_rule_experiment.py
-.github/workflows/dynamic-rule-replacement.yml
-```
-
-使用固定规则序列：
+Dynamic schedule：
 
 ```text
 phase 0: Bow Range +1
@@ -95,27 +112,12 @@ phase 3: Low HP, Bow Damage +1
 phase 4: Repeat Bow cooldown
 ```
 
-与同 seed 下的 static baseline 比较：
+Static paired baseline：
 
 ```text
 phase 0: Bow Range +1
-后续阶段：不提交新规则，因此一直沿用 phase 0
+后续阶段不提交新规则，持续沿用 phase 0
 ```
-
-这样可以把差异归因于“替换机制”，而不是有没有规则。
-
-## 6. 场景
-
-Bot pairings：
-
-```text
-Attack-first vs Attack-first
-Attack-first vs Kite
-Kite vs Attack-first
-Kite vs Kite
-```
-
-每组 500 paired seeds。
 
 实验配置：
 
@@ -125,21 +127,88 @@ Knife Damage = 2
 Round-24 Hard Liveness = 产品当前默认
 ```
 
-HP=5 仅用于让更多比赛进入多个规则阶段，不修改产品默认 HP=4。
+HP=5 只用于让更多比赛进入多个规则阶段，不修改产品默认 HP=4。
 
-## 7. Gate
+## 6. 4×500 paired-seed 结果
 
-动态实验至少必须满足：
+| Pairing | Outcome change | Mean dynamic replacements | Round-4 action change | Static mean rounds | Dynamic mean rounds | Dynamic TIMEOUT |
+|---|---:|---:|---:|---:|---:|---:|
+| Attack-first vs Attack-first | 49.6% | 3.888 | 58.0% | 22.364 | 11.188 | 0% |
+| Attack-first vs Kite | 31.8% | 4.652 | 0% | 15.278 | 15.226 | 0% |
+| Kite vs Attack-first | 28.8% | 4.656 | 0% | 15.586 | 15.396 | 0% |
+| Kite vs Kite | 32.4% | 4.572 | 0% | 11.242 | 14.344 | 0% |
 
-1. dynamic schedule 不重新引入 TIMEOUT；
-2. 至少部分比赛实际经历超过一次规则替换；
-3. static / dynamic paired runs 中至少有比赛同时进入 Round 4；
-4. 第一次替换后，至少一个 pairing 的 Round-4 动作出现可观察变化；
-5. 普通 pytest 全部通过。
+每个 pairing 都有 500/500 static + dynamic 对局同时进入 Round 4。
 
-这里暂不设置“结果变化率越高越好”的硬阈值，因为本轮目标是验证 replacement plumbing 与策略可见性，不是做最终平衡结论。
+## 7. 解释
 
-## 8. 本轮不做
+### 7.1 Replacement plumbing 有明确策略信号
+
+四个 pairing 的 outcome change 均达到约 28.8%~49.6%，说明动态规则序列不是只在日志层“替换成功”，而是能够传播到 Bot 决策和终局。
+
+### 7.2 Round-4 立即动作变化不是所有 pairing 都发生
+
+第一次 replacement 为：
+
+```text
+Bow Range +1
+→
+Move Range +1
+```
+
+Attack-first mirror 在 Round 4 有 58% paired action change；其余三个 pairing 在 Round 4 本身没有变化。
+
+这不构成失败：它说明“某条新规则是否立刻改变当前动作”取决于局面与 Bot 策略。后续多次替换仍使这三类 pairing 的最终 outcome change 达到 28.8%~32.4%。
+
+因此后续 UI/分析不能把“规则已替换”错误等同于“下一回合动作必然改变”。
+
+### 7.3 Liveness 未回退
+
+四个 dynamic pairing：
+
+```text
+TIMEOUT = 0%
+```
+
+说明当前这组动态规则在 Round-24 正式 liveness 下没有重新打开此前的 timeout blocker。
+
+### 7.4 当前固定序列不是平衡方案
+
+例如 Attack-first mirror：
+
+```text
+22.364 rounds
+→ 11.188 rounds
+```
+
+而 Kite mirror：
+
+```text
+11.242 rounds
+→ 14.344 rounds
+```
+
+这证明规则序列能显著改变比赛长度，但不能据此把该固定序列当作玩家最优规则或正式关卡设计。
+
+本轮只验证动态 replacement mechanism，不优化玩家得分。
+
+## 8. Gate 判定
+
+要求：
+
+1. dynamic TIMEOUT = 0；
+2. 至少部分比赛经历 >1 replacement；
+3. paired runs 有 Round-4 comparable；
+4. 至少一个 pairing 在第一次 replacement 后出现 Round-4 action change；
+5. pytest PASS。
+
+当前结果：
+
+```text
+Dynamic replacement gate = PASS
+```
+
+## 9. 本轮不做
 
 - 不调用 GLM；
 - 不实现 20 秒倒计时；
@@ -149,14 +218,16 @@ HP=5 仅用于让更多比赛进入多个规则阶段，不修改产品默认 HP
 - 不改变 Round-24；
 - 不开始前端。
 
-## 9. 下一 Gate
+## 10. 下一 Gate
 
 ```text
 Dynamic controller + regression PASS
 ↓
-检查替换时序、策略变化和 liveness
-↓
-通过后再进入 Natural Language -> Candidate RuleAST 接口层
+Natural Language input
+→ LLM adapter
+→ untrusted Candidate RuleAST
+→ RuleValidator
+→ DynamicRuleController
 ```
 
-如果动态替换本身没有稳定通过，就不接 LLM。
+下一阶段仍必须保持：LLM 不能直接修改 active_rule、GameState 或 Engine 参数。
