@@ -73,11 +73,12 @@ class RuleAwareGameEngine(GameEngine):
             self._require_valid_rule(rule)
 
         modifiers = self.evaluator.evaluate(rule, state, histories)
+        late_game_hard = state.round_no >= self.config.late_game_hard_round
         stats = {
             team: self._effective_rule_stats(
                 state.no_damage_streak,
                 modifiers[team],
-                hard_liveness_active=state.hard_liveness_active,
+                hard_liveness_active=state.hard_liveness_active or late_game_hard,
             )
             for team in (Team.RED, Team.BLUE)
         }
@@ -198,10 +199,11 @@ class RuleAwareGameEngine(GameEngine):
         if rule is not None:
             self._require_valid_rule(rule)
         modifiers = self.evaluator.evaluate(rule, state, histories)
+        late_game_hard = state.round_no >= self.config.late_game_hard_round
         return self._effective_rule_stats(
             state.no_damage_streak,
             modifiers[team],
-            hard_liveness_active=state.hard_liveness_active,
+            hard_liveness_active=state.hard_liveness_active or late_game_hard,
         )
 
     def _effective_rule_stats(

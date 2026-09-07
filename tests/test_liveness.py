@@ -1,5 +1,6 @@
 from rules_beyond import (
     Action,
+    GameConfig,
     GameEngine,
     GameState,
     MatchResult,
@@ -166,8 +167,54 @@ def test_hard_liveness_can_force_terminal_event_from_one_hp() -> None:
     assert resolution.state.unit(Team.BLUE).hp == 0
 
 
-def test_timeout_is_terminal_when_max_round_is_reached_without_death() -> None:
+def test_round_23_does_not_trigger_absolute_late_game_fallback() -> None:
     engine = GameEngine()
+    state = GameState(
+        round_no=23,
+        units={
+            Team.RED: UnitState(Team.RED, Position(1, 1), 4),
+            Team.BLUE: UnitState(Team.BLUE, Position(5, 5), 4),
+        },
+        no_damage_streak=0,
+    )
+
+    resolution = engine.resolve_round(
+        state,
+        {Team.RED: Action(), Team.BLUE: Action()},
+        match_seed=8,
+    )
+
+    assert not any(event.kind == "FORCED_BOW" for event in resolution.events)
+    assert resolution.state.hard_liveness_active is False
+    assert resolution.state.round_no == 24
+
+
+def test_round_24_triggers_and_latches_absolute_hard_liveness() -> None:
+    engine = GameEngine()
+    state = GameState(
+        round_no=24,
+        units={
+            Team.RED: UnitState(Team.RED, Position(1, 1), 4),
+            Team.BLUE: UnitState(Team.BLUE, Position(5, 5), 4),
+        },
+        no_damage_streak=0,
+    )
+
+    resolution = engine.resolve_round(
+        state,
+        {Team.RED: Action(), Team.BLUE: Action()},
+        match_seed=9,
+    )
+
+    forced = [event for event in resolution.events if event.kind == "FORCED_BOW"]
+    assert {event.actor for event in forced} == {Team.RED, Team.BLUE}
+    assert resolution.state.unit(Team.RED).hp == 3
+    assert resolution.state.unit(Team.BLUE).hp == 3
+    assert resolution.state.hard_liveness_active is True
+
+
+def test_timeout_is_terminal_when_max_round_is_reached_without_death() -> None:
+    engine = GameEngine(GameConfig(late_game_hard_round=31))
     state = GameState(
         round_no=30,
         units={

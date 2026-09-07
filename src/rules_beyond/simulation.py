@@ -9,7 +9,13 @@ from typing import Iterable
 
 from .bots import AggressiveBot, Bot, KiteBot, PassiveBot, RandomBot
 from .engine import GameEngine
-from .model import MatchResult, Team, initial_state
+from .model import GameConfig, MatchResult, Team, initial_state
+
+
+# Historical 2026-09-07 baseline predates the normative Round-24 fallback.
+# Keep it explicit so the committed snapshot remains reproducible after product
+# defaults evolve.
+BASELINE_CONFIG = GameConfig(late_game_hard_round=31)
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,11 +184,12 @@ def baseline_suite(matches_per_pair: int) -> list[BatchSummary]:
         (RandomBot(), RandomBot()),
     ]
 
+    historical_engine = GameEngine(BASELINE_CONFIG)
     summaries: list[BatchSummary] = []
     for pair_index, (red_bot, blue_bot) in enumerate(pairings):
         start = pair_index * matches_per_pair
         seeds = range(start, start + matches_per_pair)
-        summaries.append(run_batch(red_bot, blue_bot, seeds))
+        summaries.append(run_batch(red_bot, blue_bot, seeds, engine=historical_engine))
     return summaries
 
 

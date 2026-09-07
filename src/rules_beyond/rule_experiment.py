@@ -55,7 +55,9 @@ class PairedRuleSummary:
     ruled_timeout_rate: float
 
 
-EXPERIMENT_CONFIG = GameConfig(initial_hp=5, knife_damage=2)
+# Historical experiment configuration deliberately disables the new product
+# Round-24 fallback so previous paired-seed reports remain reproducible.
+EXPERIMENT_CONFIG = GameConfig(initial_hp=5, knife_damage=2, late_game_hard_round=31)
 
 
 RULE_CANDIDATES: Mapping[str, dict[str, object]] = {
