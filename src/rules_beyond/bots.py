@@ -30,6 +30,14 @@ _MOVE_ORDER: tuple[Direction | None, ...] = (
 )
 
 
+def _stats_for_state(state: GameState, engine: GameEngine):
+    """Simulation-only access to the exact effective stats used by Engine."""
+    return engine._effective_stats(
+        state.no_damage_streak,
+        hard_liveness_active=state.hard_liveness_active,
+    )
+
+
 def _candidate_moves(
     state: GameState,
     team: Team,
@@ -72,7 +80,7 @@ class AggressiveBot:
     ) -> Action:
         del match_seed
         opponent = state.unit(team.opponent).position
-        stats = engine._effective_stats(state.no_damage_streak)  # simulation-only bot
+        stats = _stats_for_state(state, engine)
         candidates = _candidate_moves(state, team, engine)
 
         path, destination = min(
@@ -107,7 +115,7 @@ class KiteBot:
     ) -> Action:
         del match_seed
         opponent = state.unit(team.opponent).position
-        stats = engine._effective_stats(state.no_damage_streak)  # simulation-only bot
+        stats = _stats_for_state(state, engine)
         candidates = _candidate_moves(state, team, engine)
 
         def score(item: tuple[tuple[Direction, ...], Position]) -> tuple[float, int, int, tuple[str, ...]]:
@@ -129,7 +137,6 @@ class KiteBot:
             bow_range=stats.bow_range,
         )
         if weapon is Weapon.KNIFE and distance < self.preferred_distance:
-            # KiteBot only uses knife if it cannot maintain a ranged posture.
             farther = [
                 item
                 for item in candidates
@@ -177,7 +184,7 @@ class RandomBot:
         *,
         match_seed: int,
     ) -> Action:
-        stats = engine._effective_stats(state.no_damage_streak)  # simulation-only bot
+        stats = _stats_for_state(state, engine)
         opponent = state.unit(team.opponent).position
         rng = random.Random(f"{match_seed}:{state.round_no}:{team.value}:{self.name}")
         candidates = _candidate_moves(state, team, engine)
