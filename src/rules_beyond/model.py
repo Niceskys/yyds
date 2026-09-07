@@ -91,6 +91,7 @@ class GameState:
     round_no: int
     units: Mapping[Team, UnitState]
     no_damage_streak: int = 0
+    hard_liveness_active: bool = False
     result: MatchResult | None = None
 
     def unit(self, team: Team) -> UnitState:
@@ -117,6 +118,7 @@ def initial_state(config: GameConfig | None = None) -> GameState:
             Team.BLUE: UnitState(Team.BLUE, Position(3, config.cols), config.initial_hp),
         },
         no_damage_streak=0,
+        hard_liveness_active=False,
         result=None,
     )
 
