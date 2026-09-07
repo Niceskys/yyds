@@ -1,5 +1,14 @@
 """Rules Beyond deterministic engine package."""
 
+from .dynamic_rule_controller import (
+    RULE_PHASE_INTERVAL,
+    DynamicMatchState,
+    DynamicRoundResult,
+    DynamicRuleController,
+    DynamicRulePhaseResult,
+    DynamicStartResult,
+    RulePhaseOutcome,
+)
 from .engine import GameEngine, RoundResolution
 from .model import (
     Action,
@@ -37,12 +46,18 @@ from .rule_validator import RuleValidator, ValidationIssue, ValidationResult
 __all__ = [
     "Action",
     "Direction",
+    "DynamicMatchState",
+    "DynamicRoundResult",
+    "DynamicRuleController",
+    "DynamicRulePhaseResult",
+    "DynamicStartResult",
     "GameConfig",
     "GameEngine",
     "GameState",
     "MatchResult",
     "Position",
     "PublicRuleHistory",
+    "RULE_PHASE_INTERVAL",
     "RoundResolution",
     "RuleAST",
     "RuleAwareGameEngine",
@@ -54,6 +69,7 @@ __all__ = [
     "RuleEffectiveStats",
     "RuleEvaluator",
     "RuleModifiers",
+    "RulePhaseOutcome",
     "RuleRoundResolution",
     "RuleTarget",
     "RuleValidator",
