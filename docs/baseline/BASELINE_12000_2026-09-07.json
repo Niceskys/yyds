@@ -1,0 +1,131 @@
+[
+  {
+    "red_bot": "aggressive",
+    "blue_bot": "aggressive",
+    "matches": 2000,
+    "results": {
+      "DRAW_MUTUAL_DEATH": 2000
+    },
+    "mean_rounds": 8.749,
+    "median_rounds": 9.0,
+    "max_rounds_observed": 9,
+    "hard_liveness_matches": 0,
+    "hard_liveness_rate": 0.0,
+    "mean_max_no_damage_streak": 3,
+    "total_same_destination_conflicts": 15498,
+    "total_swap_conflicts": 0,
+    "total_attacks": 12000,
+    "total_knife_attacks": 8000,
+    "total_bow_attacks": 4000,
+    "total_forced_bows": 0
+  },
+  {
+    "red_bot": "aggressive",
+    "blue_bot": "kite",
+    "matches": 2000,
+    "results": {
+      "BLUE_WIN": 1806,
+      "DRAW_MUTUAL_DEATH": 33,
+      "RED_WIN": 161
+    },
+    "mean_rounds": 7.779,
+    "median_rounds": 8.0,
+    "max_rounds_observed": 16,
+    "hard_liveness_matches": 0,
+    "hard_liveness_rate": 0.0,
+    "mean_max_no_damage_streak": 2.011,
+    "total_same_destination_conflicts": 0,
+    "total_swap_conflicts": 0,
+    "total_attacks": 18570,
+    "total_knife_attacks": 1012,
+    "total_bow_attacks": 17558,
+    "total_forced_bows": 0
+  },
+  {
+    "red_bot": "kite",
+    "blue_bot": "aggressive",
+    "matches": 2000,
+    "results": {
+      "BLUE_WIN": 139,
+      "DRAW_MUTUAL_DEATH": 42,
+      "RED_WIN": 1819
+    },
+    "mean_rounds": 7.7225,
+    "median_rounds": 7.5,
+    "max_rounds_observed": 15,
+    "hard_liveness_matches": 0,
+    "hard_liveness_rate": 0.0,
+    "mean_max_no_damage_streak": 1.954,
+    "total_same_destination_conflicts": 0,
+    "total_swap_conflicts": 0,
+    "total_attacks": 18390,
+    "total_knife_attacks": 945,
+    "total_bow_attacks": 17445,
+    "total_forced_bows": 0
+  },
+  {
+    "red_bot": "kite",
+    "blue_bot": "kite",
+    "matches": 2000,
+    "results": {
+      "BLUE_WIN": 876,
+      "DRAW_MUTUAL_DEATH": 204,
+      "RED_WIN": 920
+    },
+    "mean_rounds": 9.864,
+    "median_rounds": 9.0,
+    "max_rounds_observed": 27,
+    "hard_liveness_matches": 0,
+    "hard_liveness_rate": 0.0,
+    "mean_max_no_damage_streak": 2.556,
+    "total_same_destination_conflicts": 0,
+    "total_swap_conflicts": 0,
+    "total_attacks": 26822,
+    "total_knife_attacks": 0,
+    "total_bow_attacks": 26822,
+    "total_forced_bows": 0
+  },
+  {
+    "red_bot": "passive",
+    "blue_bot": "passive",
+    "matches": 2000,
+    "results": {
+      "DRAW_MUTUAL_DEATH": 2000
+    },
+    "mean_rounds": 16,
+    "median_rounds": 16.0,
+    "max_rounds_observed": 16,
+    "hard_liveness_matches": 2000,
+    "hard_liveness_rate": 1.0,
+    "mean_max_no_damage_streak": 12,
+    "total_same_destination_conflicts": 0,
+    "total_swap_conflicts": 0,
+    "total_attacks": 16000,
+    "total_knife_attacks": 0,
+    "total_bow_attacks": 16000,
+    "total_forced_bows": 16000
+  },
+  {
+    "red_bot": "random",
+    "blue_bot": "random",
+    "matches": 2000,
+    "results": {
+      "BLUE_WIN": 775,
+      "DRAW_MUTUAL_DEATH": 244,
+      "RED_WIN": 727,
+      "TIMEOUT": 254
+    },
+    "mean_rounds": 19.026,
+    "median_rounds": 18.0,
+    "max_rounds_observed": 30,
+    "hard_liveness_matches": 201,
+    "hard_liveness_rate": 0.1005,
+    "mean_max_no_damage_streak": 7.6495,
+    "total_same_destination_conflicts": 597,
+    "total_swap_conflicts": 92,
+    "total_attacks": 21688,
+    "total_knife_attacks": 1586,
+    "total_bow_attacks": 20102,
+    "total_forced_bows": 609
+  }
+]

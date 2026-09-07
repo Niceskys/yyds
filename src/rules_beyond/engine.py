@@ -56,7 +56,10 @@ class GameEngine:
             raise ValueError("Cannot resolve a terminal game state")
 
         events: list[Event] = []
-        stats = self._effective_stats(state.no_damage_streak)
+        stats = self._effective_stats(
+            state.no_damage_streak,
+            hard_liveness_active=state.hard_liveness_active,
+        )
 
         normalized_actions: dict[Team, Action] = {}
         for team in (Team.RED, Team.BLUE):
@@ -127,6 +130,7 @@ class GameEngine:
 
         result = self._terminal_result(final_units)
         next_streak = 0 if total_applied_damage > 0 else state.no_damage_streak + 1
+        next_hard_liveness = state.hard_liveness_active or stats.hard_liveness
 
         if result is None and state.round_no >= self.config.max_rounds:
             result = MatchResult.TIMEOUT
@@ -139,17 +143,25 @@ class GameEngine:
             round_no=state.round_no if result is not None else state.round_no + 1,
             units=final_units,
             no_damage_streak=next_streak,
+            hard_liveness_active=next_hard_liveness,
             result=result,
         )
         return RoundResolution(next_state, tuple(events))
 
-    def _effective_stats(self, no_damage_streak: int) -> EffectiveStats:
+    def _effective_stats(
+        self,
+        no_damage_streak: int,
+        *,
+        hard_liveness_active: bool = False,
+    ) -> EffectiveStats:
         level = self.conflict_level(no_damage_streak)
+        hard = hard_liveness_active or level == 4
+        if hard:
+            level = 4
 
         knife_range = self.config.base_knife_range
         bow_range = self.config.base_bow_range
         bow_hit_floor = 0.0
-        hard = level == 4
 
         if level >= 1:
             knife_range += 1
