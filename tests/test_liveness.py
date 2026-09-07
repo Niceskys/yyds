@@ -102,6 +102,31 @@ def test_hard_liveness_forces_bow_when_attack_is_missing() -> None:
     assert resolution.state.unit(Team.RED).hp == 3
     assert resolution.state.unit(Team.BLUE).hp == 3
     assert resolution.state.no_damage_streak == 0
+    assert resolution.state.hard_liveness_active is True
+
+
+def test_hard_liveness_stays_active_after_damage_resets_streak() -> None:
+    engine = GameEngine()
+    first = engine.resolve_round(
+        state_with_streak(12),
+        {Team.RED: Action(), Team.BLUE: Action()},
+        match_seed=1,
+    )
+
+    assert first.state.no_damage_streak == 0
+    assert first.state.hard_liveness_active is True
+
+    second = engine.resolve_round(
+        first.state,
+        {Team.RED: Action(), Team.BLUE: Action()},
+        match_seed=1,
+    )
+
+    forced = [event for event in second.events if event.kind == "FORCED_BOW"]
+    assert {event.actor for event in forced} == {Team.RED, Team.BLUE}
+    assert second.state.hard_liveness_active is True
+    assert second.state.unit(Team.RED).hp == 2
+    assert second.state.unit(Team.BLUE).hp == 2
 
 
 def test_hard_liveness_forced_bow_hits_across_maximum_distance() -> None:
