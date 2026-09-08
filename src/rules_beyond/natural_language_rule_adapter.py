@@ -12,22 +12,34 @@ from .rule_validator import RuleValidator, ValidationIssue
 MAX_MODEL_OUTPUT_CHARS = 16_384
 
 
-SYSTEM_PROMPT_V0_1 = """You translate one player's natural-language public rule into exactly one Rules Beyond V0.1 candidate JSON object.
+SYSTEM_PROMPT_V0_1 = """You translate one player's natural-language public rule for Rules Beyond V0.1.
 
 Security / authority boundary:
 - You do not execute game actions.
 - You do not change GameState, HP, winner, max rounds, anti-stall, system rules, or AI objectives.
-- Your output is only an untrusted candidate. A deterministic RuleValidator makes the final decision.
+- Your output is untrusted. A deterministic RuleValidator makes the final decision.
+- Never silently rewrite a disallowed or unsupported player intent into a different legal rule.
 
 Return ONLY one JSON object. No Markdown fences, prose, comments, or extra text.
 
-Required root shape:
+Choose exactly one envelope:
+
+1) If the player's intent can be represented faithfully and safely by the V0.1 DSL:
 {
-  \"version\": \"v0.1\",
-  \"target\": \"ALL_UNITS\",
-  \"conditions\": [],
-  \"effect\": {},
-  \"duration\": \"UNTIL_REPLACED\"
+  \"decision\": \"CANDIDATE\",
+  \"candidate\": {
+    \"version\": \"v0.1\",
+    \"target\": \"ALL_UNITS\",
+    \"conditions\": [],
+    \"effect\": {},
+    \"duration\": \"UNTIL_REPLACED\"
+  }
+}
+
+2) If the intent is disallowed, unsupported, ambiguous, or cannot be mapped without changing its meaning:
+{
+  \"decision\": \"NO_CANDIDATE\",
+  \"reason_code\": \"DISALLOWED_INTENT|UNSUPPORTED_CAPABILITY|AMBIGUOUS|CANNOT_MAP_SAFELY\"
 }
 
 Allowed conditions, maximum two, combined with AND:
@@ -53,11 +65,13 @@ BOW_HIT_MULTIPLIER(multiplier)
 WEAPON_COOLDOWN(weapon=KNIFE|BOW, rounds=1)
 
 Never target RED, BLUE, a unit id, a coordinate, or a winner. Never invent fields or capabilities not listed above.
+If a player explicitly asks for any such disallowed capability, use NO_CANDIDATE with DISALLOWED_INTENT rather than converting it into a symmetric rule.
 """
 
 
 class TranslationStatus(str, Enum):
     ACCEPTED = "ACCEPTED"
+    NO_CANDIDATE = "NO_CANDIDATE"
     INPUT_REJECTED = "INPUT_REJECTED"
     MODEL_ERROR = "MODEL_ERROR"
     MODEL_PROTOCOL_ERROR = "MODEL_PROTOCOL_ERROR"
@@ -67,12 +81,19 @@ class TranslationStatus(str, Enum):
     RULE_REJECTED = "RULE_REJECTED"
 
 
+class NoCandidateReason(str, Enum):
+    DISALLOWED_INTENT = "DISALLOWED_INTENT"
+    UNSUPPORTED_CAPABILITY = "UNSUPPORTED_CAPABILITY"
+    AMBIGUOUS = "AMBIGUOUS"
+    CANNOT_MAP_SAFELY = "CANNOT_MAP_SAFELY"
+
+
 class RuleCandidateModel(Protocol):
     """Provider-neutral boundary for one model call.
 
     Implementations may call GLM or another LLM later. The core package only
-    accepts the returned text and never gives the model direct access to Engine
-    or GameState mutation APIs.
+    accepts returned text and never gives the model direct access to Engine or
+    GameState mutation APIs.
     """
 
     def generate_candidate(self, *, system_prompt: str, player_text: str) -> str: ...
@@ -86,6 +107,7 @@ class NaturalLanguageTranslation:
     candidate: Mapping[str, Any] | None
     rule: RuleAST | None
     validation_issues: tuple[ValidationIssue, ...] = ()
+    no_candidate_reason: NoCandidateReason | None = None
     error_message: str | None = None
 
     @property
@@ -94,11 +116,10 @@ class NaturalLanguageTranslation:
 
 
 class NaturalLanguageRuleAdapter:
-    """Strict Natural Language -> untrusted candidate -> RuleValidator adapter.
+    """Strict Natural Language -> untrusted envelope -> RuleValidator adapter.
 
-    Important: prompt compliance is never treated as a security boundary. The
-    model output must be an exact JSON object and is always re-validated by the
-    deterministic V0.1 RuleValidator.
+    Prompt compliance is never treated as a security boundary. A candidate is
+    accepted only after deterministic V0.1 RuleValidator validation.
     """
 
     def __init__(
@@ -174,21 +195,55 @@ class NaturalLanguageRuleAdapter:
 
         if not isinstance(decoded, dict):
             return NaturalLanguageTranslation(
+                status=TranslationStatus.MODEL_PROTOCOL_ERROR,
+                player_text=player_text,
+                raw_model_output=raw,
+                candidate=None,
+                rule=None,
+                error_message="decoded model output must be one envelope object",
+            )
+
+        decision = decoded.get("decision")
+        if decision == "NO_CANDIDATE":
+            if set(decoded) != {"decision", "reason_code"}:
+                return self._protocol_error(player_text, raw, "NO_CANDIDATE envelope has invalid fields")
+            try:
+                reason = NoCandidateReason(decoded.get("reason_code"))
+            except (TypeError, ValueError):
+                return self._protocol_error(player_text, raw, "NO_CANDIDATE reason_code is invalid")
+            return NaturalLanguageTranslation(
+                status=TranslationStatus.NO_CANDIDATE,
+                player_text=player_text,
+                raw_model_output=raw,
+                candidate=None,
+                rule=None,
+                no_candidate_reason=reason,
+            )
+
+        if decision != "CANDIDATE":
+            return self._protocol_error(player_text, raw, "decision must be CANDIDATE or NO_CANDIDATE")
+
+        if set(decoded) != {"decision", "candidate"}:
+            return self._protocol_error(player_text, raw, "CANDIDATE envelope has invalid fields")
+
+        candidate = decoded.get("candidate")
+        if not isinstance(candidate, dict):
+            return NaturalLanguageTranslation(
                 status=TranslationStatus.CANDIDATE_NOT_OBJECT,
                 player_text=player_text,
                 raw_model_output=raw,
                 candidate=None,
                 rule=None,
-                error_message="decoded model output must be a JSON object",
+                error_message="candidate must be a JSON object",
             )
 
-        validation = self.validator.validate(decoded)
+        validation = self.validator.validate(candidate)
         if not validation.accepted or validation.rule is None:
             return NaturalLanguageTranslation(
                 status=TranslationStatus.RULE_REJECTED,
                 player_text=player_text,
                 raw_model_output=raw,
-                candidate=decoded,
+                candidate=candidate,
                 rule=None,
                 validation_issues=validation.issues,
                 error_message="candidate was rejected by RuleValidator",
@@ -198,8 +253,23 @@ class NaturalLanguageRuleAdapter:
             status=TranslationStatus.ACCEPTED,
             player_text=player_text,
             raw_model_output=raw,
-            candidate=decoded,
+            candidate=candidate,
             rule=validation.rule,
             validation_issues=(),
             error_message=None,
+        )
+
+    @staticmethod
+    def _protocol_error(
+        player_text: str,
+        raw: str,
+        message: str,
+    ) -> NaturalLanguageTranslation:
+        return NaturalLanguageTranslation(
+            status=TranslationStatus.MODEL_PROTOCOL_ERROR,
+            player_text=player_text,
+            raw_model_output=raw,
+            candidate=None,
+            rule=None,
+            error_message=message,
         )
