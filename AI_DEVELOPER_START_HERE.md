@@ -1,8 +1,8 @@
 # AI Developer Start Here
 
 > **所有 AI / 新开发者开始非 trivial 工作前必须先读本文件。**
->
-> 目的：让新的 ChatGPT / Codex / MiMo / DeepSeek / 其他 AI 或人类开发者快速进入当前正确上下文，避免重复实现、覆盖核心语义、接口漂移、把实验结论当成产品事实，或绕过已经验证过的安全边界。
+
+目的：进入当前正确上下文，避免继续实现已经被 V0.2 玩法取代的旧 cadence，或破坏已经验证过的安全边界。
 
 ---
 
@@ -16,82 +16,245 @@
 正式 MVP 产品开发（GO WITH CONDITIONS）
 ```
 
-第二轮独立审计后的当前行动基线：
+当前最重要的规范顺序：
 
 ```text
-docs/SECOND_AUDIT_ACTION_PLAN_2026-09-08.md
+1. docs/GAMEPLAY_FLOW_V0.2.md
+2. docs/MVP_API_CONTRACT_V0.2.md
+3. docs/MVP_FIRST_TASKS.md
+4. docs/SECOND_AUDIT_ACTION_PLAN_2026-09-08.md
+5. docs/AI_COLLABORATION_PROTOCOL.md
+6. 与当前任务直接相关的最新 handoff
 ```
 
-当前 Sprint 0 公共契约：
-
-```text
-docs/MVP_API_CONTRACT_V0.1.md
-```
-
-这表示：Engine、规则权限边界、动态规则生命周期和 provider/Agent 基本连通性已经足以开始真人可玩的 MVP。
-
-这**不表示**：
-
-- 游戏已经被证明好玩；
-- 当前 Planner 是最终策略系统；
-- 当前四分类 LLM Agent 已被证明有产品价值；
-- MiMo 是最终模型选择；
-- 自然语言体验已经完全稳定；
-- 当前 UI / API 可以随意各自设计；
-- 项目已经具备竞赛获奖保证。
+V0.1 API contract / Phase0 / 每3回合规则阶段文档保留为历史证据，但不再作为新产品实现依据。
 
 ---
 
-# 2. 现在最重要的开发顺序
+# 2. 项目一句话定义
 
-不要继续把“增加功能”当成第一目标。
+真人玩家不直接操控棋子。红方 AI 和蓝方 AI 各自以击败对方为目标，玩家在每个完整回合结束后观察战局，并决定是否替换一条同时约束双方的公共自然语言规则，目标是在有限生命值和“战局升温”压力下尽可能延长对局。
+
+三个角色目标：
+
+```text
+RED AI  → 击败 BLUE
+BLUE AI → 击败 RED
+PLAYER  → 尽量延长完整回合数
+```
+
+---
+
+# 3. V0.2 正式游玩流程
+
+```text
+点击开始游戏
+↓
+创建 Match
+↓
+第1回合无玩家规则自动进行
+↓
+RED / BLUE 各自独立思考
+↓
+Planner 生成双方具体动作
+↓
+Engine 同步结算一个完整回合
+↓
+如果终局 → 结算 / Replay
+否则 → PLAYER_DECISION
+↓
+玩家：直接继续，或尝试提交一条公共规则
+↓
+规则被拒绝 → 可改写后重试
+规则第一次成功 → 替换旧规则，rule_change_count +1，本 intermission 不再允许第二次成功替换
+↓
+玩家仍需点击“继续下一回合”
+↓
+下一回合
+```
+
+硬规则：
+
+- Round 1 前不能制定规则；
+- 不存在 pre-game Phase 0；
+- 红蓝各行动一次合起来才算一个完整回合；
+- AI/provider 的响应秒数不计入玩家成绩；
+- 每个非终局完整回合后都暂停；
+- 同一回合间最多成功替换一次规则；
+- 始终最多一条 active rule；
+- 规则成功后不自动推进下一回合；
+- 规则被拒绝不增加 `rule_change_count`；
+- 暂无回血；
+- 玩家主成绩暂为 `score_rounds = completed_rounds`。
+
+---
+
+# 4. 当前最重要的开发顺序
+
+**不要直接开始旧计划里的 MatchApplicationService。**
 
 当前固定顺序：
 
 ```text
-MVP API / Replay / PublicStrategy Contract
+Gameplay Flow V0.2
 ↓
-Pydantic / OpenAPI + schema-validated fixtures
+API / Replay Contract V0.2
 ↓
-MatchApplicationService 与 React Mock Shell 并行
+DynamicRuleController cadence migration
 ↓
-revision / per-match lock / idempotency
+controller regression tests
+↓
+MatchApplicationService
+↓
+in-memory repository / revision / per-match lock / idempotency
 ↓
 FastAPI five-route vertical slice
 ↓
 Frontend real API integration
 ↓
-Replay public projection
+Replay
 ↓
-Agent A/B/C
+追逃/软死局实验 + Agent A/B/C
 ↓
 真人试玩
 ```
 
-如果一个新任务不在这条链上，默认先判断它是否真的比当前 P0 更重要。
-
----
-
-# 3. 项目一句话定义
-
-真人玩家不直接操控棋子，而是在战斗过程中为红蓝双方制定**对称的公共自然语言规则**；两个独立 AI 在相同公开规则下各自以获胜为目标进行对抗，玩家通过改变规则观察并影响双方策略与战局。
-
-核心循环：
+Developer B 可以与 Controller migration 并行，直接使用：
 
 ```text
-制定公共规则
-→ 两个独立 AI 适应规则
-→ 确定性 Planner 生成动作
-→ Engine 同步结算
-→ 玩家观察变化
-→ 下一规则阶段再次修改
-→ 终局
-→ Replay
+contracts/fixtures/mvp-v0.2/
 ```
 
 ---
 
-# 4. 当前核心架构
+# 5. 当前 Controller 状态：必须注意
+
+当前 `main` 的 `DynamicRuleController` 在本次 V0.2 迁移完成前仍实现旧逻辑：
+
+```text
+phase 0 before Round1
+then Round3 / 6 / 9 ... rule phase
+```
+
+这是**待迁移实现**，不是当前产品玩法。
+
+任何新 AI 不得因为看到旧 Controller 就反过来把产品文档改回旧 cadence。
+
+正确目标见：
+
+```text
+docs/GAMEPLAY_FLOW_V0.2.md
+docs/MVP_FIRST_TASKS.md
+```
+
+---
+
+# 6. 当前公共 API Contract
+
+Canonical source：
+
+```text
+src/rules_beyond/api_contract.py
+```
+
+当前：
+
+```text
+schema_version = mvp-v0.2
+replay_version = replay-v0.2
+```
+
+五个路由保持：
+
+```text
+POST /api/v1/matches
+GET  /api/v1/matches/{match_id}
+POST /api/v1/matches/{match_id}/rules
+POST /api/v1/matches/{match_id}/advance
+GET  /api/v1/matches/{match_id}/replay
+```
+
+关键公共对象：
+
+```text
+MatchSnapshot
+PlayerDecisionSnapshot
+BattleEscalationSnapshot
+RuleSubmissionResult
+PublicStrategyDecision
+ReplaySnapshot
+ErrorEnvelope
+```
+
+关键字段：
+
+```text
+completed_rounds
+score_rounds
+rule_change_count
+player_decision.can_submit_rule
+player_decision.rule_changed_this_intermission
+player_decision.can_advance
+battle_escalation
+```
+
+Developer B 不得自行发明另一套类型。
+
+---
+
+# 7. “战局升温”不是可随意删除的隐藏机制
+
+当前 Engine 已实现基于连续无实际伤害回合的 anti-stall：
+
+```text
+0-2  → level 0
+3-5  → level 1
+6-8  → level 2, bow hit floor 25%
+9-11 → level 3, bow hit floor 50%
+>=12 → level 4, hard liveness
+```
+
+另外保留 Round24 hard-liveness 兜底。
+
+V0.2 产品层把它统一称为：
+
+```text
+战局升温
+```
+
+硬约束：
+
+```text
+rule replacement ≠ damage
+```
+
+因此：
+
+- 换规则不能重置 `no_damage_streak`；
+- 只有实际应用伤害才能把连续无伤害计数归零；
+- 玩家规则不能关闭系统破局兜底。
+
+普通玩家 UI 不直接显示 `Hard Liveness / conflict_level` 英文工程名。
+
+---
+
+# 8. 暂无回血
+
+V0.2 明确：
+
+```text
+没有基础回血
+Rule DSL 不支持回血
+自然语言规则不能创建回血
+```
+
+不要为了“增加玩法”临时加入恢复类 effect。
+
+原因：有限 HP 是当前延长对局玩法的重要约束，稳定回血可能直接制造循环最优策略。
+
+---
+
+# 9. 当前核心架构
 
 ```text
 玩家自然语言
@@ -130,13 +293,55 @@ EVADE
 HOLD
 ```
 
-注意：这是**当前代码兼容结构**，不是最终产品公共合同。
-
-公共 API 使用版本化 `PublicStrategyDecision`，为后续 richer plan 预留可选字段。不要让前端永久锁死在“四个词”。
+它们是当前代码兼容结构，不是最终策略产品合同。
 
 ---
 
-# 5. LLM 的权限边界
+# 10. UI / 玩家可见信息原则
+
+普通玩家界面尽量中文。
+
+至少映射：
+
+```text
+PRESSURE → 逼近进攻
+KITE → 保持距离
+EVADE → 躲避保命
+HOLD → 原地应对
+RED → 红方
+BLUE → 蓝方
+BOW → 弓箭
+KNIFE → 刀
+```
+
+玩家可以看到：
+
+```text
+当前策略
+本回合目标
+武器倾向
+风险倾向
+实际动作
+Engine 结果
+```
+
+不要展示：
+
+```text
+chain-of-thought
+hidden reasoning
+private memory
+raw provider body
+完整 system prompt
+secret
+stack trace
+```
+
+“AI 公开策略摘要”和“完整模型思维过程”不是一回事。
+
+---
+
+# 11. LLM 权限边界
 
 LLM 可以：
 
@@ -162,22 +367,15 @@ LLM **不能**：
 
 ---
 
-# 6. 开工前最低读取顺序
+# 12. Rule DSL / 安全语义
 
-### 所有人 / AI 都必须先读
+当前规则仍坚持：
 
 ```text
-1. AI_DEVELOPER_START_HERE.md
-2. README.md
-3. docs/SECOND_AUDIT_ACTION_PLAN_2026-09-08.md
-4. docs/MVP_API_CONTRACT_V0.1.md
-5. docs/MVP_PARALLEL_DEVELOPMENT_PLAN.md
-6. docs/MVP_FIRST_TASKS.md
-7. docs/AI_COLLABORATION_PROTOCOL.md
-8. 与当前任务直接相关的最新 handoff
+Open Language, Closed Semantics
 ```
 
-### 如果任务会碰规则 / Engine / Agent，再读
+必须读：
 
 ```text
 docs/P0_RULE_FREEZE_V0.1.md
@@ -185,88 +383,6 @@ docs/P0_RULE_FREEZE_V0.1_ROUND24_AMENDMENT.md
 docs/RULE_DSL_VALIDATOR_IMPLEMENTATION_V0.1.md
 docs/PUBLIC_RULE_HISTORY_V0.1.md
 docs/SEMANTIC_FAITHFULNESS_GATE_V0.1.md
-docs/VALIDATION_HISTORY.md
-```
-
-### 如果任务会碰 API / 前后端契约 / Replay
-
-必须读：
-
-```text
-docs/MVP_API_CONTRACT_V0.1.md
-```
-
-Developer B 不得自行发明另一套 `MatchSnapshot/ReplaySnapshot/PublicStrategyDecision`。
-
----
-
-# 7. Source of Truth 优先级
-
-发生冲突时，不要凭聊天记录或旧 README 猜。
-
-优先级：
-
-```text
-1. 最新 normative / freeze / contract 文档
-2. 最新 main 上的实现与测试
-3. 最新 action plan / handoff / MVP phase 文档
-4. experiment / validation 记录
-5. README
-6. 旧设计草案 / 旧聊天上下文
-```
-
-其中 V0.1 以下语义仍以 `docs/P0_RULE_FREEZE_V0.1.md` 及 amendment 为准：
-
-- terminal utility；
-- anti-stall / Hard Liveness；
-- movement occupancy；
-- Rule DSL；
-- symmetry。
-
-公共 Web/API/Replay 语义以：
-
-```text
-docs/MVP_API_CONTRACT_V0.1.md
-```
-
-为准。
-
----
-
-# 8. 当前不可擅自改变的产品基线
-
-```text
-board = 5×5
-units = RED 1 vs BLUE 1
-product initial_hp = 4
-knife_damage = 2
-max_rounds = 30
-rule cadence = phase0 before Round1, then after Round3/6/9/...
-rule duration = UNTIL_REPLACED
-```
-
-`HP5/K2` 曾用于部分 Gate，只是为了稳定跨越多个阶段，**不是产品默认**。
-
-### Hard Liveness
-
-当前系统包含：
-
-```text
-previous latch
-OR no_damage_streak >= 12
-OR round_no >= 24
-```
-
-一旦触发，保持到终局。
-
-不要在没有实验和规范变更的情况下自行删掉。
-
-### Rule DSL
-
-V0.1 是：
-
-```text
-Open Language, Closed Semantics
 ```
 
 不要：
@@ -274,34 +390,31 @@ Open Language, Closed Semantics
 - 临时增加新 effect/condition；
 - 前端自行解析规则；
 - 因 false reject 放松 Validator；
-- 自动把非法规则“改成差不多合法的规则”后直接执行；
-- 现在扩 OR / NOT / multi-effect。
+- 自动把非法规则改成“差不多合法”后直接执行；
+- 现在扩 OR / NOT / multi-effect；
+- 现在加回血。
 
 ---
 
-# 9. 第二轮审计后的证据口径
+# 13. 第二轮审计后的证据口径
 
-历史 `live-agent-planner-match` PASS 保留，但从现在开始正式称为：
+历史 `live-agent-planner-match` PASS 只称为：
 
 ```text
 connectivity evidence
 ```
 
-它证明：
-
-- 真实 provider 可调用；
-- RED/BLUE 两个 Agent 实例与 private memory 可隔离；
-- Planner 可把 StrategyIntent 映射为 Action；
-- Controller / Engine 可完成动态规则终局对战。
+它证明 provider / Agent / Planner / Controller / Engine 能连通并完成终局。
 
 它不证明：
 
 - LLM 比 heuristic 更聪明；
 - 四分类就是最佳策略结构；
 - private memory 已形成学习；
-- 当前 Agent 对玩家有明显可感知价值。
+- 当前 Agent 对玩家有明显价值；
+- V0.2 新玩法已经好玩。
 
-因此 Sprint 1 必须比较：
+Sprint 1 必须比较：
 
 ```text
 A deterministic heuristic
@@ -309,51 +422,47 @@ B current four-intent LLM
 C richer-plan LLM + deterministic short rollout
 ```
 
-在没有 A/B/C 证据前，禁止在新文档/PR 里声称“LLM Agent 必要性已经证明”。
+没有 A/B/C 证据前，不得声称 LLM Agent 必要性已证明。
 
 ---
 
-# 10. 当前已知的重要实验结论
+# 14. 当前已知实验事实
 
-详细证据链：
+完整证据链：
 
 ```text
 docs/VALIDATION_HISTORY.md
 ```
 
-新开发者至少知道：
+至少知道：
 
-1. Prompt **不是安全边界**；
-2. 曾出现非法阵营规则被 semantic laundering 成合法规则，因此引入 `NO_CANDIDATE`；
-3. 曾出现 `OR → 单条件`、`OR → AND` 语义篡改，因此引入 Faithfulness Verifier 和 Deterministic Intent Guard；
+1. Prompt 不是安全边界；
+2. 曾出现 semantic laundering，因此引入 `NO_CANDIDATE`；
+3. 曾出现 `OR → 单条件` / `OR → AND`，因此引入 Faithfulness Verifier 和 Intent Guard；
 4. V0.3 unseen verified holdout 达到冻结阈值；
-5. Dynamic Natural-Language Match V0.2 **永久记为 FAIL**，因为一个合法简单规则被 MiMo 安全误拒；
+5. Dynamic Natural-Language Match V0.2 有过安全 false reject，永久作为 FAIL 证据保留；
 6. false reject 是可用性债务，不能靠放松 deterministic safety 解决；
-7. Agent/Planner live Gate 证明真实集成可连通，但不是 LLM value evidence。
+7. Agent live Gate 是 connectivity evidence，不是 LLM value evidence。
 
 ---
 
-# 11. 双人 + AI 责任边界
+# 15. 双人 + AI 责任边界
 
-### Developer A：后端 / AI / 核心集成
-
-默认拥有：
+### Developer A
 
 ```text
 src/rules_beyond/**
 Python tests
-Pydantic / OpenAPI source
+DynamicRuleController cadence migration
+Pydantic / OpenAPI
 MatchApplicationService
 MatchRepository
 FastAPI
 Replay public projection
-LLM provider integration
-contract tests
+provider integration
 ```
 
-### Developer B：前端 / 交互 / 可视化
-
-默认拥有：
+### Developer B
 
 ```text
 web/**
@@ -361,28 +470,27 @@ React
 TypeScript
 Vite
 5×5 board
-Rule input / rejection / rephrase UX
-Effective stats visualization
+中文 Rule UX
+规则制定次数
+战局升温
 Public strategy display
 Event feed
 Replay timeline
-frontend tests
 ```
 
 ### Shared review
 
 ```text
-MVP_API_CONTRACT_V0.1
+GAMEPLAY_FLOW_V0.2
+MVP_API_CONTRACT_V0.2
 OpenAPI canonical schema
 PublicStrategyDecision
 Replay schema/version
 privacy boundary
-Agent A/B/C product metrics
+Agent A/B/C metrics
 ```
 
-### 热点文件
-
-除非明确协调，不要并行修改：
+热点文件不要未经协调并行修改：
 
 ```text
 engine.py
@@ -391,73 +499,35 @@ dynamic_rule_controller.py
 strategy_agent.py
 rule_dsl.py
 rule_validator.py
-canonical API schemas
+api_contract.py
 replay event mapping
 ```
 
-Developer B **不得把游戏规则逻辑复制到 TypeScript**。前端只渲染后端 authoritative state。
-
 ---
 
-# 12. Sprint 0 Contract 硬约束
+# 16. 测试要求
 
-公共 API 必须至少包含：
+### 修改 Controller cadence
 
-```text
-schema_version
-match revision
-Match lifecycle
-RuleSubmissionResult
-PublicStrategyDecision
-ReplaySnapshot
-ErrorEnvelope
-```
-
-写操作必须考虑：
+必须覆盖：
 
 ```text
-expected_revision
-Idempotency-Key
-per-match lock
-atomic state update
+Round1 before-rule forbidden
+Round1 resolved → PLAYER_DECISION
+reject → retry allowed
+accept → same intermission locked
+continue → next round
+rule change does not reset history/no_damage_streak
+terminal → no next player decision
 ```
 
-Replay：
-
-```text
-不得再次调用模型
-不得记录 chain-of-thought
-不得记录 private memory
-不得记录 secret / raw provider body / stack trace
-```
-
-具体字段全部以：
-
-```text
-docs/MVP_API_CONTRACT_V0.1.md
-```
-
-为准。
-
----
-
-# 13. 测试要求
-
-### 修改核心逻辑
-
-至少：
-
-- 单元测试；
-- 旧行为回归；
-- 相关 experiment/gate 回归（若适用）；
-- CI 全绿。
+并确保原 Engine / Rule tests 不被破坏。
 
 ### 修改 API contract
 
 至少：
 
 - Pydantic/OpenAPI 一致；
-- generated/validated frontend types；
 - fixture schema validation；
 - accepted/rejected/terminal/revision-conflict 样例；
 - private-field exclusion test；
@@ -473,101 +543,47 @@ vs
 真正 unseen holdout
 ```
 
-禁止：
-
-- 改 Prompt 后继续把同一题库叫 unseen；
-- 看到结果后临时降低 Gate；
-- 删除失败实验记录；
-- 只汇报最好的一次运行。
+禁止改 Prompt 后继续把同一题库叫 unseen。
 
 ---
 
-# 14. 明确禁止 AI 擅自做的事
+# 17. 当前禁止擅自做的事
 
 禁止：
 
-- 把 HP5 实验值设成产品默认；
-- 擅自改变 3 回合 rule cadence；
+- 把旧 Phase0 + 3回合 cadence 当当前产品规则；
+- Round1 前允许玩家制定规则；
+- 提交规则成功后自动开始下一回合；
+- 同一 intermission 成功替换多次规则；
+- 规则替换重置 no_damage_streak；
+- 加回血；
 - 给规则自动加 TTL；
-- 绕过 RuleValidator / Faithfulness Verifier / DynamicRuleController；
+- 绕过 Validator / Verifier / Controller；
 - 让 LLM 直接控制 GameState；
-- 让两个 Agent 共用 private strategy memory；
-- 把 Dynamic NL Match V0.2 FAIL 改写成 PASS；
-- 因 false reject 放宽安全 Validator；
+- 让两个 Agent 共用 private memory；
+- 因 false reject 放宽安全边界；
 - 展示 chain-of-thought；
-- 在 Replay/API 中保存 hidden reasoning/private memory；
 - 把四个 StrategyIntent 固化成永久前端合同；
-- 没有 A/B/C 证据时声称 LLM Agent 已证明必要；
-- 未经协调在 `main` 做大范围修改；
+- 没有 A/B/C 证据时声称 LLM Agent 必要；
 - 现在引入 WebSocket、Redis、Celery、微服务；
-- 擅自扩展 OR/NOT/multi-effect、多单位、职业、地形、装备、账号、排行榜等 Non-goals。
+- 擅自扩 OR/NOT/multi-effect、多单位、地形、装备、账号、排行榜等 Non-goals。
 
 ---
 
-# 15. 当前 MVP 第一目标
+# 18. 当前第一目标
 
-当前不是继续证明“系统能不能运行”，而是做出真人能从浏览器完成的纵向闭环：
+不是继续加功能，而是做出浏览器真人可玩闭环：
 
 ```text
-创建对局
-→ 看到棋盘
-→ 输入中文规则
-→ 看见规则被接受/拒绝
-→ 两个 Agent 对战
-→ 看见有效属性 / public strategy / action / event
-→ Round3 后再次修改规则
-→ 对局终局
+游戏名 + 开始游戏
+→ 第1回合自动战斗
+→ 每回合暂停
+→ 玩家看红蓝生命 / 当前策略 / 实际动作 / 属性 / 战局升温
+→ 直接继续或提交中文公共规则
+→ 规则成功后手动继续
+→ 终局
+→ 回合成绩 / 规则制定次数
 → Replay
 ```
 
-在这条闭环稳定之前，不优先开发：
-
-```text
-账号系统
-排行榜
-多人大厅
-复杂数据库
-多单位
-职业 / 技能
-地形
-装备
-WebSocket
-3D
-移动 App
-商城
-```
-
----
-
-# 16. Handoff 规则
-
-以下情况必须在 PR Body 明确交接，必要时新增 `docs/handoffs/`：
-
-- 修改架构；
-- 修改 normative 规则；
-- 修改 API/OpenAPI contract；
-- 修改 Replay schema/version；
-- 修改 PublicStrategyDecision；
-- 涉及多个核心模块；
-- 新实验结论影响后续路线；
-- 与另一位开发者/AI 可能冲突；
-- 当前工作未完成，需要下一窗口接手。
-
----
-
-## 最后一条
-
-**不要因为 AI 能快速写代码，就跳过职责边界、公共合同和证据等级。**
-
-当前最重要的资产是：
-
-```text
-规则语义边界
-+ deterministic authority
-+ Agent isolation
-+ 可追溯实验记录
-+ 版本化公共 contract
-+ 可被多人 / 多 AI 继承的协作协议
-```
-
-任何新实现都应建立在这些资产之上，而不是重新发明一套系统。
+如果一个任务不能直接帮助完成这条链，默认延后。

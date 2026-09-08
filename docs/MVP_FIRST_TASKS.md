@@ -1,90 +1,134 @@
 # MVP 第一批任务板
 
-本文件只列“现在立刻做什么”。完整边界见：
+本文件只列“现在立刻做什么”。当前唯一产品/合同基线：
 
 ```text
-docs/MVP_API_CONTRACT_V0.1.md
+docs/GAMEPLAY_FLOW_V0.2.md
+docs/MVP_API_CONTRACT_V0.2.md
 docs/SECOND_AUDIT_ACTION_PLAN_2026-09-08.md
-docs/MVP_PARALLEL_DEVELOPMENT_PLAN.md
 ```
 
-> 第二轮审计后的核心顺序：**先统一合同，再写后端/前端；先做可玩闭环，再证明 LLM Agent 价值。**
+> 当前顺序：**先把新玩法状态机迁干净，再写 MatchApplicationService；前端可以同时按 V0.2 fixture 开工。**
 
 ---
 
-## Sprint 0 — Shared Contract（第一优先级）
+# 当前已完成
 
-### S0 — API / Replay / PublicStrategy Contract V0.1
+## S0-A — V0.2 Gameplay Flow Freeze
 
-规范源：
+已冻结：
 
-```text
-docs/MVP_API_CONTRACT_V0.1.md
-```
+- 第 1 回合前不允许制定规则；
+- 第 1 回合无玩家规则自动开始；
+- 红蓝双方各思考/行动一次，合起来算一个完整回合；
+- 每个非终局完整回合后游戏暂停；
+- 玩家每个回合间可以直接继续或尝试提交规则；
+- 同一回合间最多成功替换一次规则；
+- 规则成功后仍需点击“继续下一回合”；
+- 始终最多一条 active rule；
+- `rule_change_count` 只统计成功生效规则；
+- 暂无回血；
+- 防死局机制产品化为“战局升温”；
+- 规则修改不重置连续无伤害计数；
+- 普通玩家 UI 尽量中文，不展示完整模型内部思维。
 
-已经冻结的内容：
-
-- `/api/v1` 五个最小路由；
-- `MatchSnapshot`；
-- Match lifecycle；
-- `RuleSubmissionResult`；
-- `PublicStrategyDecision`；
-- `ReplaySnapshot`；
-- public/private projection；
-- `schema_version` / `plan_version` / `replay_version`；
-- `revision`；
-- `Idempotency-Key`；
-- per-match lock；
-- Replay 禁止再次调用模型。
-
-注意：
+规范：
 
 ```text
-PRESSURE / KITE / EVADE / HOLD
+docs/GAMEPLAY_FLOW_V0.2.md
 ```
 
-仍然是**当前实现兼容值**，但前端不得把它们写死成永久策略模型。公共策略对象已经预留 richer-plan 可选字段。
+## S0-B — API / Replay Contract V0.2
 
-Sprint 0 真正完成还需要：
+已升级公共合同：
 
-- Pydantic schema；
-- OpenAPI；
-- generated/validated TypeScript types；
-- accepted/rejected/terminal/revision-conflict fixtures；
-- contract tests；
-- 私有字段泄漏测试。
+```text
+schema_version = mvp-v0.2
+replay_version = replay-v0.2
+```
+
+V0.2 关键公共对象：
+
+```text
+MatchSnapshot
+PlayerDecisionSnapshot
+BattleEscalationSnapshot
+RuleSubmissionResult
+PublicStrategyDecision
+ReplaySnapshot
+ErrorEnvelope
+```
+
+路由仍固定为：
+
+```text
+POST /api/v1/matches
+GET  /api/v1/matches/{match_id}
+POST /api/v1/matches/{match_id}/rules
+POST /api/v1/matches/{match_id}/advance
+GET  /api/v1/matches/{match_id}/replay
+```
 
 ---
 
 # Developer A — Backend / AI
 
-## A0 — Pydantic / OpenAPI Contract Source
+## A0 — DynamicRuleController Cadence Migration【当前第一优先级】
 
-分支建议：
+建议分支：
 
 ```text
-contract/v0.1
+backend/controller-v02-intermission
 ```
 
-实现 `docs/MVP_API_CONTRACT_V0.1.md` 对应的 Python schema。
+当前 Controller 仍是旧 V0.1：
+
+```text
+pre-game phase 0
+rounds 3 / 6 / 9 ... rule phase
+```
+
+必须迁移为：
+
+```text
+start_match()
+→ active_rule = null
+→ Round 1 直接可执行
+
+每个非终局 round resolved
+→ 打开玩家决策阶段
+→ 允许 0 或多次失败的规则尝试
+→ 最多 1 次成功规则替换
+→ continue 后关闭本轮玩家决策阶段
+→ 下一回合
+```
+
+硬约束：
+
+- rule change 不清空 PublicRuleHistory；
+- rule change 不清空 `no_damage_streak`；
+- 只有实际伤害才能重置连续无伤害；
+- rejected submission 不消耗成功规则次数；
+- terminal match 不再进入玩家决策阶段；
+- 原有 Engine / RuleValidator 语义不因 cadence 迁移改变。
 
 完成标准：
 
-- OpenAPI 可生成；
-- schema_version 固定；
-- enum 与文档一致；
-- fixture 能通过 schema validation；
-- hidden reasoning / private memory / secret 不存在于 public schema。
+- 删除产品路径中的 Phase 0；
+- 每个非终局回合后均可进入 intermission；
+- 同一 intermission 最多接受一次新规则；
+- 新 controller tests 覆盖 Round1 / reject retry / accept lock / continue / terminal；
+- 原 Engine / Rule tests 全绿。
 
 ## A1 — Match Application Service
 
-分支建议：
+**只有 A0 完成后才开始。**
+
+建议分支：
 
 ```text
-backend/match-service
+backend/match-service-v02
 ```
-
-在 HTTP 层与 Engine 之间增加 service，不让 route 直接操作 Engine 内部对象。
 
 必须支持：
 
@@ -104,144 +148,225 @@ revision
 per-match lock
 idempotency
 public/private projection
+rule_change_count
+completed_rounds / score_rounds
+battle escalation public projection
 ```
+
+关键行为：
+
+- create 后第 1 回合前 `can_submit_rule = false`；
+- 前端随后调用第一次 advance，形成“第 1 回合自动开始”的体验；
+- 非终局 advance 完成后进入 `PLAYER_DECISION`；
+- rule accepted 后仍停在 `PLAYER_DECISION`；
+- 下一次 advance 才开始下一回合。
 
 ## A2 — FastAPI Vertical Slice
 
-分支建议：
+严格按 V0.2 contract 实现五个路由。
+
+第一版继续不做：
 
 ```text
-backend/fastapi-shell
+WebSocket
+Redis
+Celery
+微服务
+复杂数据库
 ```
-
-严格按 V0.1 contract 实现：
-
-```text
-POST /api/v1/matches
-GET  /api/v1/matches/{match_id}
-POST /api/v1/matches/{match_id}/rules
-POST /api/v1/matches/{match_id}/advance
-GET  /api/v1/matches/{match_id}/replay
-```
-
-第一版不做 WebSocket、Redis、Celery、微服务。
 
 ---
 
 # Developer B — Frontend
 
-## B0 — React/Vite App Shell
-
-分支建议：
+Developer B **不需要等待 A0/A1 完成**，可直接使用：
 
 ```text
-frontend/app-shell
+contracts/fixtures/mvp-v0.2/
 ```
 
-新建 `web/`，搭建 React + TypeScript + Vite。
+## B0 — React/Vite App Shell
 
-B 可以在 A 完成完整 FastAPI 前开工，但只能使用**通过 Contract schema 校验的 fixture**，不得自行定义另一套接口。
+建议分支：
+
+```text
+frontend/app-shell-v02
+```
+
+初始页面：
+
+```text
+《规则之外》
+[开始游戏]
+```
+
+点击后进入游玩界面，不做登录/设置/排行榜。
 
 ## B1 — Game Board + Status
 
-分支建议：
+主界面三栏：
 
 ```text
-frontend/game-board
+红方 | 5×5棋盘 | 蓝方
 ```
 
-实现：
-
-- 5×5 棋盘；
-- RED / BLUE unit；
-- HP；
-- round；
-- Match lifecycle；
-- active rule；
-- rule phase due；
-- effective stats；
-- `PublicStrategyDecision`。
-
-前端不计算规则效果。
-
-## B2 — Rule Panel
-
-分支建议：
+顶部至少显示：
 
 ```text
-frontend/rule-panel
+已完成回合
+规则制定次数
+当前公共规则
+战局升温
 ```
 
-实现：
-
-- 中文规则输入；
-- accepted；
-- NO_CANDIDATE；
-- RULE_REJECTED；
-- FAITHFULNESS_REJECTED；
-- MODEL_UNAVAILABLE；
-- suggested rephrase；
-- 只在对应 lifecycle 时允许提交。
-
-建议改写必须由玩家确认后重新提交，前端不得自动执行。
-
-## B3 — Replay / Explainability Shell
-
-分支建议：
+红蓝两侧至少显示：
 
 ```text
-frontend/replay-timeline
+生命值
+当前策略
+实际行动
+当前有效属性
 ```
 
-根据 Replay fixture 渲染：
+前端不自行计算规则效果或弓命中率。
+
+## B2 — Player Decision / Rule Panel
+
+只根据 `PlayerDecisionSnapshot` 控制按钮。
 
 ```text
-玩家规则
-→ 规则接受/拒绝
-→ 双方有效属性
-→ RED/BLUE public strategy
-→ concrete action
-→ engine events
-→ HP/position 变化
+can_submit_rule = true
+→ 显示可用规则输入
+
+rule accepted
+→ 输入区锁定
+→ 仍显示“继续下一回合”
+
+rule rejected
+→ 不增加规则制定次数
+→ 允许修改后重试
 ```
 
-不展示 chain-of-thought / private memory。
+中文文案优先。
+
+内部值映射：
+
+```text
+PRESSURE → 逼近进攻
+KITE → 保持距离
+EVADE → 躲避保命
+HOLD → 原地应对
+RED → 红方
+BLUE → 蓝方
+BOW → 弓箭
+KNIFE → 刀
+```
+
+不要展示：
+
+```text
+chain-of-thought
+private memory
+Hard Liveness
+conflict_level
+provider raw error
+```
+
+`BattleEscalationSnapshot` 在 UI 统一叫“战局升温”。
+
+## B3 — Event Feed + Replay
+
+本回合结果需要解释：
+
+```text
+移动
+攻击
+命中/未命中
+伤害
+HP变化
+规则效果
+战局升温变化
+```
+
+Replay V0.2 时间线：
+
+```text
+ROUND
+INTERMISSION
+ROUND
+INTERMISSION
+...
+```
+
+第 1 个 entry 必须是 Round 1，而不是旧 Phase 0。
 
 ---
 
-# 两人第一个同步点
+# 两人当前同步点
 
-现在不再是“等 A 把整个后端写完”。
-
-唯一同步合同是：
+唯一同步合同：
 
 ```text
-MVP_API_CONTRACT_V0.1
-+ OpenAPI generated source
+GAMEPLAY_FLOW_V0.2
++
+MVP_API_CONTRACT_V0.2
++
+Pydantic/OpenAPI canonical source
++
+contracts/fixtures/mvp-v0.2
 ```
 
-在此基础上：
+当前可以并行：
 
 ```text
-A：MatchApplicationService / FastAPI
-B：React shell / board / rule / replay fixtures
+A：Controller cadence V0.2 migration
+B：React/Vite + V0.2 fixture UI
 ```
 
-可以并行。
+A0 完成后：
+
+```text
+A：MatchApplicationService
+B：继续 Board / Rule / Replay UI
+```
 
 ---
 
-# Sprint 1 必做实验 — Agent A/B/C
+# Sprint 1 必做玩法实验
 
-当前 live Agent Gate 只算：
+## 1. 追逃 / 软死局实验
+
+至少测试：
+
+```text
+PRESSURE vs KITE
+KITE vs KITE
+EVADE vs EVADE
+PRESSURE vs EVADE
+HOLD vs KITE
+```
+
+记录：
+
+```text
+总回合数
+最长连续无伤害
+最高战局升温等级
+重复位置/重复策略
+强制弓攻击次数
+```
+
+重点验证现有 `3 / 6 / 9 / 12` 阈值在“每回合人工暂停”的新节奏下是否太慢。
+
+## 2. Agent A/B/C
+
+当前 live Agent Gate 仍只算：
 
 ```text
 connectivity evidence
 ```
 
-不算 LLM value evidence。
-
-Sprint 1 必须比较：
+必须比较：
 
 ```text
 A deterministic heuristic
@@ -249,14 +374,25 @@ B current four-intent LLM
 C richer-plan LLM + deterministic short rollout
 ```
 
-如果 C 或 B 无法在客观指标或玩家感知上优于 A，不得为了“AI 项目”叙事强行宣称 LLM Agent 必要。
+如果 LLM 无客观或玩家可感知增益，允许简化/重构。
+
+## 3. 真人试玩重点
+
+必须观察：
+
+- 玩家是不是每回合都必改规则；
+- “继续下一回合”是不是伪选择；
+- 是否很快出现固定拖延套路；
+- 玩家是否理解战局升温；
+- 玩家是否理解同一公共规则对红蓝不同状态产生的不同效果。
 
 ---
 
-# 现在不要做
+# 当前明确不要做
 
 ```text
-扩 Rule DSL
+回血
+规则叠加
 OR / NOT / multi-effect
 WebSocket
 复杂数据库
@@ -269,4 +405,4 @@ MCTS
 账号 / 排行 / 商城
 ```
 
-这些不是当前 P0。
+除非后续实验提供证据，否则这些都不是当前 P0。

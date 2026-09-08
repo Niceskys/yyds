@@ -1,0 +1,46 @@
+{
+  "schema_version": "mvp-v0.2",
+  "match_id": "match_fixture_001",
+  "revision": 4,
+  "lifecycle": "TERMINAL",
+  "seed": 1270000,
+  "round_no": 2,
+  "completed_rounds": 2,
+  "score_rounds": 2,
+  "rule_change_count": 1,
+  "board": {"rows": 5, "cols": 5},
+  "units": {
+    "RED": {"team": "RED", "hp": 2, "position": {"row": 3, "col": 2}},
+    "BLUE": {"team": "BLUE", "hp": 0, "position": {"row": 3, "col": 5}}
+  },
+  "active_rule": {
+    "rule_id": "rule_fixture_001",
+    "player_text": "双方移动距离增加1格",
+    "ast": {
+      "version": "0.1",
+      "target": "ALL_UNITS",
+      "conditions": [],
+      "effect": {"type": "MOVE_RANGE_ADD", "delta": 1, "multiplier": null, "weapon": null, "rounds": null},
+      "duration": "UNTIL_REPLACED"
+    }
+  },
+  "player_decision": {
+    "after_round": 2,
+    "can_submit_rule": false,
+    "rule_changed_this_intermission": false,
+    "can_advance": false
+  },
+  "effective_stats": {
+    "RED": {"move_range": 2, "knife_range": 1, "bow_range": 3, "knife_damage": 2, "bow_damage": 1, "bow_hit_multiplier": 1.0, "bow_hit_floor": 0.0, "cooldown_weapons": [], "conflict_level": 0, "hard_liveness": false},
+    "BLUE": {"move_range": 2, "knife_range": 1, "bow_range": 3, "knife_damage": 2, "bow_damage": 1, "bow_hit_multiplier": 1.0, "bow_hit_floor": 0.0, "cooldown_weapons": [], "conflict_level": 0, "hard_liveness": false}
+  },
+  "latest_strategy": {"RED": null, "BLUE": null},
+  "battle_escalation": {
+    "level": 0,
+    "no_damage_streak": 0,
+    "next_level_at_no_damage": 3,
+    "rounds_until_next_level": 3,
+    "hard_liveness_active": false
+  },
+  "result": "RED_WIN"
+}

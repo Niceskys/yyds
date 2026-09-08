@@ -22,17 +22,17 @@ from .api_contract import (
 def _not_implemented() -> None:
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Contract-only route. MatchApplicationService is implemented in the next task.",
+        detail="Contract-only route. MatchApplicationService is implemented after the V0.2 controller cadence migration.",
     )
 
 
 def build_contract_app() -> FastAPI:
     app = FastAPI(
         title="Rules Beyond MVP API",
-        version="0.1.0",
+        version="0.2.0",
         description=(
-            "Frozen MVP V0.1 public HTTP contract. Route bodies are implemented "
-            "by MatchApplicationService later."
+            "Frozen MVP V0.2 public HTTP contract for the every-round player-decision flow. "
+            "Route bodies are implemented by MatchApplicationService later."
         ),
     )
 
@@ -111,7 +111,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("contracts/openapi/mvp-v0.1.json"),
+        default=Path("contracts/openapi/mvp-v0.2.json"),
     )
     args = parser.parse_args()
     export_openapi(args.output)

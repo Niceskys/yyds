@@ -5,8 +5,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
-SCHEMA_VERSION = "mvp-v0.1"
-REPLAY_VERSION = "replay-v0.1"
+SCHEMA_VERSION = "mvp-v0.2"
+REPLAY_VERSION = "replay-v0.2"
 EVENT_VERSION = "event-v0.1"
 CURRENT_PLAN_VERSION = "intent-v0.1"
 
@@ -40,9 +40,8 @@ class MatchResultPublic(str, Enum):
 
 
 class MatchLifecycle(str, Enum):
-    AWAITING_INITIAL_RULE = "AWAITING_INITIAL_RULE"
     RUNNING = "RUNNING"
-    AWAITING_RULE = "AWAITING_RULE"
+    PLAYER_DECISION = "PLAYER_DECISION"
     TERMINAL = "TERMINAL"
     FAILED_RECOVERABLE = "FAILED_RECOVERABLE"
 
@@ -123,15 +122,15 @@ class RuleSubmissionCode(str, Enum):
     RULE_REJECTED = "RULE_REJECTED"
     FAITHFULNESS_REJECTED = "FAITHFULNESS_REJECTED"
     MODEL_UNAVAILABLE = "MODEL_UNAVAILABLE"
-    RULE_PHASE_NOT_DUE = "RULE_PHASE_NOT_DUE"
+    RULE_SUBMISSION_NOT_ALLOWED = "RULE_SUBMISSION_NOT_ALLOWED"
     MATCH_TERMINAL = "MATCH_TERMINAL"
     REVISION_CONFLICT = "REVISION_CONFLICT"
 
 
 class ErrorCode(str, Enum):
     REVISION_CONFLICT = "REVISION_CONFLICT"
-    RULE_PHASE_REQUIRED = "RULE_PHASE_REQUIRED"
-    RULE_PHASE_NOT_DUE = "RULE_PHASE_NOT_DUE"
+    RULE_SUBMISSION_NOT_ALLOWED = "RULE_SUBMISSION_NOT_ALLOWED"
+    ADVANCE_NOT_ALLOWED = "ADVANCE_NOT_ALLOWED"
     MATCH_TERMINAL = "MATCH_TERMINAL"
     MATCH_NOT_FOUND = "MATCH_NOT_FOUND"
     IDEMPOTENCY_KEY_REQUIRED = "IDEMPOTENCY_KEY_REQUIRED"
@@ -165,7 +164,7 @@ class EffectiveStatsPublicView(ContractModel):
     bow_hit_multiplier: float = Field(ge=0.0)
     bow_hit_floor: float = Field(ge=0.0, le=1.0)
     cooldown_weapons: list[WeaponPublic] = Field(default_factory=list)
-    conflict_level: int = Field(ge=0)
+    conflict_level: int = Field(ge=0, le=4)
     hard_liveness: bool
 
 
@@ -230,10 +229,19 @@ class TeamRoundStrategyMap(ContractModel):
     BLUE: PublicStrategyDecision
 
 
-class RulePhaseSnapshot(ContractModel):
-    phase_index: int = Field(ge=0)
-    due: bool
-    next_due_after_round: int | None = Field(default=None, ge=1)
+class PlayerDecisionSnapshot(ContractModel):
+    after_round: int | None = Field(default=None, ge=1)
+    can_submit_rule: bool
+    rule_changed_this_intermission: bool
+    can_advance: bool
+
+
+class BattleEscalationSnapshot(ContractModel):
+    level: int = Field(ge=0, le=4)
+    no_damage_streak: int = Field(ge=0)
+    next_level_at_no_damage: int | None = Field(default=None, ge=1)
+    rounds_until_next_level: int | None = Field(default=None, ge=0)
+    hard_liveness_active: bool
 
 
 class MatchSnapshot(ContractModel):
@@ -243,14 +251,16 @@ class MatchSnapshot(ContractModel):
     lifecycle: MatchLifecycle
     seed: int
     round_no: int = Field(ge=1)
+    completed_rounds: int = Field(ge=0)
+    score_rounds: int = Field(ge=0)
+    rule_change_count: int = Field(ge=0)
     board: BoardSnapshot
     units: TeamUnitMap
     active_rule: RulePublicView | None
-    rule_phase: RulePhaseSnapshot
+    player_decision: PlayerDecisionSnapshot
     effective_stats: TeamStatsMap
     latest_strategy: TeamLatestStrategyMap
-    no_damage_streak: int = Field(ge=0)
-    hard_liveness_active: bool
+    battle_escalation: BattleEscalationSnapshot
     result: MatchResultPublic | None
 
 
@@ -321,15 +331,22 @@ class GameConfigPublicView(ContractModel):
     bow_damage: int = Field(ge=0)
 
 
-class ReplayRulePhaseEntry(ContractModel):
-    entry_type: Literal["RULE_PHASE"] = "RULE_PHASE"
-    phase_index: int = Field(ge=0)
-    submitted_player_text: str | None
-    submission_public_code: RuleSubmissionCode | None
-    accepted_rule_id: str | None
-    accepted_rule: RulePublicView | None
-    active_rule_before: RulePublicView | None
-    active_rule_after: RulePublicView | None
+class IntermissionChoicePublic(str, Enum):
+    CONTINUE = "CONTINUE"
+    RULE_ATTEMPT = "RULE_ATTEMPT"
+
+
+class ReplayIntermissionEntry(ContractModel):
+    entry_type: Literal["INTERMISSION"] = "INTERMISSION"
+    after_round: int = Field(ge=1)
+    choice: IntermissionChoicePublic
+    submitted_player_text: str | None = None
+    submission_public_code: RuleSubmissionCode | None = None
+    accepted_rule_id: str | None = None
+    accepted_rule: RulePublicView | None = None
+    active_rule_before: RulePublicView | None = None
+    active_rule_after: RulePublicView | None = None
+    rule_change_count_after: int = Field(ge=0)
 
 
 class ReplayRoundEntry(ContractModel):
@@ -340,14 +357,13 @@ class ReplayRoundEntry(ContractModel):
     actions: TeamActionMap
     events: list[RoundEventPublicView]
     post_round_units: TeamUnitMap
-    no_damage_streak: int = Field(ge=0)
-    hard_liveness_active: bool
+    battle_escalation: BattleEscalationSnapshot
     effective_stats: TeamStatsMap
     result: MatchResultPublic | None
 
 
 ReplayEntry = Annotated[
-    ReplayRulePhaseEntry | ReplayRoundEntry,
+    ReplayIntermissionEntry | ReplayRoundEntry,
     Field(discriminator="entry_type"),
 ]
 
@@ -360,6 +376,8 @@ class ReplaySnapshot(ContractModel):
     initial_config: GameConfigPublicView
     timeline: list[ReplayEntry]
     terminal_result: MatchResultPublic | None
+    score_rounds: int = Field(ge=0)
+    rule_change_count: int = Field(ge=0)
 
 
 class ErrorDetail(ContractModel):
