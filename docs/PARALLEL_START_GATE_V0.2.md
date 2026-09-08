@@ -8,6 +8,13 @@
 
 结论：**是。**
 
+执行任务：
+
+```text
+Developer A → Issue #37
+Developer B → Issue #38
+```
+
 ---
 
 ## 1. 为什么现在允许同时开工
@@ -32,6 +39,8 @@ dynamic-rule-replacement
 ---
 
 # 2. Developer A — 可以立即开工
+
+对应 GitHub Issue：**#37 — `[Developer A] 迁移 DynamicRuleController 到 V0.2 回合间状态机`**
 
 ## 当前任务
 
@@ -103,6 +112,8 @@ A3 FastAPI five-route vertical slice
 ---
 
 # 3. Developer B — 可以立即开工
+
+对应 GitHub Issue：**#38 — `[Developer B] 使用 V0.2 fixtures 开发 React/Vite 游玩界面`**
 
 ## 当前任务
 
@@ -330,8 +341,8 @@ Developer B: START
 当前推荐同时进行：
 
 ```text
-A → backend/controller-v02-intermission
-B → frontend/app-shell-v02
+A → Issue #37 → backend/controller-v02-intermission
+B → Issue #38 → frontend/app-shell-v02
 ```
 
 除非出现 V0.2 contract blocker，否则任何一方都不应以“等待另一方完成”为理由停止当前任务。
