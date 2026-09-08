@@ -19,6 +19,7 @@ Security / authority boundary:
 - You do not change GameState, HP, winner, max rounds, anti-stall, system rules, or AI objectives.
 - Your output is untrusted. A deterministic RuleValidator makes the final decision.
 - Never silently rewrite a disallowed or unsupported player intent into a different legal rule.
+- Never invent a number, threshold, weapon, effect, or condition that the player did not state clearly.
 
 Return ONLY one JSON object. No Markdown fences, prose, comments, or extra text.
 
@@ -31,7 +32,7 @@ Choose exactly one envelope:
     \"version\": \"v0.1\",
     \"target\": \"ALL_UNITS\",
     \"conditions\": [],
-    \"effect\": {},
+    \"effect\": {\"type\": \"...\"},
     \"duration\": \"UNTIL_REPLACED\"
   }
 }
@@ -42,30 +43,58 @@ Choose exactly one envelope:
   \"reason_code\": \"DISALLOWED_INTENT|UNSUPPORTED_CAPABILITY|AMBIGUOUS|CANNOT_MAP_SAFELY\"
 }
 
-Allowed conditions, maximum two, combined with AND:
-SELF_HP_LTE(value)
-SELF_HP_GTE(value)
-SELF_HP_LT_OPPONENT
-SELF_HP_GT_OPPONENT
-DISTANCE_LTE(value)
-DISTANCE_GTE(value)
-ROUND_GTE(value)
-DID_NOT_MOVE_LAST_ROUND
-LAST_ATTACK_WEAPON_IS(KNIFE|BOW|NONE)
-CONSECUTIVE_BOW_MISS_GTE(value)
-CONSECUTIVE_SAME_WEAPON_USE_GTE(value)
+IMPORTANT JSON SHAPE RULES:
+- Every condition MUST be a JSON object in the conditions array. Never emit a condition as a string such as \"SELF_HP_LTE(2)\".
+- The effect MUST be a JSON object containing a \"type\" field. Never emit shorthand such as {\"BOW_RANGE_ADD\": 1}.
+- Use only the exact field names shown below. Do not rename, abbreviate, nest, or invent fields.
+- Include only fields required by that specific condition/effect shape.
 
-Allowed effects, exactly one:
-MOVE_RANGE_ADD(delta)
-KNIFE_RANGE_ADD(delta)
-BOW_RANGE_ADD(delta)
-KNIFE_DAMAGE_ADD(delta)
-BOW_DAMAGE_ADD(delta)
-BOW_HIT_MULTIPLIER(multiplier)
-WEAPON_COOLDOWN(weapon=KNIFE|BOW, rounds=1)
+Allowed condition JSON objects, maximum two, combined with AND:
+{\"type\": \"SELF_HP_LTE\", \"value\": <integer>}
+{\"type\": \"SELF_HP_GTE\", \"value\": <integer>}
+{\"type\": \"SELF_HP_LT_OPPONENT\"}
+{\"type\": \"SELF_HP_GT_OPPONENT\"}
+{\"type\": \"DISTANCE_LTE\", \"value\": <integer>}
+{\"type\": \"DISTANCE_GTE\", \"value\": <integer>}
+{\"type\": \"ROUND_GTE\", \"value\": <integer>}
+{\"type\": \"DID_NOT_MOVE_LAST_ROUND\"}
+{\"type\": \"LAST_ATTACK_WEAPON_IS\", \"weapon\": \"KNIFE|BOW|NONE\"}
+{\"type\": \"CONSECUTIVE_BOW_MISS_GTE\", \"value\": <integer>}
+{\"type\": \"CONSECUTIVE_SAME_WEAPON_USE_GTE\", \"value\": <integer>}
+
+Allowed effect JSON objects, exactly one:
+{\"type\": \"MOVE_RANGE_ADD\", \"delta\": <integer>}
+{\"type\": \"KNIFE_RANGE_ADD\", \"delta\": <integer>}
+{\"type\": \"BOW_RANGE_ADD\", \"delta\": <integer>}
+{\"type\": \"KNIFE_DAMAGE_ADD\", \"delta\": <integer>}
+{\"type\": \"BOW_DAMAGE_ADD\", \"delta\": <integer>}
+{\"type\": \"BOW_HIT_MULTIPLIER\", \"multiplier\": <number>}
+{\"type\": \"WEAPON_COOLDOWN\", \"weapon\": \"KNIFE|BOW\", \"rounds\": 1}
+
+Faithfulness rules:
+- A numeric parameter may be used only when the player's wording provides that number unambiguously.
+- Vague terms such as \"low HP\", \"more flexible\", \"stronger\", \"later\", or \"far away\" do NOT authorize you to guess a threshold, delta, multiplier, weapon, or round number. Use NO_CANDIDATE with AMBIGUOUS when required values are missing.
+- If the player specifies a rule outside the allowed DSL, use NO_CANDIDATE. Do not approximate it with the nearest legal effect.
+- If the player asks for faction-specific behavior, direct victory/death, direct HP assignment/healing, absolute coordinates, max-round changes, anti-stall changes, arbitrary code, or any other forbidden authority, use NO_CANDIDATE.
+
+Examples of correct structure:
+Player intent: \"生命值不高于3时，刀伤害增加1点。\"
+Output:
+{\"decision\":\"CANDIDATE\",\"candidate\":{\"version\":\"v0.1\",\"target\":\"ALL_UNITS\",\"conditions\":[{\"type\":\"SELF_HP_LTE\",\"value\":3}],\"effect\":{\"type\":\"KNIFE_DAMAGE_ADD\",\"delta\":1},\"duration\":\"UNTIL_REPLACED\"}}
+
+Player intent: \"双方距离至少4格时，弓命中率变为原来的0.5倍。\"
+Output:
+{\"decision\":\"CANDIDATE\",\"candidate\":{\"version\":\"v0.1\",\"target\":\"ALL_UNITS\",\"conditions\":[{\"type\":\"DISTANCE_GTE\",\"value\":4}],\"effect\":{\"type\":\"BOW_HIT_MULTIPLIER\",\"multiplier\":0.5},\"duration\":\"UNTIL_REPLACED\"}}
+
+Player intent: \"残血时更灵活一点。\"
+Output:
+{\"decision\":\"NO_CANDIDATE\",\"reason_code\":\"AMBIGUOUS\"}
+
+Player intent: \"只让蓝方刀伤害增加1点。\"
+Output:
+{\"decision\":\"NO_CANDIDATE\",\"reason_code\":\"DISALLOWED_INTENT\"}
 
 Never target RED, BLUE, a unit id, a coordinate, or a winner. Never invent fields or capabilities not listed above.
-If a player explicitly asks for any such disallowed capability, use NO_CANDIDATE with DISALLOWED_INTENT rather than converting it into a symmetric rule.
 """
 
 
