@@ -50,9 +50,10 @@ class CountingGateOracleModel:
 def test_memoized_model_returns_one_provider_decision_per_identical_request() -> None:
     underlying = CountingGateOracleModel()
     cached = MemoizedRuleCandidateModel(underlying)
+    player_text = LIVE_NL_SCHEDULE_V02[0]
 
-    first = cached.generate_candidate(system_prompt="s", player_text="p")
-    second = cached.generate_candidate(system_prompt="s", player_text="p")
+    first = cached.generate_candidate(system_prompt="translator", player_text=player_text)
+    second = cached.generate_candidate(system_prompt="translator", player_text=player_text)
 
     assert first == second
     assert underlying.calls == 1
