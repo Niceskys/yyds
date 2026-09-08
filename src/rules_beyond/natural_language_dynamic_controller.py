@@ -5,10 +5,12 @@ from typing import Mapping
 
 from .dynamic_rule_controller import (
     DynamicMatchState,
+    DynamicRoundResult,
     DynamicRuleController,
     RulePhaseOutcome,
 )
-from .model import Event, GameConfig
+from .model import Action, Event, GameConfig, Team
+from .rule_engine import RuleAwareGameEngine
 from .verified_natural_language_rule_adapter import (
     VerifiedNaturalLanguageRuleAdapter,
     VerifiedNaturalLanguageTranslation,
@@ -91,6 +93,10 @@ class VerifiedNaturalLanguageDynamicController:
     def config(self) -> GameConfig:
         return self.controller.config
 
+    @property
+    def engine(self) -> RuleAwareGameEngine:
+        return self.controller.engine
+
     def start_match(self, initial_text: str | None = None) -> NaturalLanguageDynamicStartResult:
         candidate, translation = self._translate(initial_text)
         started = self.controller.start_match(candidate)
@@ -103,6 +109,19 @@ class VerifiedNaturalLanguageDynamicController:
             state=started.state,
             phase=phase,
             events=started.events,
+        )
+
+    def resolve_round(
+        self,
+        state: DynamicMatchState,
+        actions: Mapping[Team, Action],
+        *,
+        match_seed: int,
+    ) -> DynamicRoundResult:
+        return self.controller.resolve_round(
+            state,
+            actions,
+            match_seed=match_seed,
         )
 
     def apply_due_rule_phase(
