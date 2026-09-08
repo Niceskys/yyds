@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Local secrets / environment
+.env
+.env.*
+!.env.example
+
+# Local benchmark output
+benchmark-output/
