@@ -274,16 +274,16 @@ def build_fixtures() -> dict[str, object]:
     )
     round_one_events = [
         RoundEventPublicView(
-            kind="BOW_HIT",
+            kind="DAMAGE_APPLIED",
             actor=TeamPublic.RED,
-            details={"damage": 1, "target": "BLUE"},
+            details={"amount": 1, "hp_after": 3, "hp_before": 4, "target": "BLUE"},
         )
     ]
     round_two_events = [
         RoundEventPublicView(
             kind="DAMAGE_APPLIED",
             actor=TeamPublic.RED,
-            details={"amount": 3, "target": "BLUE"},
+            details={"amount": 3, "hp_after": 0, "hp_before": 3, "target": "BLUE"},
         )
     ]
 
