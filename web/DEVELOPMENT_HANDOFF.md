@@ -25,24 +25,29 @@
 
 ### Commit
 
-`PENDING`（提交后见 `git log -1`）
+见下方「提交记录」最后一行。
 
 ### 完成内容
 
-- 增加 vitest + @testing-library 测试（28 个用例），覆盖初始页、按钮状态、棋盘坐标、
-  中文映射、隐藏内部字段、未知事件 fallback、Replay 顺序。
+- 仅更新本文件，记录本分支的提交历史，便于下一位开发者直接恢复上下文。
 
 ### 主要修改文件
 
-- `web/src/__tests__/*.test.ts(x)`
-- `web/vitest.setup.ts`
 - `web/DEVELOPMENT_HANDOFF.md`
 
 ### 验证
 
-- `npm run typecheck` → PASS
-- `npm run test` → PASS（5 个测试文件 / 28 个用例）
-- `npm run build` → PASS
+- 本提交为纯文档更新，未改动代码。
+- 上一个代码提交验证结果：`npm run typecheck` → PASS，`npm run test` → PASS（5 文件 / 28 用例），`npm run build` → PASS。
+
+## 提交记录
+
+- `9a8150b` — feat(frontend): bootstrap React/Vite app shell with start screen
+- `ad5cfa7` — feat(frontend): add V0.2 fixture adapter and UI view model layer
+- `0e2b97d` — feat(frontend): render board and red/blue status panels from V0.2 fixtures
+- `6449098` — feat(frontend): wire rule submission, terminal result and replay timeline
+- `9f18392` — test(frontend): cover B1 UI states, coordinates and privacy boundaries
+- 本次提交 — docs(frontend): record Developer B commit history in handoff
 
 ## 当前可运行状态
 
