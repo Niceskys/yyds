@@ -7,6 +7,10 @@ name = "rules-beyond"
 version = "0.1.0"
 description = "Deterministic engine prototype for Rules Beyond"
 requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.128,<1",
+  "pydantic>=2.13,<3",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
