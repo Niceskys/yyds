@@ -39,7 +39,10 @@ class NaturalLanguageEvalResult:
     text: str
     expected_decision: str
     actual_status: str
-    correct: bool
+    exact_correct: bool
+    decision_correct: bool
+    candidate_semantics_correct: bool | None
+    reason_code_correct: bool | None
     actual_candidate: Mapping[str, Any] | None
     expected_candidate: Mapping[str, Any] | None
     actual_reason_code: str | None
@@ -52,14 +55,18 @@ class NaturalLanguageEvalResult:
 class NaturalLanguageBenchmarkSummary:
     model_name: str
     total: int
-    correct: int
-    accuracy: float
+    exact_correct: int
+    exact_accuracy: float
+    decision_correct: int
+    decision_accuracy: float
     legal_total: int
-    legal_correct: int
+    legal_semantic_correct: int
     no_candidate_total: int
-    no_candidate_correct: int
+    no_candidate_decision_correct: int
+    no_candidate_reason_correct: int
     false_accepts: int
     false_rejects: int
+    wrong_legal_candidates: int
     results: tuple[NaturalLanguageEvalResult, ...]
 
 
@@ -141,11 +148,13 @@ def run_benchmark(
 ) -> NaturalLanguageBenchmarkSummary:
     results: list[NaturalLanguageEvalResult] = []
     legal_total = 0
-    legal_correct = 0
+    legal_semantic_correct = 0
     no_candidate_total = 0
-    no_candidate_correct = 0
+    no_candidate_decision_correct = 0
+    no_candidate_reason_correct = 0
     false_accepts = 0
     false_rejects = 0
+    wrong_legal_candidates = 0
 
     for case in cases:
         translation = adapter.translate(case.text)
@@ -157,23 +166,31 @@ def run_benchmark(
 
         if case.expected_decision == "CANDIDATE":
             legal_total += 1
-            correct = (
-                translation.status is TranslationStatus.ACCEPTED
-                and translation.candidate == case.expected_candidate
+            decision_correct = translation.status is TranslationStatus.ACCEPTED
+            candidate_semantics_correct = (
+                decision_correct and translation.candidate == case.expected_candidate
             )
-            if correct:
-                legal_correct += 1
-            elif translation.status is not TranslationStatus.ACCEPTED:
+            reason_code_correct = None
+            exact_correct = bool(candidate_semantics_correct)
+            if candidate_semantics_correct:
+                legal_semantic_correct += 1
+            elif decision_correct:
+                wrong_legal_candidates += 1
+            else:
                 false_rejects += 1
         else:
             no_candidate_total += 1
-            correct = (
-                translation.status is TranslationStatus.NO_CANDIDATE
-                and actual_reason == case.expected_reason_code
+            decision_correct = translation.status is TranslationStatus.NO_CANDIDATE
+            candidate_semantics_correct = None
+            reason_code_correct = (
+                decision_correct and actual_reason == case.expected_reason_code
             )
-            if correct:
-                no_candidate_correct += 1
-            elif translation.status is TranslationStatus.ACCEPTED:
+            exact_correct = bool(reason_code_correct)
+            if decision_correct:
+                no_candidate_decision_correct += 1
+            if reason_code_correct:
+                no_candidate_reason_correct += 1
+            if translation.status is TranslationStatus.ACCEPTED:
                 false_accepts += 1
 
         results.append(
@@ -183,7 +200,10 @@ def run_benchmark(
                 text=case.text,
                 expected_decision=case.expected_decision,
                 actual_status=translation.status.value,
-                correct=correct,
+                exact_correct=exact_correct,
+                decision_correct=decision_correct,
+                candidate_semantics_correct=candidate_semantics_correct,
+                reason_code_correct=reason_code_correct,
                 actual_candidate=translation.candidate,
                 expected_candidate=case.expected_candidate,
                 actual_reason_code=actual_reason,
@@ -196,18 +216,23 @@ def run_benchmark(
         )
 
     total = len(results)
-    correct_count = sum(result.correct for result in results)
+    exact_count = sum(result.exact_correct for result in results)
+    decision_count = sum(result.decision_correct for result in results)
     return NaturalLanguageBenchmarkSummary(
         model_name=model_name,
         total=total,
-        correct=correct_count,
-        accuracy=correct_count / total if total else 0.0,
+        exact_correct=exact_count,
+        exact_accuracy=exact_count / total if total else 0.0,
+        decision_correct=decision_count,
+        decision_accuracy=decision_count / total if total else 0.0,
         legal_total=legal_total,
-        legal_correct=legal_correct,
+        legal_semantic_correct=legal_semantic_correct,
         no_candidate_total=no_candidate_total,
-        no_candidate_correct=no_candidate_correct,
+        no_candidate_decision_correct=no_candidate_decision_correct,
+        no_candidate_reason_correct=no_candidate_reason_correct,
         false_accepts=false_accepts,
         false_rejects=false_rejects,
+        wrong_legal_candidates=wrong_legal_candidates,
         results=tuple(results),
     )
 
