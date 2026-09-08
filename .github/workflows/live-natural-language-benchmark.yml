@@ -3,10 +3,18 @@ name: live-natural-language-benchmark
 on:
   workflow_dispatch:
     inputs:
-      model:
-        description: "Zhipu model name to benchmark"
+      provider:
+        description: "Live provider"
         required: true
-        default: "glm-5.1"
+        default: "mimo"
+        type: choice
+        options:
+          - mimo
+          - zhipu
+      model:
+        description: "Model name (MiMo default: mimo-v2.5-pro)"
+        required: true
+        default: "mimo-v2.5-pro"
         type: string
 
 jobs:
@@ -16,6 +24,7 @@ jobs:
     permissions:
       contents: read
     env:
+      MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
       ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
     steps:
       - uses: actions/checkout@v4
@@ -27,21 +36,39 @@ jobs:
       - name: Install project
         run: python -m pip install -e '.[dev]'
 
-      - name: Verify API key secret exists
+      - name: Verify selected provider secret exists
         shell: bash
+        env:
+          PROVIDER_NAME: ${{ inputs.provider }}
         run: |
-          if [ -z "$ZHIPU_API_KEY" ]; then
-            echo "ZHIPU_API_KEY repository secret is not configured."
-            exit 1
-          fi
+          case "$PROVIDER_NAME" in
+            mimo)
+              if [ -z "$MIMO_API_KEY" ]; then
+                echo "MIMO_API_KEY repository secret is not configured."
+                exit 1
+              fi
+              ;;
+            zhipu)
+              if [ -z "$ZHIPU_API_KEY" ]; then
+                echo "ZHIPU_API_KEY repository secret is not configured."
+                exit 1
+              fi
+              ;;
+            *)
+              echo "Unsupported provider."
+              exit 1
+              ;;
+          esac
 
       - name: Run fixed 18-case natural-language benchmark
         shell: bash
         env:
+          PROVIDER_NAME: ${{ inputs.provider }}
           MODEL_NAME: ${{ inputs.model }}
         run: |
           mkdir -p benchmark-output
           python -m rules_beyond.natural_language_benchmark \
+            --provider "$PROVIDER_NAME" \
             --model "$MODEL_NAME" \
             > benchmark-output/result.json
 
