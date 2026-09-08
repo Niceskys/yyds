@@ -28,6 +28,7 @@ from .natural_language_rule_adapter import (
     SYSTEM_PROMPT_V0_1,
     NaturalLanguageRuleAdapter,
     NaturalLanguageTranslation,
+    NoCandidateReason,
     RuleCandidateModel,
     TranslationStatus,
 )
@@ -66,6 +67,7 @@ __all__ = [
     "MatchResult",
     "NaturalLanguageRuleAdapter",
     "NaturalLanguageTranslation",
+    "NoCandidateReason",
     "Position",
     "PublicRuleHistory",
     "RULE_PHASE_INTERVAL",
