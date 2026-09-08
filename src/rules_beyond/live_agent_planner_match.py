@@ -15,15 +15,14 @@ from .strategy_agent import (
     IsolatedStrategyAgent,
     StrategyDecision,
     StrategyDecisionStatus,
-    StrategyIntent,
 )
 
 
 AGENT_GATE_CONFIG = GameConfig(initial_hp=5, knife_damage=2)
 AGENT_GATE_SEED = 1_270_000
 
-# Fixed, already-closed rule candidates deliberately decouple this Gate from the
-# natural-language compiler. Dynamic rule translation has its own evidence/Gates.
+# Fixed, closed candidates deliberately decouple this Gate from the natural-language
+# compiler. Dynamic natural-language translation has its own evidence and failure log.
 AGENT_RULE_SCHEDULE: Mapping[int, Mapping[str, object] | None] = {
     0: {
         "version": "v0.1",
@@ -123,7 +122,7 @@ def evaluate_agent_gate(summary: AgentPlannerMatchSummary) -> tuple[str, ...]:
         failures.append("deterministic planner produced INVALID_MOVE_PATH")
     if summary.event_counts.get("INVALID_ATTACK", 0) != 0:
         failures.append("deterministic planner produced INVALID_ATTACK")
-    if summary.event_counts.get("RULE_REPLACED", 0) < 2:
+    if summary.event_counts.get("PLAYER_RULE_REPLACED", 0) < 2:
         failures.append("dynamic match did not exercise at least two accepted public-rule replacements")
     if not summary.round_traces:
         failures.append("no combat rounds were resolved")
@@ -278,7 +277,6 @@ def main() -> None:
     if not api_key.strip():
         raise SystemExit("MIMO_API_KEY is not set")
 
-    # Distinct provider and session objects make the isolation boundary explicit.
     red_agent = IsolatedStrategyAgent(
         Team.RED,
         MimoStrategyModel(api_key, model_name=args.model),
