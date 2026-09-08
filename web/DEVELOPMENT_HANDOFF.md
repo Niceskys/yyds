@@ -29,7 +29,7 @@
 
 ### 完成内容
 
-- 仅更新本文件，记录本分支的提交历史，便于下一位开发者直接恢复上下文。
+- 仅更新本文件，记录 `package-lock.json` 缺失这一跟进项，供 Issue #42 的前端 CI 一并处理。
 
 ### 主要修改文件
 
@@ -38,7 +38,7 @@
 ### 验证
 
 - 本提交为纯文档更新，未改动代码。
-- 上一个代码提交验证结果：`npm run typecheck` → PASS，`npm run test` → PASS（5 文件 / 28 用例），`npm run build` → PASS。
+- 代码提交验证结果：`npm run typecheck` → PASS，`npm run test` → PASS（5 文件 / 28 用例），`npm run build` → PASS。
 
 ## 提交记录
 
@@ -47,7 +47,8 @@
 - `0e2b97d` — feat(frontend): render board and red/blue status panels from V0.2 fixtures
 - `6449098` — feat(frontend): wire rule submission, terminal result and replay timeline
 - `9f18392` — test(frontend): cover B1 UI states, coordinates and privacy boundaries
-- 本次提交 — docs(frontend): record Developer B commit history in handoff
+- `58b1256` — docs(frontend): record Developer B commit history in handoff
+- 本次提交 — docs(frontend): note missing package-lock.json as a follow-up
 
 ## 当前可运行状态
 
@@ -74,6 +75,7 @@ cd web && npm install && npm run dev
 
 - `src/contract/types.ts` 是**临时**手写类型，仅为 mock 阶段服务，必须由 OpenAPI generated types 替换。
 - `src/components/MockScenarioBar.tsx` 与 `src/mock/scenarios.ts` 是开发演示代码，B4 接入真实 API 后删除。
+- 尚未提交 `web/package-lock.json`；Issue #42 引入前端 CI 时应一并加入锁文件并改用 `npm ci`。
 - 棋盘使用 CSS `aspect-ratio: 1 / 1`，尚未针对窄屏做棋盘尺寸上限优化。
 - 未引入状态管理库；当前 `useState` 足够，后续如接入真实 API 再评估。
 
@@ -82,7 +84,7 @@ cd web && npm install && npm run dev
 1. 与 Developer A 确认 FastAPI vertical slice 可调用后，实现 `apiAdapter`（复用同一 ViewModel）。
 2. 用 OpenAPI 生成 TypeScript 类型，删除临时 `types.ts`。
 3. 增加提交规则 / 推进回合的错误处理（revision conflict、幂等重试）。
-4. 处理 Issue #42 的前端 CI（在 `web/` 进入 main 之后）。
+4. 处理 Issue #42 的前端 CI（锁文件 + `npm ci` + typecheck/test/build）。
 
 ## 下一位开发者必须先读
 
