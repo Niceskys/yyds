@@ -5,12 +5,13 @@
 - branch: `frontend/app-shell-v02`
 - latest commit: 见 `git log -1`（本文件随每次 Developer B 提交同步更新）
 - contract version: `mvp-v0.2`
-- current task: B1 — fixture adapter + UI ViewModel
+- current task: B1 — 5×5 棋盘 + 红蓝状态面板
 
 ## 已完成
 
 - B0：React + TypeScript + Vite 应用外壳，初始页《规则之外》+「开始游戏」。
 - B1（数据层）：fixture 读取、临时 UI 契约类型、中文映射、事件展示、Mock Adapter、ViewModel、Mock 场景。
+- B1（棋盘与状态）：5×5 棋盘、红蓝面板、顶部状态、战局升温、本回合结果与公开事件。
 
 ## 本次提交
 
@@ -20,19 +21,16 @@
 
 ### 完成内容
 
-- 建立 `contract fixture → adapter → UI ViewModel → React components` 数据流中的 adapter 层。
-- 直接读取仓库 canonical `contracts/fixtures/mvp-v0.2/`，不在 web/ 复制第二套 fixture。
-- 集中管理中文映射（策略 / 阵营 / 武器 / 结果 / 战局升温）。
-- 有效属性使用白名单，`conflict_level` / `hard_liveness` 不进入 ViewModel 展示字段。
-- 未知 `RoundEventPublicView.kind` 提供安全 fallback。
-- 注册 8 个 V0.2 fixture 对应的 Mock 场景。
+- 棋盘按 `board.rows` / `board.cols` 渲染，不硬编码 5×5；公共 1-based 坐标只在渲染边界转 0-based。
+- 红方 / 蓝方面板：生命值、当前策略、实际行动、当前有效属性。
+- 顶部状态：已完成回合、规则制定次数、当前公共规则、战局升温。
+- 本回合结果 + 公开事件（中文，未知事件安全 fallback）。
+- Mock 场景切换条（8 个 V0.2 fixture）。
 
 ### 主要修改文件
 
-- `web/src/contract/types.ts`（临时，待 OpenAPI 替换）
-- `web/src/contract/labels.ts`、`eventLabels.ts`、`fixtures.ts`
-- `web/src/contract/viewModel.ts`、`mockAdapter.ts`、`replayAdapter.ts`
-- `web/src/mock/scenarios.ts`
+- `web/src/components/Board.tsx`、`TeamPanel.tsx`、`TopStatusBar.tsx`、`EscalationPanel.tsx`、`EventList.tsx`、`RoundSummary.tsx`、`MockScenarioBar.tsx`、`GameScreen.tsx`
+- `web/src/App.tsx`
 
 ### 验证
 
@@ -46,24 +44,26 @@
 cd web && npm install && npm run dev
 ```
 
-- 初始页可进入游玩界面占位；数据层已可解析全部 8 个 V0.2 fixture。
-- 棋盘 / 面板 / 规则输入由下一个提交接入。
+- 初始页可进入游玩界面；顶部状态 + 红蓝面板 + 5×5 棋盘 + 本回合结果可渲染。
+- 可通过顶部场景条切换 8 个 V0.2 fixture。
+- 规则输入 / 提交 / 继续下一回合 / 终局 / 回放由下一提交接入。
 
 ## 尚未完成
 
-- B1 UI：5×5 棋盘、红蓝面板、顶部状态、规则输入、终局与 Replay 组件。
+- B1：规则输入 / 提交 / 继续下一回合 / accepted / rejected / terminal 控件。
+- B3：Replay 页面接入。
 - B1 测试。
 - B4：真实 API 接入。
 
 ## 已知问题 / 技术债
 
 - `web/src/contract/types.ts` 是临时手写类型，必须由 OpenAPI generated types 替换。
-- 本提交只有数据层，UI 尚未消费。
+- `MockScenarioBar` 与 `web/src/mock/scenarios.ts` 是开发演示代码，B4 接入真实 API 后删除。
 
 ## 下一步
 
-1. 渲染 5×5 棋盘与红蓝状态面板。
-2. 接入规则输入 / 提交 / 继续下一回合与终局状态。
+1. 接入规则输入 / 提交 / 继续下一回合与 accepted / rejected / terminal 状态。
+2. 接入 Replay 页面。
 3. 补充关键 UI 状态测试。
 
 ## 下一位开发者必须先读
