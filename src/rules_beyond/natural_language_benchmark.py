@@ -7,6 +7,11 @@ import os
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from .mimo_rule_provider import (
+    DEFAULT_MIMO_API_KEY_ENV,
+    DEFAULT_MIMO_RULE_MODEL,
+    MimoRuleCandidateModel,
+)
 from .natural_language_rule_adapter import (
     NaturalLanguageRuleAdapter,
     NoCandidateReason,
@@ -15,11 +20,13 @@ from .natural_language_rule_adapter import (
 from .rule_validator import RuleValidator
 from .zhipu_rule_provider import (
     DEFAULT_ZHIPU_API_KEY_ENV,
+    DEFAULT_ZHIPU_RULE_MODEL,
     ZhipuRuleCandidateModel,
 )
 
 
 DEFAULT_CORPUS_PATH = Path("evals/natural_language_rule_corpus_v0.1.json")
+SUPPORTED_PROVIDERS = ("mimo", "zhipu")
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +60,7 @@ class NaturalLanguageEvalResult:
 
 @dataclass(frozen=True, slots=True)
 class NaturalLanguageBenchmarkSummary:
+    provider: str
     model_name: str
     total: int
     exact_correct: int
@@ -144,6 +152,7 @@ def run_benchmark(
     adapter: NaturalLanguageRuleAdapter,
     cases: Iterable[NaturalLanguageEvalCase],
     *,
+    provider: str = "test",
     model_name: str,
 ) -> NaturalLanguageBenchmarkSummary:
     results: list[NaturalLanguageEvalResult] = []
@@ -219,6 +228,7 @@ def run_benchmark(
     exact_count = sum(result.exact_correct for result in results)
     decision_count = sum(result.decision_correct for result in results)
     return NaturalLanguageBenchmarkSummary(
+        provider=provider,
         model_name=model_name,
         total=total,
         exact_correct=exact_count,
@@ -237,34 +247,55 @@ def run_benchmark(
     )
 
 
+def _build_provider(provider_name: str, model_name: str | None, timeout_seconds: float):
+    if provider_name == "mimo":
+        if model_name is None:
+            return MimoRuleCandidateModel.from_env(timeout_seconds=timeout_seconds)
+        api_key = os.getenv(DEFAULT_MIMO_API_KEY_ENV, "")
+        if not api_key.strip():
+            raise ValueError(f"{DEFAULT_MIMO_API_KEY_ENV} is not set")
+        return MimoRuleCandidateModel(
+            api_key,
+            model_name=model_name,
+            timeout_seconds=timeout_seconds,
+        )
+
+    if provider_name == "zhipu":
+        if model_name is None:
+            return ZhipuRuleCandidateModel.from_env(timeout_seconds=timeout_seconds)
+        api_key = os.getenv(DEFAULT_ZHIPU_API_KEY_ENV, "")
+        if not api_key.strip():
+            raise ValueError(f"{DEFAULT_ZHIPU_API_KEY_ENV} is not set")
+        return ZhipuRuleCandidateModel(
+            api_key,
+            model_name=model_name,
+            timeout_seconds=timeout_seconds,
+        )
+
+    raise ValueError(f"unsupported provider: {provider_name}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run the fixed natural-language RuleAST benchmark against Zhipu API"
+        description="Run the fixed natural-language RuleAST benchmark against a live provider"
     )
     parser.add_argument("--corpus", default=str(DEFAULT_CORPUS_PATH))
+    parser.add_argument("--provider", choices=SUPPORTED_PROVIDERS, default="mimo")
     parser.add_argument("--model", default=None)
     parser.add_argument("--timeout-seconds", type=float, default=20.0)
     args = parser.parse_args()
 
     cases = load_corpus(args.corpus)
     validate_corpus_against_rule_validator(cases)
-
-    if args.model is None:
-        provider = ZhipuRuleCandidateModel.from_env(
-            timeout_seconds=args.timeout_seconds,
-        )
-    else:
-        api_key = os.getenv(DEFAULT_ZHIPU_API_KEY_ENV, "")
-        if not api_key.strip():
-            raise ValueError(f"{DEFAULT_ZHIPU_API_KEY_ENV} is not set")
-        provider = ZhipuRuleCandidateModel(
-            api_key,
-            model_name=args.model,
-            timeout_seconds=args.timeout_seconds,
-        )
+    provider = _build_provider(args.provider, args.model, args.timeout_seconds)
 
     adapter = NaturalLanguageRuleAdapter(provider)
-    summary = run_benchmark(adapter, cases, model_name=provider.model_name)
+    summary = run_benchmark(
+        adapter,
+        cases,
+        provider=args.provider,
+        model_name=provider.model_name,
+    )
     print(json.dumps(asdict(summary), ensure_ascii=False, indent=2))
 
 

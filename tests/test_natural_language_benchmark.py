@@ -1,11 +1,14 @@
 import json
 
+from rules_beyond.mimo_rule_provider import MimoRuleCandidateModel
 from rules_beyond.natural_language_benchmark import (
+    _build_provider,
     load_corpus,
     run_benchmark,
     validate_corpus_against_rule_validator,
 )
 from rules_beyond.natural_language_rule_adapter import NaturalLanguageRuleAdapter
+from rules_beyond.zhipu_rule_provider import ZhipuRuleCandidateModel
 
 
 class CorpusOracleModel:
@@ -48,6 +51,7 @@ def test_oracle_model_scores_perfectly_on_benchmark_logic() -> None:
 
     summary = run_benchmark(adapter, cases, model_name="oracle")
 
+    assert summary.provider == "test"
     assert summary.total == 18
     assert summary.exact_correct == 18
     assert summary.exact_accuracy == 1.0
@@ -111,6 +115,20 @@ def test_safe_rejection_with_different_reason_is_decision_correct_but_not_exact(
     assert result.decision_correct is True
     assert result.reason_code_correct is False
     assert result.exact_correct is False
+
+
+def test_build_provider_selects_mimo_from_env(monkeypatch) -> None:
+    monkeypatch.setenv("MIMO_API_KEY", "tp-test")
+    provider = _build_provider("mimo", "mimo-v2.5-pro", 3.0)
+    assert isinstance(provider, MimoRuleCandidateModel)
+    assert provider.model_name == "mimo-v2.5-pro"
+
+
+def test_build_provider_selects_zhipu_from_env(monkeypatch) -> None:
+    monkeypatch.setenv("ZHIPU_API_KEY", "sk-test")
+    provider = _build_provider("zhipu", "glm-5.1", 3.0)
+    assert isinstance(provider, ZhipuRuleCandidateModel)
+    assert provider.model_name == "glm-5.1"
 
 
 def test_invalid_corpus_duplicate_id_is_rejected(tmp_path) -> None:
