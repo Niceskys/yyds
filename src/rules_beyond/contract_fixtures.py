@@ -7,19 +7,22 @@ from pathlib import Path
 from .api_contract import (
     ActionPublicView,
     AdvanceResult,
+    BattleEscalationSnapshot,
     BoardSnapshot,
     EffectiveStatsPublicView,
     ErrorCode,
     ErrorDetail,
     ErrorEnvelope,
     GameConfigPublicView,
+    IntermissionChoicePublic,
     MatchLifecycle,
     MatchResultPublic,
     MatchSnapshot,
+    PlayerDecisionSnapshot,
     PositionSnapshot,
     PublicStrategyDecision,
+    ReplayIntermissionEntry,
     ReplayRoundEntry,
-    ReplayRulePhaseEntry,
     ReplaySnapshot,
     RiskBudgetPublic,
     RoundEventPublicView,
@@ -28,7 +31,6 @@ from .api_contract import (
     RuleDurationPublic,
     RuleEffectPublicView,
     RuleEffectTypePublic,
-    RulePhaseSnapshot,
     RulePublicView,
     RuleSubmissionCode,
     RuleSubmissionResult,
@@ -48,17 +50,45 @@ from .api_contract import (
 )
 
 
-def _stats(*, move_range: int = 1, hard: bool = False) -> EffectiveStatsPublicView:
+def _battle(*, no_damage_streak: int = 0, hard: bool = False) -> BattleEscalationSnapshot:
+    if hard or no_damage_streak >= 12:
+        level = 4
+        next_threshold = None
+    elif no_damage_streak >= 9:
+        level = 3
+        next_threshold = 12
+    elif no_damage_streak >= 6:
+        level = 2
+        next_threshold = 9
+    elif no_damage_streak >= 3:
+        level = 1
+        next_threshold = 6
+    else:
+        level = 0
+        next_threshold = 3
+
+    return BattleEscalationSnapshot(
+        level=level,
+        no_damage_streak=no_damage_streak,
+        next_level_at_no_damage=next_threshold,
+        rounds_until_next_level=(
+            None if next_threshold is None else max(0, next_threshold - no_damage_streak)
+        ),
+        hard_liveness_active=hard or level == 4,
+    )
+
+
+def _stats(*, move_range: int = 1, conflict_level: int = 0, hard: bool = False) -> EffectiveStatsPublicView:
     return EffectiveStatsPublicView(
         move_range=move_range,
-        knife_range=1,
-        bow_range=3,
+        knife_range=1 if conflict_level == 0 else 2,
+        bow_range=3 + min(conflict_level, 3) if not hard else 8,
         knife_damage=2,
         bow_damage=1,
         bow_hit_multiplier=1.0,
-        bow_hit_floor=0.0,
+        bow_hit_floor={0: 0.0, 1: 0.0, 2: 0.25, 3: 0.50, 4: 1.0}[conflict_level],
         cooldown_weapons=[],
-        conflict_level=0,
+        conflict_level=conflict_level,
         hard_liveness=hard,
     )
 
@@ -113,21 +143,110 @@ def _strategy(intent: StrategyIntentPublic) -> PublicStrategyDecision:
     )
 
 
-def _running_match(*, revision: int = 7) -> MatchSnapshot:
-    rule = _rule()
+def _empty_strategies() -> TeamLatestStrategyMap:
+    return TeamLatestStrategyMap(RED=None, BLUE=None)
+
+
+def _strategies() -> TeamRoundStrategyMap:
+    return TeamRoundStrategyMap(
+        RED=_strategy(StrategyIntentPublic.PRESSURE),
+        BLUE=_strategy(StrategyIntentPublic.KITE),
+    )
+
+
+def _initial_match() -> MatchSnapshot:
+    return MatchSnapshot(
+        match_id="match_fixture_001",
+        revision=0,
+        lifecycle=MatchLifecycle.RUNNING,
+        seed=1_270_000,
+        round_no=1,
+        completed_rounds=0,
+        score_rounds=0,
+        rule_change_count=0,
+        board=BoardSnapshot(rows=5, cols=5),
+        units=_units(red_hp=4, blue_hp=4),
+        active_rule=None,
+        player_decision=PlayerDecisionSnapshot(
+            after_round=None,
+            can_submit_rule=False,
+            rule_changed_this_intermission=False,
+            can_advance=True,
+        ),
+        effective_stats=TeamStatsMap(RED=_stats(), BLUE=_stats()),
+        latest_strategy=_empty_strategies(),
+        battle_escalation=_battle(),
+        result=None,
+    )
+
+
+def _decision_match(*, revision: int = 1) -> MatchSnapshot:
     return MatchSnapshot(
         match_id="match_fixture_001",
         revision=revision,
-        lifecycle=MatchLifecycle.RUNNING,
+        lifecycle=MatchLifecycle.PLAYER_DECISION,
         seed=1_270_000,
         round_no=2,
+        completed_rounds=1,
+        score_rounds=1,
+        rule_change_count=0,
         board=BoardSnapshot(rows=5, cols=5),
         units=_units(),
-        active_rule=rule,
-        rule_phase=RulePhaseSnapshot(
-            phase_index=0,
-            due=False,
-            next_due_after_round=3,
+        active_rule=None,
+        player_decision=PlayerDecisionSnapshot(
+            after_round=1,
+            can_submit_rule=True,
+            rule_changed_this_intermission=False,
+            can_advance=True,
+        ),
+        effective_stats=TeamStatsMap(RED=_stats(), BLUE=_stats()),
+        latest_strategy=TeamLatestStrategyMap(
+            RED=_strategy(StrategyIntentPublic.PRESSURE),
+            BLUE=_strategy(StrategyIntentPublic.KITE),
+        ),
+        battle_escalation=_battle(no_damage_streak=0),
+        result=None,
+    )
+
+
+def _post_rule_match() -> MatchSnapshot:
+    base = _decision_match(revision=2)
+    return base.model_copy(
+        update={
+            "active_rule": _rule(),
+            "rule_change_count": 1,
+            "player_decision": PlayerDecisionSnapshot(
+                after_round=1,
+                can_submit_rule=False,
+                rule_changed_this_intermission=True,
+                can_advance=True,
+            ),
+            "effective_stats": TeamStatsMap(
+                RED=_stats(move_range=2),
+                BLUE=_stats(move_range=2),
+            ),
+        }
+    )
+
+
+def _terminal_match() -> MatchSnapshot:
+    return MatchSnapshot(
+        match_id="match_fixture_001",
+        revision=4,
+        lifecycle=MatchLifecycle.TERMINAL,
+        seed=1_270_000,
+        round_no=2,
+        completed_rounds=2,
+        score_rounds=2,
+        rule_change_count=1,
+        board=BoardSnapshot(rows=5, cols=5),
+        units=_units(red_hp=2, blue_hp=0),
+        active_rule=_rule(),
+        player_decision=PlayerDecisionSnapshot(
+            after_round=2,
+            can_submit_rule=False,
+            rule_changed_this_intermission=False,
+            can_advance=False,
         ),
         effective_stats=TeamStatsMap(
             RED=_stats(move_range=2),
@@ -137,62 +256,34 @@ def _running_match(*, revision: int = 7) -> MatchSnapshot:
             RED=_strategy(StrategyIntentPublic.PRESSURE),
             BLUE=_strategy(StrategyIntentPublic.KITE),
         ),
-        no_damage_streak=0,
-        hard_liveness_active=False,
-        result=None,
-    )
-
-
-def _awaiting_rule_match() -> MatchSnapshot:
-    base = _running_match(revision=8)
-    return base.model_copy(
-        update={
-            "lifecycle": MatchLifecycle.AWAITING_RULE,
-            "round_no": 4,
-            "rule_phase": RulePhaseSnapshot(
-                phase_index=1,
-                due=True,
-                next_due_after_round=6,
-            ),
-        }
-    )
-
-
-def _terminal_match() -> MatchSnapshot:
-    base = _running_match(revision=12)
-    return base.model_copy(
-        update={
-            "lifecycle": MatchLifecycle.TERMINAL,
-            "round_no": 5,
-            "units": _units(red_hp=2, blue_hp=0),
-            "rule_phase": RulePhaseSnapshot(
-                phase_index=1,
-                due=False,
-                next_due_after_round=None,
-            ),
-            "result": MatchResultPublic.RED_WIN,
-        }
+        battle_escalation=_battle(no_damage_streak=0),
+        result=MatchResultPublic.RED_WIN,
     )
 
 
 def build_fixtures() -> dict[str, object]:
-    running = _running_match()
-    awaiting = _awaiting_rule_match()
+    initial = _initial_match()
+    decision = _decision_match()
+    post_rule = _post_rule_match()
     terminal = _terminal_match()
     rule = _rule()
-    strategies = TeamRoundStrategyMap(
-        RED=_strategy(StrategyIntentPublic.PRESSURE),
-        BLUE=_strategy(StrategyIntentPublic.KITE),
-    )
+    strategies = _strategies()
     actions = TeamActionMap(
         RED=ActionPublicView(move_path=[], attack=WeaponPublic.BOW),
         BLUE=ActionPublicView(move_path=[], attack=WeaponPublic.BOW),
     )
-    events = [
+    round_one_events = [
         RoundEventPublicView(
             kind="BOW_HIT",
             actor=TeamPublic.RED,
             details={"damage": 1, "target": "BLUE"},
+        )
+    ]
+    round_two_events = [
+        RoundEventPublicView(
+            kind="DAMAGE_APPLIED",
+            actor=TeamPublic.RED,
+            details={"amount": 3, "target": "BLUE"},
         )
     ]
 
@@ -203,7 +294,7 @@ def build_fixtures() -> dict[str, object]:
         suggested_rephrase=None,
         candidate_preview=None,
         rule_id=rule.rule_id,
-        match=running,
+        match=post_rule,
     )
     rejected = RuleSubmissionResult(
         accepted=False,
@@ -212,7 +303,7 @@ def build_fixtures() -> dict[str, object]:
         suggested_rephrase="双方的移动距离增加1格",
         candidate_preview=None,
         rule_id=None,
-        match=awaiting,
+        match=decision,
     )
     revision_conflict = ErrorEnvelope(
         error=ErrorDetail(
@@ -223,12 +314,12 @@ def build_fixtures() -> dict[str, object]:
     )
     advance = AdvanceResult(
         round=RoundExecutionPublicView(
-            round_no=2,
+            round_no=1,
             strategies=strategies,
             actions=actions,
-            events=events,
+            events=round_one_events,
         ),
-        match=running,
+        match=decision,
     )
     replay = ReplaySnapshot(
         match_id=terminal.match_id,
@@ -246,33 +337,59 @@ def build_fixtures() -> dict[str, object]:
             bow_damage=1,
         ),
         timeline=[
-            ReplayRulePhaseEntry(
-                phase_index=0,
+            ReplayRoundEntry(
+                round_no=1,
+                pre_round=initial,
+                strategies=strategies,
+                actions=actions,
+                events=round_one_events,
+                post_round_units=decision.units,
+                battle_escalation=decision.battle_escalation,
+                effective_stats=decision.effective_stats,
+                result=None,
+            ),
+            ReplayIntermissionEntry(
+                after_round=1,
+                choice=IntermissionChoicePublic.RULE_ATTEMPT,
                 submitted_player_text=rule.player_text,
                 submission_public_code=RuleSubmissionCode.ACCEPTED,
                 accepted_rule_id=rule.rule_id,
                 accepted_rule=rule,
                 active_rule_before=None,
                 active_rule_after=rule,
+                rule_change_count_after=1,
+            ),
+            ReplayIntermissionEntry(
+                after_round=1,
+                choice=IntermissionChoicePublic.CONTINUE,
+                submitted_player_text=None,
+                submission_public_code=None,
+                accepted_rule_id=None,
+                accepted_rule=None,
+                active_rule_before=rule,
+                active_rule_after=rule,
+                rule_change_count_after=1,
             ),
             ReplayRoundEntry(
                 round_no=2,
-                pre_round=running,
+                pre_round=post_rule,
                 strategies=strategies,
                 actions=actions,
-                events=events,
+                events=round_two_events,
                 post_round_units=terminal.units,
-                no_damage_streak=0,
-                hard_liveness_active=False,
+                battle_escalation=terminal.battle_escalation,
                 effective_stats=terminal.effective_stats,
                 result=MatchResultPublic.RED_WIN,
             ),
         ],
         terminal_result=MatchResultPublic.RED_WIN,
+        score_rounds=2,
+        rule_change_count=1,
     )
 
     return {
-        "match_running.json": running,
+        "match_initial.json": initial,
+        "match_player_decision.json": decision,
         "rule_accepted.json": accepted,
         "rule_rejected.json": rejected,
         "match_terminal.json": terminal,
@@ -297,7 +414,7 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("contracts/fixtures/mvp-v0.1"),
+        default=Path("contracts/fixtures/mvp-v0.2"),
     )
     args = parser.parse_args()
     export_fixtures(args.output_dir)
