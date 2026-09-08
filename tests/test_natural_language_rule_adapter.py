@@ -1,5 +1,6 @@
 import json
 
+from rules_beyond.dynamic_rule_controller import DynamicRuleController
 from rules_beyond.natural_language_rule_adapter import (
     MAX_MODEL_OUTPUT_CHARS,
     NaturalLanguageRuleAdapter,
@@ -145,6 +146,37 @@ def test_oversized_output_is_rejected_before_json_decode() -> None:
     assert result.status is TranslationStatus.OUTPUT_TOO_LARGE
     assert result.candidate is None
     assert result.rule is None
+
+
+def test_accepted_candidate_is_revalidated_by_dynamic_controller() -> None:
+    model = StubModel(json.dumps(valid_candidate()))
+    adapter = NaturalLanguageRuleAdapter(model)
+    translated = adapter.translate("生命值不高于2时，弓射程增加1格")
+
+    assert translated.accepted is True
+    assert translated.candidate is not None
+
+    started = DynamicRuleController().start_match(translated.candidate)
+
+    assert started.phase.accepted is True
+    assert started.state.active_rule is not None
+    assert started.state.active_rule.effect.type is RuleEffectType.BOW_RANGE_ADD
+
+
+def test_rejected_candidate_still_cannot_bypass_controller_if_forwarded() -> None:
+    candidate = valid_candidate(target="RED")
+    model = StubModel(json.dumps(candidate))
+    adapter = NaturalLanguageRuleAdapter(model)
+    translated = adapter.translate("只让红方弓射程增加1")
+
+    assert translated.status is TranslationStatus.RULE_REJECTED
+    assert translated.candidate is not None
+
+    started = DynamicRuleController().start_match(translated.candidate)
+
+    assert started.phase.accepted is False
+    assert started.state.active_rule is None
+    assert "FACTION_NEUTRALITY" in {issue.code for issue in started.phase.issues}
 
 
 def test_system_prompt_states_the_narrow_authority_boundary() -> None:
