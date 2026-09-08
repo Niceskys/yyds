@@ -24,6 +24,7 @@ on:
         options:
           - baseline
           - holdout
+          - holdout-v02
       pipeline:
         description: "Translator only, or translator + Validator + faithfulness gate"
         required: true
@@ -88,6 +89,9 @@ jobs:
               ;;
             holdout)
               echo "corpus=evals/natural_language_rule_holdout_v0.1.json" >> "$GITHUB_OUTPUT"
+              ;;
+            holdout-v02)
+              echo "corpus=evals/natural_language_rule_holdout_v0.2.json" >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "Unsupported suite."
