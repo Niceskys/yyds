@@ -1,0 +1,45 @@
+{
+  "schema_version": "mvp-v0.2",
+  "accepted": false,
+  "public_code": "NO_CANDIDATE",
+  "message": "当前规则系统无法安全表达这句话。",
+  "suggested_rephrase": "双方的移动距离增加1格",
+  "candidate_preview": null,
+  "rule_id": null,
+  "match": {
+    "schema_version": "mvp-v0.2",
+    "match_id": "match_fixture_001",
+    "revision": 1,
+    "lifecycle": "PLAYER_DECISION",
+    "seed": 1270000,
+    "round_no": 2,
+    "completed_rounds": 1,
+    "score_rounds": 1,
+    "rule_change_count": 0,
+    "board": {"rows": 5, "cols": 5},
+    "units": {
+      "RED": {"team": "RED", "hp": 4, "position": {"row": 3, "col": 2}},
+      "BLUE": {"team": "BLUE", "hp": 3, "position": {"row": 3, "col": 5}}
+    },
+    "active_rule": null,
+    "player_decision": {
+      "after_round": 1,
+      "can_submit_rule": true,
+      "rule_changed_this_intermission": false,
+      "can_advance": true
+    },
+    "effective_stats": {
+      "RED": {"move_range": 1, "knife_range": 1, "bow_range": 3, "knife_damage": 2, "bow_damage": 1, "bow_hit_multiplier": 1.0, "bow_hit_floor": 0.0, "cooldown_weapons": [], "conflict_level": 0, "hard_liveness": false},
+      "BLUE": {"move_range": 1, "knife_range": 1, "bow_range": 3, "knife_damage": 2, "bow_damage": 1, "bow_hit_multiplier": 1.0, "bow_hit_floor": 0.0, "cooldown_weapons": [], "conflict_level": 0, "hard_liveness": false}
+    },
+    "latest_strategy": {"RED": null, "BLUE": null},
+    "battle_escalation": {
+      "level": 0,
+      "no_damage_streak": 0,
+      "next_level_at_no_damage": 3,
+      "rounds_until_next_level": 3,
+      "hard_liveness_active": false
+    },
+    "result": null
+  }
+}
