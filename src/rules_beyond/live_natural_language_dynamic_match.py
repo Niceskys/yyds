@@ -7,7 +7,7 @@ import json
 import os
 from typing import Mapping
 
-from .dynamic_rule_controller import DynamicMatchState
+from .dynamic_rule_controller import DynamicRuleController
 from .mimo_rule_provider import DEFAULT_MIMO_RULE_MODEL, MimoRuleCandidateModel
 from .model import Action, GameConfig, MatchResult, Team
 from .natural_language_dynamic_controller import (
@@ -160,13 +160,8 @@ def _phase_trace(phase: NaturalLanguageDynamicPhase) -> LivePhaseTrace:
 
 def _baseline_round1_actions(config: GameConfig, seed: int) -> tuple[str, str]:
     bot = RuleAwareAttackFirstBot()
-    controller = VerifiedNaturalLanguageDynamicController.__new__(
-        VerifiedNaturalLanguageDynamicController
-    )
-    # Baseline needs no natural-language layer: use the deterministic dynamic
-    # controller directly so the comparison isolates the phase-0 public rule.
-    from .dynamic_rule_controller import DynamicRuleController
-
+    # Baseline deliberately bypasses all natural-language code so the comparison
+    # isolates whether the accepted phase-0 public rule changes planner behavior.
     dynamic = DynamicRuleController(config)
     started = dynamic.start_match(None)
     state = started.state
@@ -186,7 +181,6 @@ def _baseline_round1_actions(config: GameConfig, seed: int) -> tuple[str, str]:
         histories=state.histories,
         match_seed=seed,
     )
-    del controller
     return _action_signature(red), _action_signature(blue)
 
 
