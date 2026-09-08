@@ -10,22 +10,15 @@ from rules_beyond.verified_natural_language_rule_adapter import VerifiedNaturalL
 class RoutingModel:
     def generate_candidate(self, *, system_prompt: str, player_text: str) -> str:
         if "strict semantic verifier" in system_prompt:
-            payload = json.loads(player_text)
-            if "或者" in payload["player_text"]:
-                return json.dumps({"decision": "REJECT", "reason_code": "DROPPED_INTENT"})
             return json.dumps({"decision": "FAITHFUL"})
 
-        if "或者" in player_text:
-            conditions = [{"type": "SELF_HP_LTE", "value": 2}]
-        else:
-            conditions = [{"type": "SELF_HP_LTE", "value": 2}]
         return json.dumps(
             {
                 "decision": "CANDIDATE",
                 "candidate": {
                     "version": "v0.1",
                     "target": "ALL_UNITS",
-                    "conditions": conditions,
+                    "conditions": [{"type": "SELF_HP_LTE", "value": 2}],
                     "effect": {"type": "BOW_RANGE_ADD", "delta": 1},
                     "duration": "UNTIL_REPLACED",
                 },
@@ -34,7 +27,7 @@ class RoutingModel:
         )
 
 
-def test_verified_benchmark_counts_semantic_rejection_as_safe_block() -> None:
+def test_verified_benchmark_counts_intent_guard_rejection_as_safe_block() -> None:
     legal_candidate = {
         "version": "v0.1",
         "target": "ALL_UNITS",
@@ -76,4 +69,8 @@ def test_verified_benchmark_counts_semantic_rejection_as_safe_block() -> None:
     assert summary.no_candidate_blocked == 1
     assert summary.false_accepts == 0
     assert summary.wrong_legal_candidates == 0
-    assert summary.semantic_rejections == 1
+    assert summary.intent_guard_rejections == 1
+    assert summary.semantic_rejections == 0
+    rejected = next(result for result in summary.results if result.case_id == "or-reject")
+    assert rejected.pipeline_status == "INTENT_GUARD_REJECTED"
+    assert rejected.intent_guard_reason == "EXPLICIT_OR_UNSUPPORTED"
