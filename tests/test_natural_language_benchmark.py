@@ -11,6 +11,9 @@ from rules_beyond.natural_language_rule_adapter import NaturalLanguageRuleAdapte
 from rules_beyond.zhipu_rule_provider import ZhipuRuleCandidateModel
 
 
+HOLDOUT_CORPUS = "evals/natural_language_rule_holdout_v0.1.json"
+
+
 class CorpusOracleModel:
     def __init__(self, cases, *, override=None):
         self.by_text = {case.text: case for case in cases}
@@ -45,6 +48,17 @@ def test_fixed_corpus_loads_and_all_expected_candidates_are_validator_legal() ->
     validate_corpus_against_rule_validator(cases)
 
 
+def test_holdout_corpus_is_frozen_balanced_and_validator_legal() -> None:
+    cases = load_corpus(HOLDOUT_CORPUS)
+
+    assert len(cases) == 40
+    assert len({case.case_id for case in cases}) == 40
+    assert sum(case.expected_decision == "CANDIDATE" for case in cases) == 20
+    assert sum(case.expected_decision == "NO_CANDIDATE" for case in cases) == 20
+
+    validate_corpus_against_rule_validator(cases)
+
+
 def test_oracle_model_scores_perfectly_on_benchmark_logic() -> None:
     cases = load_corpus()
     adapter = NaturalLanguageRuleAdapter(CorpusOracleModel(cases))
@@ -62,6 +76,22 @@ def test_oracle_model_scores_perfectly_on_benchmark_logic() -> None:
     assert summary.no_candidate_total == 10
     assert summary.no_candidate_decision_correct == 10
     assert summary.no_candidate_reason_correct == 10
+    assert summary.false_accepts == 0
+    assert summary.false_rejects == 0
+    assert summary.wrong_legal_candidates == 0
+
+
+def test_holdout_oracle_scores_perfectly_without_prompt_changes() -> None:
+    cases = load_corpus(HOLDOUT_CORPUS)
+    adapter = NaturalLanguageRuleAdapter(CorpusOracleModel(cases))
+
+    summary = run_benchmark(adapter, cases, model_name="holdout-oracle")
+
+    assert summary.total == 40
+    assert summary.legal_total == 20
+    assert summary.legal_semantic_correct == 20
+    assert summary.no_candidate_total == 20
+    assert summary.no_candidate_decision_correct == 20
     assert summary.false_accepts == 0
     assert summary.false_rejects == 0
     assert summary.wrong_legal_candidates == 0
