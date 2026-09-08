@@ -84,6 +84,7 @@ class LiveDynamicMatchSummary:
     config: dict[str, object]
     schedule: dict[int, str]
     gate_passed: bool
+    gate_failures: tuple[str, ...]
     matches: tuple[LiveMatchTrace, ...]
 
 
@@ -267,37 +268,46 @@ def play_live_match(
     )
 
 
-def assert_live_dynamic_match_gate(traces: tuple[LiveMatchTrace, ...]) -> None:
+def evaluate_live_dynamic_match_gate(traces: tuple[LiveMatchTrace, ...]) -> tuple[str, ...]:
+    failures: list[str] = []
     if len(traces) < 3:
-        raise AssertionError("live gate requires at least three deterministic seeds")
+        failures.append("live gate requires at least three deterministic seeds")
     if any(trace.result == MatchResult.TIMEOUT.value for trace in traces):
-        raise AssertionError("live natural-language schedule must not end in TIMEOUT")
-    if any(not trace.round1_behavior_changed for trace in traces):
-        raise AssertionError("phase-0 natural-language rule did not change deterministic round-1 behavior")
-    if any(trace.rule_modifier_events <= 0 for trace in traces):
-        raise AssertionError("accepted natural-language rule produced no Engine modifier event")
+        failures.append("live natural-language schedule ended in TIMEOUT")
+    for trace in traces:
+        if not trace.round1_behavior_changed:
+            failures.append(
+                f"seed {trace.seed}: phase-0 natural-language rule did not change round-1 behavior"
+            )
+        if trace.rule_modifier_events <= 0:
+            failures.append(f"seed {trace.seed}: no RULE_MODIFIER_APPLIED Engine event")
 
     reached_phase3 = 0
     for trace in traces:
         by_index = {phase.phase_index: phase for phase in trace.phases}
-        for required in (0, 1, 2):
-            if required not in by_index:
-                raise AssertionError(f"seed {trace.seed} did not reach required phase {required}")
+        missing = [required for required in (0, 1, 2) if required not in by_index]
+        if missing:
+            failures.append(f"seed {trace.seed}: missing required phases {missing}")
+            continue
 
         for phase_index in (0, 1):
             phase = by_index[phase_index]
             if phase.translation_status != "ACCEPTED" or not phase.controller_replaced:
-                raise AssertionError(
-                    f"seed {trace.seed} legal phase {phase_index} was not accepted and replaced"
+                failures.append(
+                    f"seed {trace.seed}: legal phase {phase_index} was not accepted and replaced "
+                    f"(translation={phase.translation_status}, replaced={phase.controller_replaced})"
                 )
 
         rejected_or = by_index[2]
         if rejected_or.translation_status != "INTENT_GUARD_REJECTED":
-            raise AssertionError(f"seed {trace.seed} explicit OR was not rejected by intent guard")
+            failures.append(
+                f"seed {trace.seed}: explicit OR was not intent-guard rejected "
+                f"(translation={rejected_or.translation_status})"
+            )
         if rejected_or.controller_replaced:
-            raise AssertionError(f"seed {trace.seed} rejected OR unexpectedly replaced active rule")
+            failures.append(f"seed {trace.seed}: rejected OR replaced the active rule")
         if not rejected_or.carried_forward_after_translation_rejection:
-            raise AssertionError(f"seed {trace.seed} rejected OR did not carry prior rule forward")
+            failures.append(f"seed {trace.seed}: rejected OR did not carry the previous rule")
 
         for phase_index in (3, 4):
             phase = by_index.get(phase_index)
@@ -305,12 +315,20 @@ def assert_live_dynamic_match_gate(traces: tuple[LiveMatchTrace, ...]) -> None:
                 continue
             reached_phase3 += int(phase_index == 3)
             if phase.translation_status != "ACCEPTED" or not phase.controller_replaced:
-                raise AssertionError(
-                    f"seed {trace.seed} reached legal phase {phase_index} but did not accept it"
+                failures.append(
+                    f"seed {trace.seed}: reached legal phase {phase_index} but it was not accepted "
+                    f"(translation={phase.translation_status}, replaced={phase.controller_replaced})"
                 )
 
     if reached_phase3 == 0:
-        raise AssertionError("no live match survived long enough to exercise a post-rejection replacement")
+        failures.append("no match exercised a post-rejection legal replacement at phase 3")
+    return tuple(failures)
+
+
+def assert_live_dynamic_match_gate(traces: tuple[LiveMatchTrace, ...]) -> None:
+    failures = evaluate_live_dynamic_match_gate(traces)
+    if failures:
+        raise AssertionError("; ".join(failures))
 
 
 def build_live_controller(model: MimoRuleCandidateModel) -> VerifiedNaturalLanguageDynamicController:
@@ -332,13 +350,14 @@ def run_live_suite(
         play_live_match(build_live_controller(model), seed=seed)
         for seed in seeds
     )
-    assert_live_dynamic_match_gate(traces)
+    failures = evaluate_live_dynamic_match_gate(traces)
     return LiveDynamicMatchSummary(
         provider="mimo",
         model_name=model.model_name,
         config=asdict(LIVE_MATCH_CONFIG),
         schedule=dict(LIVE_NL_SCHEDULE),
-        gate_passed=True,
+        gate_passed=not failures,
+        gate_failures=failures,
         matches=traces,
     )
 
@@ -355,6 +374,8 @@ def main() -> None:
     model = MimoRuleCandidateModel(api_key, model_name=args.model)
     summary = run_live_suite(model=model)
     print(json.dumps(asdict(summary), ensure_ascii=False, indent=2))
+    if not summary.gate_passed:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
