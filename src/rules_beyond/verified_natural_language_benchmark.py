@@ -35,6 +35,8 @@ class VerifiedEvalResult:
     actual_candidate: Mapping[str, Any] | None
     expected_candidate: Mapping[str, Any] | None
     base_status: str
+    intent_guard_decision: str | None
+    intent_guard_reason: str | None
     faithfulness_decision: str | None
     faithfulness_reason: str | None
 
@@ -51,6 +53,7 @@ class VerifiedBenchmarkSummary:
     no_candidate_blocked: int
     false_accepts: int
     wrong_legal_candidates: int
+    intent_guard_rejections: int
     semantic_rejections: int
     verifier_errors: int
     results: tuple[VerifiedEvalResult, ...]
@@ -71,6 +74,7 @@ def run_verified_benchmark(
     no_candidate_blocked = 0
     false_accepts = 0
     wrong_legal_candidates = 0
+    intent_guard_rejections = 0
     semantic_rejections = 0
     verifier_errors = 0
 
@@ -79,8 +83,11 @@ def run_verified_benchmark(
         accepted = translated.accepted
         actual_candidate = translated.candidate
         faithfulness = translated.faithfulness
+        intent_guard = translated.intent_guard
 
-        if translated.status is VerifiedTranslationStatus.SEMANTIC_REJECTED:
+        if translated.status is VerifiedTranslationStatus.INTENT_GUARD_REJECTED:
+            intent_guard_rejections += 1
+        elif translated.status is VerifiedTranslationStatus.SEMANTIC_REJECTED:
             semantic_rejections += 1
         elif translated.status is VerifiedTranslationStatus.VERIFIER_ERROR:
             verifier_errors += 1
@@ -118,6 +125,14 @@ def run_verified_benchmark(
                 actual_candidate=actual_candidate,
                 expected_candidate=case.expected_candidate,
                 base_status=translated.base.status.value,
+                intent_guard_decision=(
+                    intent_guard.decision.value if intent_guard is not None else None
+                ),
+                intent_guard_reason=(
+                    intent_guard.reason.value
+                    if intent_guard is not None and intent_guard.reason is not None
+                    else None
+                ),
                 faithfulness_decision=(
                     faithfulness.decision.value if faithfulness is not None else None
                 ),
@@ -140,6 +155,7 @@ def run_verified_benchmark(
         no_candidate_blocked=no_candidate_blocked,
         false_accepts=false_accepts,
         wrong_legal_candidates=wrong_legal_candidates,
+        intent_guard_rejections=intent_guard_rejections,
         semantic_rejections=semantic_rejections,
         verifier_errors=verifier_errors,
         results=tuple(results),
@@ -148,7 +164,7 @@ def run_verified_benchmark(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run translator + RuleValidator + semantic faithfulness pipeline benchmark"
+        description="Run deterministic intent guard + translator + RuleValidator + semantic verifier benchmark"
     )
     parser.add_argument("--corpus", default=str(DEFAULT_CORPUS_PATH))
     parser.add_argument("--provider", choices=SUPPORTED_PROVIDERS, default="mimo")
