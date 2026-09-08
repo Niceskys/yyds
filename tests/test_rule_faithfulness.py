@@ -116,28 +116,57 @@ def test_verified_adapter_accepts_only_after_second_gate() -> None:
     assert result.accepted is True
     assert result.candidate is not None
     assert result.rule is not None
+    assert len(translator.calls) == 1
     assert len(checker.calls) == 1
+
+
+def test_explicit_or_is_rejected_before_any_model_call() -> None:
+    translator = StubModel(
+        candidate_envelope(
+            [
+                {"type": "SELF_HP_LTE", "value": 2},
+                {"type": "DID_NOT_MOVE_LAST_ROUND"},
+            ]
+        )
+    )
+    checker = StubModel(json.dumps({"decision": "FAITHFUL"}))
+    adapter = VerifiedNaturalLanguageRuleAdapter(
+        NaturalLanguageRuleAdapter(translator),
+        NaturalLanguageRuleFaithfulnessVerifier(checker),
+    )
+
+    result = adapter.translate("生命值不超过2或者上一回合没移动时，弓射程增加1格。")
+
+    assert result.status is VerifiedTranslationStatus.INTENT_GUARD_REJECTED
+    assert result.accepted is False
+    assert result.candidate is None
+    assert result.rule is None
+    assert result.intent_guard is not None
+    assert result.intent_guard.allowed is False
+    assert translator.calls == []
+    assert checker.calls == []
 
 
 def test_verified_adapter_hides_candidate_when_semantics_are_rejected() -> None:
     translator = StubModel(
-        candidate_envelope([{"type": "SELF_HP_LTE", "value": 2}])
+        candidate_envelope([{"type": "LAST_ATTACK_WEAPON_IS", "weapon": "KNIFE"}])
     )
     checker = StubModel(
-        json.dumps({"decision": "REJECT", "reason_code": "DROPPED_INTENT"})
+        json.dumps({"decision": "REJECT", "reason_code": "ALTERED_INTENT"})
     )
     adapter = VerifiedNaturalLanguageRuleAdapter(
         NaturalLanguageRuleAdapter(translator),
         NaturalLanguageRuleFaithfulnessVerifier(checker),
     )
 
-    result = adapter.translate("生命值不高于2或者距离至少4格时，弓射程增加1格。")
+    result = adapter.translate("上一回合不是使用弓的单位，弓射程增加1格。")
 
     assert result.status is VerifiedTranslationStatus.SEMANTIC_REJECTED
     assert result.accepted is False
     assert result.candidate is None
     assert result.rule is None
     assert result.base.candidate is not None
+    assert len(checker.calls) == 1
 
 
 def test_base_rejection_never_calls_semantic_verifier() -> None:
