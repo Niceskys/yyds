@@ -1,168 +1,179 @@
 # 《规则之外》MVP 双人 + AI 并行开发计划
 
-状态：正式 MVP 开发
+状态：正式 MVP 开发（**GO WITH CONDITIONS**）  
+当前行动基线：`docs/SECOND_AUDIT_ACTION_PLAN_2026-09-08.md`  
+公共契约：`docs/MVP_API_CONTRACT_V0.1.md`
 
-本计划适用于两名开发者各自使用 AI 辅助开发的场景。目标是最大化并行效率，同时避免两个 AI 同时改核心热点文件导致冲突或语义漂移。
+本计划适用于两名开发者各自使用 AI 辅助开发。核心目标不是“让两个人同时写最多代码”，而是：**让两个人并行时不互相制造返工。**
 
 ---
 
-## 一、总原则
+# 一、先说最重要的规则
 
-### 开发者 A：后端 / AI / 核心集成
+在任何真实前后端集成之前，以下内容只能有一份定义：
 
-主要责任域：
+```text
+MatchSnapshot
+RuleSubmissionResult
+PublicStrategyDecision
+ReplaySnapshot
+ErrorEnvelope
+schema version / enum / error code
+```
+
+唯一规范：
+
+```text
+docs/MVP_API_CONTRACT_V0.1.md
+```
+
+Developer A 维护 Pydantic/OpenAPI 生成源；Developer B 使用生成/验证后的 TypeScript 类型和 fixture。
+
+**禁止 A/B 各自手写一套长期并存的接口类型。**
+
+---
+
+# 二、责任域
+
+## Developer A — 后端 / AI / 核心集成
+
+主要责任：
 
 ```text
 Python
-Game Engine integration
+Engine integration
 DynamicRuleController
-Natural Language rule pipeline
+Natural Language pipeline
 Strategy Agent / Planner
+Pydantic / OpenAPI
+MatchApplicationService
+MatchRepository
 FastAPI
-API schema
-match service
-replay/log serialization
+Replay public projection
 backend tests
+provider telemetry / fallback
 ```
 
-### 开发者 B：前端 / 交互 / 可视化
+## Developer B — 前端 / 交互 / 可视化
 
-主要责任域：
+主要责任：
 
 ```text
 React
 TypeScript
 Vite
-5x5 board UI
-unit / HP / round visualization
-public-rule input UI
-rule rejection feedback
-strategy/event display
+5×5 board
+HP / round / lifecycle
+rule input UX
+rule rejection / rephrase UX
+effective modifier visualization
+public strategy visualization
+event feed
 replay timeline
 frontend tests
 ```
 
-### 禁止的并行方式
-
-不要让 A、B 或两个 AI：
-
-- 同时修改 `engine.py`；
-- 同时修改 `dynamic_rule_controller.py`；
-- 同时修改 `strategy_agent.py`；
-- 同时修改 Rule DSL / Validator；
-- 在没有 API contract 的情况下各自猜测请求/响应结构；
-- 为了前端方便直接把游戏规则逻辑复制到 TypeScript；
-- 让前端自行判断规则是否合法；
-- 让 LLM 直接修改 GameState。
-
----
-
-# 二、目录责任边界
-
-## 开发者 A 默认拥有
-
-```text
-src/rules_beyond/**
-tests/**（Python）
-server/** 或后续确定的后端应用目录
-pyproject.toml
-backend migration / persistence files
-```
-
-注意：核心文件属于热点区，A 自己也应一任务一分支，不要同时让多个 AI 修改同一热点文件。
-
-## 开发者 B 默认拥有
-
-建议新建：
-
-```text
-web/
-  src/
-  public/
-  tests/
-  package.json
-  vite.config.*
-  tsconfig.*
-```
-
-B 不直接修改 Python Engine 来“配合 UI”。如果接口不足，提出 API contract 变更，由 A 负责后端实现。
-
-## 共享区
+## Shared — 必须双人 review
 
 ```text
 docs/MVP_API_CONTRACT_V0.1.md
-docs/MVP_PARALLEL_DEVELOPMENT_PLAN.md
-README.md
-.github/workflows/**
+OpenAPI canonical schema
+Replay schema/version
+PublicStrategyDecision
+privacy boundary
+product-level A/B metrics
 ```
 
-共享区变更需要在 PR 中明确说明，避免两个分支同时编辑。
+这些不是“谁写后端谁说了算”的纯实现细节，因为会直接决定产品展示和前端结构。
 
 ---
 
-# 三、Sprint 0：先冻结前后端契约
+# 三、热点文件与禁止并行区
 
-这是正式 MVP 开发的第一件事。
-
-## A0 — API Contract V0.1
-
-负责人：开发者 A
-
-先定义，不急着做完整服务器实现。
-
-至少覆盖：
+默认不要让两个 AI/开发者同时修改：
 
 ```text
-POST /api/matches
-GET  /api/matches/{match_id}
-POST /api/matches/{match_id}/rules
-POST /api/matches/{match_id}/advance
-GET  /api/matches/{match_id}/replay
+src/rules_beyond/engine.py
+src/rules_beyond/rule_engine.py
+src/rules_beyond/dynamic_rule_controller.py
+src/rules_beyond/strategy_agent.py
+src/rules_beyond/rule_dsl.py
+src/rules_beyond/rule_validator.py
+未来 canonical schemas.py
+未来 replay event mapping
+OpenAPI generated source
 ```
 
-V0.1 可以先用显式“advance”推进回合，避免第一版就引入 WebSocket / 实时房间复杂度。后续如果产品体验需要，再增加流式推送。
+Developer B 不为了 UI 方便修改 Engine 语义。
 
-需要冻结的主要 DTO：
+如果 UI 缺字段：
 
 ```text
+提出 contract 变更
+→ shared review
+→ A 修改 schema/backend
+→ regenerated types/fixtures
+→ B 使用新合同
+```
+
+---
+
+# 四、Sprint 0 — 先冻结和实现 Contract
+
+这是当前第一件事。
+
+## S0.1 Public Contract
+
+规范已建立：
+
+```text
+docs/MVP_API_CONTRACT_V0.1.md
+```
+
+当前冻结：
+
+```text
+POST /api/v1/matches
+GET  /api/v1/matches/{match_id}
+POST /api/v1/matches/{match_id}/rules
+POST /api/v1/matches/{match_id}/advance
+GET  /api/v1/matches/{match_id}/replay
+```
+
+以及：
+
+```text
+Match lifecycle
 MatchSnapshot
-UnitSnapshot
-RulePhaseSnapshot
-RuleSubmissionRequest
 RuleSubmissionResult
-RoundEvent
-StrategyDecisionPublicView
+PublicStrategyDecision
 ReplaySnapshot
-ErrorEnvelope
+revision
+Idempotency-Key
+public/private projection
+schema/replay/plan version
 ```
 
-API contract 必须说明：
+## S0.2 Developer A — Schema implementation
 
-- 哪些字段是 authoritative；
-- 哪些是纯展示字段；
-- enum 值；
-- nullable 语义；
-- rule phase due 时能否 advance；
-- invalid/NO_CANDIDATE/faithfulness rejection 的返回形式；
-- Agent 私有 memory / hidden reasoning 永不通过 API 暴露。
+A 先实现：
 
-## B0 — 前端骨架 + Mock Contract
+- Pydantic DTO；
+- OpenAPI；
+- contract tests；
+- schema-validated fixtures；
+- private-field exclusion tests。
 
-负责人：开发者 B
+完成后，B 的 TypeScript 类型从 OpenAPI 生成或自动验证。
 
-A0 contract 草案出来后，B 可以立即使用固定 fixture 开工，不需要等 FastAPI 完成。
+## S0.3 Developer B — Mock Shell
 
-第一批页面只需要：
+B 不需要等完整 FastAPI。
 
-```text
-/           MVP 单页入口
-```
-
-组件建议：
+可以基于**已通过 contract schema 的 fixture**完成：
 
 ```text
 GameBoard
-UnitToken
 StatusPanel
 RulePanel
 StrategyPanel
@@ -173,25 +184,57 @@ MatchControls
 
 B0 完成标准：
 
-- 5×5 棋盘能根据 fixture 渲染；
-- 红蓝单位、HP、回合数可显示；
-- active rule 可显示；
-- rule phase due 与普通战斗阶段视觉上可区分；
-- 能输入中文规则并模拟 accepted/rejected 两种结果；
-- 能渲染回合事件与 strategy intent；
-- 不实现任何游戏规则判断。
+- 5×5 棋盘渲染；
+- RED/BLUE、HP、round 显示；
+- lifecycle 显示；
+- active rule / effective stats 显示；
+- accepted/rejected/rephrase 三类规则体验可模拟；
+- public strategy 可渲染；
+- replay timeline 可渲染；
+- 不包含任何规则裁判逻辑。
 
 ---
 
-# 四、Sprint 1：形成第一个可玩的纵向切片
+# 五、Public Strategy：当前兼容，不永久锁死
 
-## 开发者 A — Backend Vertical Slice
+当前生产代码仍使用：
 
-### A1. Match Application Service
+```text
+PRESSURE
+KITE
+EVADE
+HOLD
+```
 
-不要让 FastAPI route 直接操作 Engine 内部对象。
+但是第二轮审计明确指出：现有证据只证明连通性，不能证明这四个标签足以体现 LLM 价值。
 
-新增 application/service 层，大致职责：
+因此前端禁止把 UI/类型永久建模成“只有一个 intent 字符串”。
+
+公共结构使用：
+
+```text
+plan_version
+status
+intent
+optional richer-plan fields
+degraded
+```
+
+具体见 `MVP_API_CONTRACT_V0.1.md`。
+
+当前四分类 Agent 运行时，可选字段为 `null`。
+
+Sprint 1 的 richer-plan 实验通过后，再开始填充这些字段，而不是破坏 V0.1 前端。
+
+---
+
+# 六、Sprint 1 — 第一条可玩纵向切片
+
+## Developer A — Match Application Service
+
+FastAPI route 不得直接操作 Engine 内部对象。
+
+Application Service 负责：
 
 ```text
 create_match()
@@ -201,246 +244,273 @@ advance_match()
 get_replay()
 ```
 
-service 层负责把：
+组合：
 
 ```text
+MatchRepository
 DynamicRuleController
 NaturalLanguageVerifiedAdapter
-RED/BLUE IsolatedStrategyAgent
-DeterministicIntentPlanner
+RED/BLUE StrategyAgent
+Deterministic Planner
+Engine
+Replay projection
 ```
 
-组合起来。
-
-### A2. FastAPI
-
-第一版只要求：
-
-- Pydantic schema；
-- 明确错误码；
-- CORS 仅开发环境；
-- `MIMO_API_KEY` 从环境读取；
-- secret 不进入响应/log/replay；
-- API 与 Engine 分层。
-
-### A3. Match State
-
-MVP 第一阶段允许：
+第一版 repository：
 
 ```text
-进程内 MatchStore
+in-memory
 ```
 
-但接口设计必须允许后续替换 SQLite。
-
-当第一条纵向切片跑通后再加 SQLite；不要一开始花大量时间设计复杂数据库。
-
-### A4. Replay Serialization
-
-Replay 至少记录：
+必须实现：
 
 ```text
-match seed
-initial config
-每个 rule phase 的玩家文本
-translation / rejection public status
-accepted RuleAST（若有）
-每回合双方公开 StrategyIntent
-具体 Action
-Engine events
-round-end GameState
-terminal result
+per-match lock
+revision
+Idempotency-Key
+atomic update
+public/private projection
 ```
 
-禁止记录模型 chain-of-thought 或私有 hidden reasoning。
+不要先上 SQLite。第一条纵向切片稳定后，再判断是否需要为了重启恢复加入 SQLite。
 
-## 开发者 B — Frontend Vertical Slice
+## Developer A — Provider reliability
 
-### B1. Board
+MVP 需要：
 
-- 固定 5×5；
-- 红蓝单位；
-- 当前 HP；
-- 当前回合；
-- 当前 active public rule；
-- rule phase due 提示。
+- 每次模型调用硬 timeout；
+- 429/5xx/网络错误最多一次受控 retry；
+- strategy failure 使用 deterministic fallback，并设置 public `degraded=true`；
+- 规则翻译失败不修改 active rule；
+- usage / latency / status 最小遥测；
+- secret 不进入 response/log/replay；
+- Demo 准备 offline replay/fallback。
 
-### B2. Rule Input
+## Developer B — Real API integration
 
-只有在 rule phase due 时允许提交。
+接真实 API 后，前端必须以 authoritative snapshot 为准。
 
-至少区分：
+前端不计算：
 
 ```text
-ACCEPTED
-NO_CANDIDATE
-RULE_REJECTED
-MODEL_ERROR
-FAITHFULNESS_REJECTED / 等价公开错误分类
+rule legality
+effective stats
+bow probability
+rule phase due
+terminal
+Engine replay
 ```
 
-产品上不要把内部 Validator stack trace 暴露给玩家。
-
-### B3. Agent Strategy Display
-
-只展示：
-
-```text
-PRESSURE
-KITE
-EVADE
-HOLD
-```
-
-以及必要的简短产品文案。
-
-不要展示 chain-of-thought。
-
-### B4. Replay
-
-第一版允许简单 timeline：
-
-```text
-Round 1
-Round 2
-Rule Phase 1
-Round 4
-...
-```
-
-点击某节点恢复该节点的棋盘/HP/规则/事件快照。
+这些全部由后端返回。
 
 ---
 
-# 五、第一条可玩 MVP 的验收条件
+# 七、Replay 是共享产品能力，不只是后端日志
 
-只有满足以下全部条件，才算完成“第一条真人可玩纵向切片”：
+Replay 至少要让用户看懂：
 
-1. 浏览器能创建新对局；
-2. 能看到 5×5 棋盘和红蓝双方；
-3. Phase 0 能输入中文公共规则；
+```text
+玩家提交了什么规则
+→ 被接受还是拒绝
+→ active rule 变成什么
+→ 双方有效属性如何变化
+→ RED/BLUE 的公开策略是什么
+→ Planner 给了什么具体 Action
+→ Engine 发生了什么事件
+→ HP/位置如何变化
+→ Hard Liveness 是否触发
+→ 最终结果
+```
+
+Replay 规则：
+
+- 不再次调用模型；
+- 不展示 chain-of-thought；
+- 不保存 opponent private memory；
+- 不输出 secret / raw provider body / stack trace；
+- 使用版本号；
+- B 对“哪些字段足够解释行为”有验收权。
+
+---
+
+# 八、第一条真人可玩 MVP 的验收条件
+
+必须同时满足：
+
+1. 浏览器创建新对局；
+2. 看到 5×5 棋盘和红蓝双方；
+3. Phase 0 输入中文规则；
 4. 后端真正经过 verified NL pipeline；
-5. 两个独立 Agent 真正调用策略模型；
-6. Planner 生成具体动作；
-7. Engine 完成同步结算；
-8. 前端能看到每回合状态变化；
-9. Round 3 后进入下一规则阶段；
-10. 新规则可替换旧规则；
-11. 非法/不可表达规则有清晰反馈且不会破坏对局；
-12. 对局能进入 terminal；
-13. Replay 可以回看整局关键状态；
-14. 不需要开发者手动改 JSON 或运行 CLI 才能完成上述流程。
+5. accepted/rejected 有清晰区分；
+6. rejected 不破坏 active rule / match；
+7. 两个 Agent/或其 fallback 能完成决策；
+8. Planner 生成具体动作；
+9. Engine 同步结算；
+10. 前端看到每回合状态变化；
+11. Round 3 后进入下一规则阶段；
+12. 新规则可替换旧规则；
+13. 对局能进入 terminal；
+14. Replay 可回看；
+15. 重复请求不会重复推进；
+16. public API/replay 不泄露 private memory / hidden reasoning / secret；
+17. 不需要手工改 JSON 或运行 CLI 才能玩完整局。
 
 ---
 
-# 六、当前明确不做
+# 九、Sprint 1 必须并行做的 Agent A/B/C
 
-正式 MVP 已开始，但范围仍严格控制。
-
-当前不做：
+第二轮审计后，`live-agent-planner-match` 的后续定位统一为：
 
 ```text
-账号系统
-排行榜
-匹配大厅
-多人真人联机
-云存档
-复杂权限系统
-商城
-成就
-多单位
-职业/技能树
-地图障碍/地形
-装备系统
-大量新 DSL effect
-Unity/Godot 客户端
-3D
-高成本美术资产
-移动 App
+connectivity evidence
 ```
 
-如果某项不是完成“真人输入规则 → AI 对战 → 观察 → 再改规则 → 终局 → Replay”所必需，默认放到后面。
+不再作为 LLM value evidence。
+
+必须比较：
+
+```text
+A: deterministic heuristic
+B: current four-intent LLM
+C: richer-plan LLM + 2–3 round deterministic rollout/ranking
+```
+
+冻结场景后比较：
+
+- action divergence after rule change；
+- legal rate；
+- settlement invalid rate；
+- strategy diversity；
+- utility / win rate（在适当对局设计下）；
+- latency；
+- token/cost；
+- blind replay 玩家评分。
+
+如果 B/C 没有足够增益，就重构/简化 Agent，不允许只靠“用了大模型”作为价值证明。
 
 ---
 
-# 七、分支与 PR 规则
+# 十、分支 / PR 建议
 
-每人 + AI 都按：
+Shared contract：
 
 ```text
-一个任务
-→ 一个 branch
-→ 一个主要实现 AI
-→ 本地/CI 测试
-→ PR
-→ 独立 review
-→ merge
+contract/v0.1
 ```
 
-建议分支前缀：
-
-开发者 A：
+Developer A：
 
 ```text
-backend/api-contract-v01
 backend/match-service
-backend/fastapi-shell
-backend/replay-serialization
+backend/fastapi-slice
+backend/replay-projection
+backend/agent-ab-harness
 ```
 
-开发者 B：
+Developer B：
 
 ```text
 frontend/app-shell
-frontend/game-board
-frontend/rule-panel
+frontend/board-rule-panel
 frontend/replay-timeline
+frontend/rule-influence-view
 ```
 
-不要建立类似：
+合并顺序：
 
 ```text
-dev-all
-mvp-big-update
-ai-work
+contract
+→ schema fixtures + mock shell / service tests 并行
+→ real API integration
+→ replay
+→ A/B/C Agent evidence
+→ usability
 ```
-
-这种长期混合分支。
 
 ---
 
-# 八、两人每天对齐的最小信息
+# 十一、AI 不应并行修改的任务
 
-每次准备合并前，只需要同步 5 项：
+同一时间不要让多个 AI 同时：
+
+- 改 Engine semantics；
+- 改 canonical API schema；
+- 改 Replay event version；
+- 改 prompt 同时又改 holdout Gate；
+- 改同一个 Pydantic model；
+- 改 StrategyAgent schema 同时让前端自行猜新字段。
+
+---
+
+# 十二、当前明确不做
+
+```text
+OR / NOT / multi-effect DSL
+WebSocket
+Redis
+Celery
+Event Bus
+微服务
+多人真人联机
+账号/排行榜/商城
+复杂数据库起步
+MCTS
+多单位
+职业/技能
+地形
+装备
+3D
+移动 App
+```
+
+如果某项不是完成：
+
+```text
+真人规则
+→ AI 对战
+→ 观察
+→ 再改规则
+→ 终局
+→ Replay
+```
+
+所必需，默认延后。
+
+---
+
+# 十三、两人每天只需对齐 7 项
 
 ```text
 1. 我改了哪些路径
-2. API contract 有没有变化
-3. 是否改了 shared enum / schema
-4. CI 是否全绿
-5. 下一分支会碰哪些文件
+2. API contract 是否变化
+3. OpenAPI 是否重新生成
+4. Replay schema/version 是否变化
+5. shared enum 是否变化
+6. tests/CI 是否通过
+7. 下一分支会碰哪些热点文件
 ```
 
-如果 API contract 没变，A/B 应尽量独立推进，不需要频繁等待对方。
+如果 contract 没变，A/B 应尽量独立推进。
 
 ---
 
-# 九、当前优先级
-
-从现在开始顺序固定为：
+# 十四、当前优先级
 
 ```text
-P0  API Contract V0.1
+P0  MVP_API_CONTRACT_V0.1
+P0  Pydantic/OpenAPI + generated/validated fixtures
 P0  Frontend Mock Shell
-P0  Backend Match Service
-P0  FastAPI vertical slice
+P0  MatchApplicationService + in-memory repository
+P0  revision/lock/idempotency
+P0  FastAPI five-route vertical slice
 P0  Frontend real API integration
-P0  Replay
-P1  natural-language rejection UX
-P1  Agent strategy visualization
-P1  basic SQLite persistence
-P1  E2E test
-P2  polish / animation / competition demo packaging
+P0  Replay public projection
+P0  Agent A/B/C harness
+P1  rule rejection/rephrase UX
+P1  rule influence / strategy visualization
+P1  real-user playtest instrumentation
+P1  optional SQLite after vertical slice
+P2  polish / animation / competition packaging
 ```
 
-除非出现核心 blocker，不应重新回到大规模静态 benchmark 或继续扩充 Rule DSL。
+除非出现核心 blocker，不重新扩 DSL，不用更多静态 holdout 代替产品验证。
