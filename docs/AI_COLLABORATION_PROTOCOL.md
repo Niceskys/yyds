@@ -58,7 +58,9 @@
 - 不覆盖无关修改；
 - 尽量通过新增低耦合文件减少热点文件冲突；
 - 如果必须修改热点文件（如 `engine.py`），PR 中明确说明；
-- 实验代码与正式产品代码尽量分层，避免实验结论未经验证直接进入默认规则。
+- 实验代码与正式产品代码尽量分层，避免实验结论未经验证直接进入默认规则；
+- 一个任务只指定一个主要实现 AI，不让两个 AI 同时编辑同一分支的热点文件；
+- 前后端通过冻结 API contract 对接，不把 Engine 规则逻辑复制到前端。
 
 ## 4. AI 接手项目时的最低读取顺序
 
@@ -66,6 +68,8 @@
 
 ```text
 README.md
+docs/MVP_DEVELOPMENT_START_2026-09-08.md
+docs/MVP_PARALLEL_DEVELOPMENT_PLAN.md
 最新 P0 / normative 规则文档
 相关模块代码
 最新的 docs/handoffs/
@@ -74,14 +78,65 @@ README.md
 
 不要只根据旧聊天摘要或单个 README 猜测当前状态。
 
-## 5. 当前项目特别注意
+## 5. 当前项目阶段（2026-09-08 起）
 
-《规则之外》目前仍处于核心机制验证阶段。
+《规则之外》已经结束“只做核心机制验证”的阶段，进入：
 
-在动态公共规则 simulation 得到足够证据以前，不应把以下内容当作已验证结论：
+```text
+正式 MVP 产品开发
+```
 
-- 最终 HP / 伤害数值；
-- 最终 Planner；
-- GLM Prompt；
-- 完整 UI；
-- “核心玩法已经好玩”。
+阶段转换依据是首个真实 `live-agent-planner-match` Gate PASS：两个隔离 MiMo Agent 在动态公共规则下通过闭合 StrategyIntent + deterministic Planner 完成终局对战，且 Planner submission snapshot audit 为 0 错误。
+
+这不代表以下内容已经被证明：
+
+- 核心玩法已经好玩；
+- 当前 Planner 是最终版本；
+- 当前 HP / 伤害是最终平衡；
+- MiMo 是最终模型选择；
+- 自然语言规则不存在 false reject；
+- 当前 UI / API 已经定型；
+- 项目一定能在竞赛中获奖。
+
+## 6. MVP 双人并行责任域
+
+默认分工：
+
+```text
+开发者 A：Python 后端 / Engine integration / Agent / LLM / FastAPI / API contract
+开发者 B：React + TypeScript / Board / Rule UI / Replay / Visualization
+```
+
+默认热点文件由开发者 A 管理：
+
+```text
+src/rules_beyond/engine.py
+src/rules_beyond/rule_engine.py
+src/rules_beyond/dynamic_rule_controller.py
+src/rules_beyond/strategy_agent.py
+src/rules_beyond/rule_validator.py
+```
+
+开发者 B 不为了 UI 需求直接修改这些文件；需要新能力时先提出 API contract 变更。
+
+完整分工与当前优先级见：
+
+```text
+docs/MVP_PARALLEL_DEVELOPMENT_PLAN.md
+```
+
+## 7. 当前必须保留的已知问题
+
+Natural-Language Dynamic Match V0.2 因一条合法规则被 MiMo 安全误拒绝而正式记录为 FAIL。
+
+不能把它改写成 PASS，也不能通过放松 Validator / Faithfulness Verifier 来掩盖。
+
+MVP 中应通过：
+
+```text
+清晰的拒绝反馈
+可重新措辞
+后续评估安全重试策略
+```
+
+解决该可用性问题。
