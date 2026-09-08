@@ -10,6 +10,7 @@ from typing import Mapping
 from .dynamic_rule_controller import DynamicRuleController
 from .mimo_strategy_provider import MimoStrategyModel
 from .model import Action, GameConfig, MatchResult, Team
+from .planner_audit import audit_action_against_snapshot
 from .strategy_agent import (
     DeterministicIntentPlanner,
     IsolatedStrategyAgent,
@@ -66,6 +67,7 @@ class AgentRoundTrace:
     blue_action: str
     red_hp_after: int
     blue_hp_after: int
+    planner_snapshot_issues: tuple[str, ...]
     event_kinds: tuple[str, ...]
 
 
@@ -78,6 +80,7 @@ class AgentPlannerMatchSummary:
     rounds: int
     gate_passed: bool
     gate_failures: tuple[str, ...]
+    planner_snapshot_errors: int
     decision_traces: tuple[AgentDecisionTrace, ...]
     round_traces: tuple[AgentRoundTrace, ...]
     event_counts: dict[str, int]
@@ -89,7 +92,12 @@ def _action_signature(action: Action) -> str:
     return f"{path}|{attack}"
 
 
-def _decision_trace(phase_index: int, round_no: int, team: Team, decision: StrategyDecision) -> AgentDecisionTrace:
+def _decision_trace(
+    phase_index: int,
+    round_no: int,
+    team: Team,
+    decision: StrategyDecision,
+) -> AgentDecisionTrace:
     return AgentDecisionTrace(
         phase_index=phase_index,
         round_no=round_no,
@@ -113,15 +121,21 @@ def evaluate_agent_gate(summary: AgentPlannerMatchSummary) -> tuple[str, ...]:
         accepted = [trace for trace in traces if trace.status == StrategyDecisionStatus.ACCEPTED.value]
         if len(accepted) < 2:
             failures.append(f"{team} did not produce at least two accepted real strategy decisions")
-        if not any(trace.phase_index == 0 and trace.status == StrategyDecisionStatus.ACCEPTED.value for trace in traces):
+        if not any(
+            trace.phase_index == 0 and trace.status == StrategyDecisionStatus.ACCEPTED.value
+            for trace in traces
+        ):
             failures.append(f"{team} phase-0 strategy decision was not accepted")
-        if not any(trace.phase_index >= 1 and trace.status == StrategyDecisionStatus.ACCEPTED.value for trace in traces):
+        if not any(
+            trace.phase_index >= 1 and trace.status == StrategyDecisionStatus.ACCEPTED.value
+            for trace in traces
+        ):
             failures.append(f"{team} never produced an accepted post-rule-change strategy decision")
 
+    if summary.planner_snapshot_errors != 0:
+        failures.append("deterministic planner submitted an action illegal in its public snapshot")
     if summary.event_counts.get("INVALID_MOVE_PATH", 0) != 0:
-        failures.append("deterministic planner produced INVALID_MOVE_PATH")
-    if summary.event_counts.get("INVALID_ATTACK", 0) != 0:
-        failures.append("deterministic planner produced INVALID_ATTACK")
+        failures.append("Engine observed INVALID_MOVE_PATH from deterministic planner")
     if summary.event_counts.get("PLAYER_RULE_REPLACED", 0) < 2:
         failures.append("dynamic match did not exercise at least two accepted public-rule replacements")
     if not summary.round_traces:
@@ -170,6 +184,7 @@ def play_agent_match(
         _decision_trace(0, state.game_state.round_no, Team.BLUE, blue_decision),
     ]
     round_traces: list[AgentRoundTrace] = []
+    planner_snapshot_errors = 0
 
     while not state.game_state.is_terminal:
         played_round = state.game_state.round_no
@@ -190,6 +205,28 @@ def play_agent_match(
             intent=blue_intent,
         )
 
+        red_audit = audit_action_against_snapshot(
+            state.game_state,
+            Team.RED,
+            controller.engine,
+            red_action,
+            rule=state.active_rule,
+            histories=state.histories,
+        )
+        blue_audit = audit_action_against_snapshot(
+            state.game_state,
+            Team.BLUE,
+            controller.engine,
+            blue_action,
+            rule=state.active_rule,
+            histories=state.histories,
+        )
+        snapshot_issues = tuple(
+            [f"RED:{issue}" for issue in red_audit.issues]
+            + [f"BLUE:{issue}" for issue in blue_audit.issues]
+        )
+        planner_snapshot_errors += len(snapshot_issues)
+
         resolved = controller.resolve_round(
             state,
             {Team.RED: red_action, Team.BLUE: blue_action},
@@ -206,6 +243,7 @@ def play_agent_match(
                 blue_action=_action_signature(blue_action),
                 red_hp_after=state.game_state.unit(Team.RED).hp,
                 blue_hp_after=state.game_state.unit(Team.BLUE).hp,
+                planner_snapshot_issues=snapshot_issues,
                 event_kinds=tuple(event.kind for event in resolved.events),
             )
         )
@@ -249,6 +287,7 @@ def play_agent_match(
         rounds=len(round_traces),
         gate_passed=False,
         gate_failures=(),
+        planner_snapshot_errors=planner_snapshot_errors,
         decision_traces=tuple(decision_traces),
         round_traces=tuple(round_traces),
         event_counts=dict(sorted(event_counts.items())),
@@ -262,6 +301,7 @@ def play_agent_match(
         rounds=provisional.rounds,
         gate_passed=not failures,
         gate_failures=failures,
+        planner_snapshot_errors=provisional.planner_snapshot_errors,
         decision_traces=provisional.decision_traces,
         round_traces=provisional.round_traces,
         event_counts=provisional.event_counts,
