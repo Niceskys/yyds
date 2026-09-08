@@ -37,16 +37,18 @@ jobs:
 
       - name: Run fixed 18-case natural-language benchmark
         shell: bash
+        env:
+          MODEL_NAME: ${{ inputs.model }}
         run: |
           mkdir -p benchmark-output
           python -m rules_beyond.natural_language_benchmark \
-            --model "${{ inputs.model }}" \
-            > "benchmark-output/${{ inputs.model }}.json"
+            --model "$MODEL_NAME" \
+            > benchmark-output/result.json
 
       - name: Upload benchmark result
         uses: actions/upload-artifact@v4
         with:
-          name: natural-language-benchmark-${{ inputs.model }}
-          path: benchmark-output/${{ inputs.model }}.json
+          name: natural-language-benchmark
+          path: benchmark-output/result.json
           if-no-files-found: error
           retention-days: 30
