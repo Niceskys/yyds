@@ -16,11 +16,19 @@ on:
         required: true
         default: "mimo-v2.5-pro"
         type: string
+      suite:
+        description: "Evaluation suite"
+        required: true
+        default: "baseline"
+        type: choice
+        options:
+          - baseline
+          - holdout
 
 jobs:
   benchmark:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       contents: read
     env:
@@ -60,16 +68,37 @@ jobs:
               ;;
           esac
 
-      - name: Run fixed 18-case natural-language benchmark
+      - name: Select fixed evaluation suite
+        id: suite
+        shell: bash
+        env:
+          SUITE_NAME: ${{ inputs.suite }}
+        run: |
+          case "$SUITE_NAME" in
+            baseline)
+              echo "corpus=evals/natural_language_rule_corpus_v0.1.json" >> "$GITHUB_OUTPUT"
+              ;;
+            holdout)
+              echo "corpus=evals/natural_language_rule_holdout_v0.1.json" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unsupported suite."
+              exit 1
+              ;;
+          esac
+
+      - name: Run selected natural-language benchmark
         shell: bash
         env:
           PROVIDER_NAME: ${{ inputs.provider }}
           MODEL_NAME: ${{ inputs.model }}
+          CORPUS_PATH: ${{ steps.suite.outputs.corpus }}
         run: |
           mkdir -p benchmark-output
           python -m rules_beyond.natural_language_benchmark \
             --provider "$PROVIDER_NAME" \
             --model "$MODEL_NAME" \
+            --corpus "$CORPUS_PATH" \
             > benchmark-output/result.json
 
       - name: Upload benchmark result
