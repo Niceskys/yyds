@@ -6,11 +6,12 @@ from pathlib import Path
 from rules_beyond.api_contract import ErrorEnvelope, MatchSnapshot, RuleSubmissionResult
 
 ROOT = Path(__file__).resolve().parents[1]
-FIXTURE_DIR = ROOT / "contracts" / "fixtures" / "mvp-v0.1"
+FIXTURE_DIR = ROOT / "contracts" / "fixtures" / "mvp-v0.2"
 
 
 def test_checked_in_contract_fixtures_validate() -> None:
     models = {
+        "match_player_decision.json": MatchSnapshot,
         "rule_accepted.json": RuleSubmissionResult,
         "rule_rejected.json": RuleSubmissionResult,
         "match_terminal.json": MatchSnapshot,
