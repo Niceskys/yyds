@@ -24,11 +24,19 @@ on:
         options:
           - baseline
           - holdout
+      pipeline:
+        description: "Translator only, or translator + Validator + faithfulness gate"
+        required: true
+        default: "translator"
+        type: choice
+        options:
+          - translator
+          - verified
 
 jobs:
   benchmark:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
     env:
@@ -87,15 +95,35 @@ jobs:
               ;;
           esac
 
+      - name: Select fixed benchmark pipeline
+        id: pipeline
+        shell: bash
+        env:
+          PIPELINE_NAME: ${{ inputs.pipeline }}
+        run: |
+          case "$PIPELINE_NAME" in
+            translator)
+              echo "module=rules_beyond.natural_language_benchmark" >> "$GITHUB_OUTPUT"
+              ;;
+            verified)
+              echo "module=rules_beyond.verified_natural_language_benchmark" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unsupported pipeline."
+              exit 1
+              ;;
+          esac
+
       - name: Run selected natural-language benchmark
         shell: bash
         env:
           PROVIDER_NAME: ${{ inputs.provider }}
           MODEL_NAME: ${{ inputs.model }}
           CORPUS_PATH: ${{ steps.suite.outputs.corpus }}
+          BENCHMARK_MODULE: ${{ steps.pipeline.outputs.module }}
         run: |
           mkdir -p benchmark-output
-          python -m rules_beyond.natural_language_benchmark \
+          python -m "$BENCHMARK_MODULE" \
             --provider "$PROVIDER_NAME" \
             --model "$MODEL_NAME" \
             --corpus "$CORPUS_PATH" \
