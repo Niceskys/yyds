@@ -5,14 +5,12 @@
 - branch: `frontend/app-shell-v02`
 - latest commit: 见 `git log -1`（本文件随每次 Developer B 提交同步更新）
 - contract version: `mvp-v0.2`
-- current task: B0 — React/Vite App Shell
+- current task: B1 — fixture adapter + UI ViewModel
 
 ## 已完成
 
-- B0：React + TypeScript + Vite 应用外壳（TypeScript strict）。
-- 初始页《规则之外》+「开始游戏」，无登录/注册/排行榜/商店/设置。
-- `npm run dev / typecheck / test / build` 脚本。
-- vitest + @testing-library 配置（本提交尚无测试用例）。
+- B0：React + TypeScript + Vite 应用外壳，初始页《规则之外》+「开始游戏」。
+- B1（数据层）：fixture 读取、临时 UI 契约类型、中文映射、事件展示、Mock Adapter、ViewModel、Mock 场景。
 
 ## 本次提交
 
@@ -22,14 +20,19 @@
 
 ### 完成内容
 
-- 建立 `web/` Vite + React + TS 工程。
-- 初始页与「开始游戏」页面切换（游玩界面为 B1 占位）。
+- 建立 `contract fixture → adapter → UI ViewModel → React components` 数据流中的 adapter 层。
+- 直接读取仓库 canonical `contracts/fixtures/mvp-v0.2/`，不在 web/ 复制第二套 fixture。
+- 集中管理中文映射（策略 / 阵营 / 武器 / 结果 / 战局升温）。
+- 有效属性使用白名单，`conflict_level` / `hard_liveness` 不进入 ViewModel 展示字段。
+- 未知 `RoundEventPublicView.kind` 提供安全 fallback。
+- 注册 8 个 V0.2 fixture 对应的 Mock 场景。
 
 ### 主要修改文件
 
-- `web/package.json`、`web/tsconfig.json`、`web/vite.config.ts`、`web/index.html`
-- `web/src/main.tsx`、`web/src/App.tsx`、`web/src/components/StartScreen.tsx`、`web/src/styles/app.css`
-- `web/README.md`、`web/DEVELOPMENT_HANDOFF.md`
+- `web/src/contract/types.ts`（临时，待 OpenAPI 替换）
+- `web/src/contract/labels.ts`、`eventLabels.ts`、`fixtures.ts`
+- `web/src/contract/viewModel.ts`、`mockAdapter.ts`、`replayAdapter.ts`
+- `web/src/mock/scenarios.ts`
 
 ### 验证
 
@@ -43,25 +46,25 @@
 cd web && npm install && npm run dev
 ```
 
-- 初始页显示《规则之外》与「开始游戏」。
-- 点击「开始游戏」进入游玩界面占位（棋盘 / 红蓝面板由下一个 B1 提交填充）。
+- 初始页可进入游玩界面占位；数据层已可解析全部 8 个 V0.2 fixture。
+- 棋盘 / 面板 / 规则输入由下一个提交接入。
 
 ## 尚未完成
 
-- B1：fixture adapter、5×5 棋盘、红蓝面板、规则输入、终局与 Replay。
-- B4：真实 API 接入（等 Developer A 的 FastAPI vertical slice）。
-- 前端 CI（Issue #42）：等 `web/` 进入 main 后再处理。
+- B1 UI：5×5 棋盘、红蓝面板、顶部状态、规则输入、终局与 Replay 组件。
+- B1 测试。
+- B4：真实 API 接入。
 
 ## 已知问题 / 技术债
 
-- 游玩界面当前只是占位，不具备 B1 功能。
-- 本提交不包含任何测试用例。
+- `web/src/contract/types.ts` 是临时手写类型，必须由 OpenAPI generated types 替换。
+- 本提交只有数据层，UI 尚未消费。
 
 ## 下一步
 
-1. 增加 fixture 读取 + mock adapter + UI ViewModel 层。
-2. 渲染 5×5 棋盘与红蓝状态面板。
-3. 接入规则输入 / 提交 / 继续下一回合与终局状态。
+1. 渲染 5×5 棋盘与红蓝状态面板。
+2. 接入规则输入 / 提交 / 继续下一回合与终局状态。
+3. 补充关键 UI 状态测试。
 
 ## 下一位开发者必须先读
 
