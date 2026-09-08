@@ -4,25 +4,24 @@
 >
 > 当前 live provider：**MiMo China Token Plan**。智谱 Provider 保留，API 恢复后可用同一 corpus 比较。
 
-## 1. 当前推荐：MiMo China Token Plan
+## 1. 当前推荐配置
 
-官方 OpenAI 兼容 Base URL：
+```text
+provider = mimo
+model = mimo-v2.5-pro
+```
+
+MiMo China Token Plan 默认 Base URL：
 
 ```text
 https://token-plan-cn.xiaomimimo.com/v1
 ```
 
-当前 benchmark 默认模型：
-
-```text
-mimo-v2.5-pro
-```
-
 真实 Token Plan Key 不进入仓库。
 
-## 2. 只需要配置一次 GitHub Secret
+## 2. GitHub Secret
 
-在 GitHub 仓库：
+在仓库：
 
 ```text
 Settings
@@ -31,23 +30,19 @@ Settings
 → New repository secret
 ```
 
-名称必须是：
+名称：
 
 ```text
 MIMO_API_KEY
 ```
 
-值填写 Token Plan 页面提供的专属 key（通常为 `tp-...`）。
+值填写 Token Plan 页面提供的专属 key。
 
-注意：
+不要把 Key 写进 Issue、PR、README、`.env` 或聊天文本。
 
-- 不要把 Key 写进 Issue / PR / README；
-- 不要提交 `.env`；
-- 不要把 Key 发给其他 AI 作为普通聊天文本；
-- Workflow 日志不会主动输出 Key；
-- Token Plan Key 与按量付费 Key 是两套独立凭证，不要混用。
+## 3. Workflow 的两个 suite
 
-## 3. 运行 MiMo benchmark
+进入：
 
 ```text
 Actions
@@ -55,88 +50,132 @@ Actions
 → Run workflow
 ```
 
+现在有固定 `suite` 选择：
+
+```text
+baseline
+holdout
+```
+
+### baseline
+
+```text
+evals/natural_language_rule_corpus_v0.1.json
+18 cases
+```
+
+这是开发过程中已经用于 Prompt 反馈的语料，适合回归，不再作为泛化证明。
+
+### holdout
+
+```text
+evals/natural_language_rule_holdout_v0.1.json
+40 cases = 20 LEGAL + 20 NO_CANDIDATE
+```
+
+这是在当前 Prompt 修复后创建的新测试集，用于判断自然语言映射是否真正泛化。
+
+## 4. 当前推荐的下一次运行
+
 保持：
 
 ```text
 provider = mimo
 model = mimo-v2.5-pro
+suite = holdout
 ```
 
-然后点击运行。
+然后点击 Run workflow。
 
-该 workflow 只有手动触发，不会因为普通 push / PR 自动消耗 Token Plan 额度。
+Workflow 只支持手动触发，不会因普通 push / PR 自动消耗 Token Plan 额度。
 
-## 4. 查看结果
+## 5. 查看结果
 
-运行完成后，在该 Workflow Run 页面底部下载 Artifact：
+运行完成后，Artifact：
 
 ```text
 natural-language-benchmark
+└── result.json
 ```
 
-其中：
-
-```text
-result.json
-```
-
-包含 18 条固定语料的完整评分。
-
-重点先看：
+重点指标：
 
 ```text
 false_accepts
 wrong_legal_candidates
+legal_semantic_correct
+no_candidate_decision_correct
 false_rejects
 decision_accuracy
-legal_semantic_correct
 ```
 
 不要只看 `exact_accuracy`。
 
-其中最危险的是：
+## 6. Holdout Gate
+
+详细标准见：
 
 ```text
-false_accepts > 0
+docs/experiments/NATURAL_LANGUAGE_HOLDOUT_GATE_V0.1.md
 ```
 
-即本应拒绝的玩家意图被模型偷偷改写成合法 Candidate。
-
-## 5. 可选：比较 mimo-v2.5
-
-如果 `mimo-v2.5-pro` 已跑完，可以再次 Run workflow：
+硬性要求：
 
 ```text
-provider = mimo
-model = mimo-v2.5
+false_accepts = 0
+wrong_legal_candidates = 0
 ```
 
-必须使用同一 commit / 同一份 corpus，再比较结果。
-
-## 6. 智谱恢复后的比较
-
-智谱 API 可用后，可以配置：
+最低可用性：
 
 ```text
-ZHIPU_API_KEY
+legal_semantic_correct >= 18/20
+no_candidate_decision_correct >= 19/20
 ```
 
-然后运行：
+reason code 的精确分类不是硬性条件。
+
+## 7. 已有 baseline 结果
+
+第一轮 `mimo-v2.5-pro`：
 
 ```text
-provider = zhipu
-model = glm-5.1
+legal semantic correct = 1/8
+safe rejection         = 9/10
+false_accepts           = 0
 ```
 
-MiMo 暂代 GLM 不代表永久替换。是否切回或继续使用 MiMo，必须基于同一 corpus 和后续端到端对局数据决定。
-
-## 7. 当前 Gate
-
-在真实结果出来前：
+Prompt JSON 契约修复后第二轮：
 
 ```text
-MiMo Provider implementation = 完成后可合并
-MiMo live validation = 未完成
+legal semantic correct = 8/8
+safe rejection         = 10/10
+false_accepts           = 0
+false_rejects           = 0
+wrong_legal_candidates  = 0
 ```
 
-因此仍不能宣布正式 MVP 开发开始。
+第二轮结果说明 Prompt 修复有效，但因为 baseline 已参与调参，必须由 holdout 再验证泛化。
+
+## 8. 可选模型比较
+
+如果未来要比较：
+
+```text
+mimo-v2.5-pro
+mimo-v2.5
+glm-5.1
+```
+
+必须在相同 commit、相同 suite 下比较，不能为不同模型换题。
+
+## 9. 当前阶段
+
+在 holdout live 结果审核通过前：
+
+```text
+Natural-language baseline regression = PASS
+Natural-language holdout generalization = 未验证
+End-to-end natural-language match = 未开始
+Formal MVP development = 未开始
+```
