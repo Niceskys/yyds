@@ -9,6 +9,7 @@ from rules_beyond.rule_faithfulness import (
 from rules_beyond.verified_natural_language_rule_adapter import (
     VerifiedNaturalLanguageRuleAdapter,
     VerifiedTranslationStatus,
+    has_explicit_unsupported_disjunction,
 )
 
 
@@ -117,6 +118,36 @@ def test_verified_adapter_accepts_only_after_second_gate() -> None:
     assert result.candidate is not None
     assert result.rule is not None
     assert len(checker.calls) == 1
+
+
+def test_explicit_or_is_blocked_before_verifier_even_when_candidate_keeps_both_conditions() -> None:
+    translator = StubModel(
+        candidate_envelope(
+            [
+                {"type": "SELF_HP_LTE", "value": 2},
+                {"type": "DID_NOT_MOVE_LAST_ROUND"},
+            ]
+        )
+    )
+    checker = StubModel(json.dumps({"decision": "FAITHFUL"}))
+    adapter = VerifiedNaturalLanguageRuleAdapter(
+        NaturalLanguageRuleAdapter(translator),
+        NaturalLanguageRuleFaithfulnessVerifier(checker),
+    )
+
+    result = adapter.translate("生命值不超过2或者上一回合没移动时，弓射程增加1格。")
+
+    assert result.status is VerifiedTranslationStatus.SEMANTIC_REJECTED
+    assert result.accepted is False
+    assert result.candidate is None
+    assert result.rule is None
+    assert result.faithfulness is not None
+    assert result.faithfulness.reason is FaithfulnessReason.ALTERED_INTENT
+    assert checker.calls == []
+
+
+def test_lte_phrase_with_or_less_is_not_treated_as_boolean_disjunction() -> None:
+    assert has_explicit_unsupported_disjunction("生命值只剩1点或更少时，弓射程减少1格。") is False
 
 
 def test_verified_adapter_hides_candidate_when_semantics_are_rejected() -> None:
