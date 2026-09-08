@@ -29,11 +29,7 @@ class StrategyDecisionStatus(str, Enum):
 
 
 class StrategyModel(Protocol):
-    """Narrow provider boundary for one high-level strategic decision.
-
-    The model receives a serialized observation and returns JSON text. It never
-    receives Engine mutation methods or a writable GameState.
-    """
+    """Narrow provider boundary for one high-level strategic decision."""
 
     def generate_strategy(self, *, system_prompt: str, observation: str) -> str: ...
 
@@ -101,9 +97,10 @@ _MOVE_ORDER: tuple[Direction, ...] = (
 )
 
 
-def _rule_mapping(rule: RuleAST | None) -> dict[str, object] | None:
+def rule_to_public_mapping(rule: RuleAST | None) -> dict[str, object] | None:
     if rule is None:
         return None
+
     conditions: list[dict[str, object]] = []
     for condition in rule.conditions:
         item: dict[str, object] = {"type": condition.type.value}
@@ -133,7 +130,7 @@ def _rule_mapping(rule: RuleAST | None) -> dict[str, object] | None:
 
 
 def _rule_signature(rule: RuleAST | None) -> str:
-    mapping = _rule_mapping(rule)
+    mapping = rule_to_public_mapping(rule)
     if mapping is None:
         return "NONE"
     return json.dumps(mapping, sort_keys=True, separators=(",", ":"))
@@ -167,9 +164,9 @@ def _stats_mapping(stats: RuleEffectiveStats) -> dict[str, object]:
 class IsolatedStrategyAgent:
     """Per-team LLM strategy session with private memory and fail-safe fallback.
 
-    Each instance owns only its own private memory. Callers must create separate
-    instances for RED and BLUE. The observation contains public opponent state
-    and public rule history, never the opponent agent's private memory.
+    RED and BLUE must be represented by different instances. Each instance owns
+    only its own private strategy memory. Opponent position/HP/history are public;
+    opponent private strategy memory is never present in this observation.
     """
 
     def __init__(
@@ -342,7 +339,7 @@ class IsolatedStrategyAgent:
             distance=own.position.manhattan_distance(opponent.position),
             no_damage_streak=state.no_damage_streak,
             hard_liveness_active=state.hard_liveness_active,
-            active_rule=_rule_mapping(rule),
+            active_rule=rule_to_public_mapping(rule),
             own_effective_stats=_stats_mapping(stats),
             own_public_history=_history_mapping(own_history),
             opponent_public_history=_history_mapping(opponent_history),
@@ -351,18 +348,13 @@ class IsolatedStrategyAgent:
 
 
 @dataclass(frozen=True, slots=True)
-class PlannedAction:
-    intent: StrategyIntent
+class _ActionCandidate:
     action: Action
+    destination: Position
 
 
 class DeterministicIntentPlanner:
-    """Closed-semantics planner mapping high-level intent to one concrete Action.
-
-    The planner performs no model calls. It enumerates board-bounded move paths,
-    derives attack availability from the same effective stats used by the Engine,
-    and uses deterministic tuple ordering to choose one action.
-    """
+    """Closed-semantics planner mapping one intent to one concrete legal action."""
 
     def choose_action(
         self,
@@ -382,10 +374,11 @@ class DeterministicIntentPlanner:
         )
         opponent = state.unit(team.opponent).position
         candidates = self._candidate_actions(state, team, engine, stats)
-        return min(
+        selected = min(
             candidates,
             key=lambda item: self._score(item, opponent, stats, intent),
         )
+        return selected.action
 
     def _candidate_actions(
         self,
@@ -393,21 +386,18 @@ class DeterministicIntentPlanner:
         team: Team,
         engine: RuleAwareGameEngine,
         stats: RuleEffectiveStats,
-    ) -> tuple[Action, ...]:
+    ) -> tuple[_ActionCandidate, ...]:
         paths = self._candidate_paths(state.unit(team).position, engine, stats.move_range)
         opponent = state.unit(team.opponent).position
-        actions: list[Action] = []
+        candidates: list[_ActionCandidate] = []
         for path, destination in paths:
             distance = destination.manhattan_distance(opponent)
-            weapons: list[Weapon] = []
             if Weapon.KNIFE not in stats.cooldown_weapons and distance <= stats.knife_range:
-                weapons.append(Weapon.KNIFE)
+                candidates.append(_ActionCandidate(Action(path, Weapon.KNIFE), destination))
             if Weapon.BOW not in stats.cooldown_weapons and distance <= stats.bow_range:
-                weapons.append(Weapon.BOW)
-            for weapon in weapons:
-                actions.append(Action(path, weapon))
-            actions.append(Action(path, None))
-        return tuple(actions)
+                candidates.append(_ActionCandidate(Action(path, Weapon.BOW), destination))
+            candidates.append(_ActionCandidate(Action(path, None), destination))
+        return tuple(candidates)
 
     @staticmethod
     def _candidate_paths(
@@ -433,15 +423,77 @@ class DeterministicIntentPlanner:
         return tuple((path, destination) for destination, path in best.items())
 
     @staticmethod
+    def _bow_probability(distance: int, stats: RuleEffectiveStats) -> float:
+        if stats.hard_liveness:
+            return 1.0
+        base = 0.5 ** max(distance - 1, 0)
+        return min(1.0, max(stats.bow_hit_floor, base * stats.bow_hit_multiplier))
+
+    @classmethod
+    def _expected_damage(
+        cls,
+        weapon: Weapon | None,
+        distance: int,
+        stats: RuleEffectiveStats,
+    ) -> float:
+        if weapon is Weapon.KNIFE:
+            return float(stats.knife_damage)
+        if weapon is Weapon.BOW:
+            return float(stats.bow_damage) * cls._bow_probability(distance, stats)
+        return 0.0
+
+    @classmethod
     def _score(
-        action: Action,
+        cls,
+        candidate: _ActionCandidate,
         opponent: Position,
         stats: RuleEffectiveStats,
         intent: StrategyIntent,
     ) -> tuple[object, ...]:
-        destination = opponent
-        # Reconstructing the destination from the path is not possible without the
-        # start position here, so the caller supplies actions only and this helper
-        # is replaced below by _score_from_state in choose_action.
-        del destination, stats, intent
-        return (len(action.move_path),)
+        action = candidate.action
+        distance = candidate.destination.manhattan_distance(opponent)
+        expected_damage = cls._expected_damage(action.attack, distance, stats)
+        path_key = tuple(step.value for step in action.move_path)
+        attack_key = action.attack.value if action.attack is not None else "ZZZ"
+
+        if intent is StrategyIntent.PRESSURE:
+            return (
+                0 if action.attack is not None else 1,
+                -expected_damage,
+                distance,
+                len(action.move_path),
+                attack_key,
+                path_key,
+            )
+
+        if intent is StrategyIntent.KITE:
+            preferred = min(3, stats.bow_range)
+            bow_rank = 0 if action.attack is Weapon.BOW else (1 if action.attack is not None else 2)
+            return (
+                bow_rank,
+                abs(distance - preferred),
+                -distance,
+                len(action.move_path),
+                attack_key,
+                path_key,
+            )
+
+        if intent is StrategyIntent.EVADE:
+            return (
+                -distance,
+                0 if action.attack is not None else 1,
+                -expected_damage,
+                len(action.move_path),
+                attack_key,
+                path_key,
+            )
+
+        # HOLD
+        return (
+            0 if not action.move_path else 1,
+            0 if action.attack is not None else 1,
+            -expected_damage,
+            distance,
+            attack_key,
+            path_key,
+        )
