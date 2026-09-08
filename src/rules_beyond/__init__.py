@@ -51,9 +51,20 @@ from .rule_runtime import (
     update_public_rule_histories,
 )
 from .rule_validator import RuleValidator, ValidationIssue, ValidationResult
+from .zhipu_rule_provider import (
+    DEFAULT_ZHIPU_API_KEY_ENV,
+    DEFAULT_ZHIPU_MODEL_ENV,
+    DEFAULT_ZHIPU_RULE_MODEL,
+    ZHIPU_CHAT_COMPLETIONS_URL,
+    ZhipuProviderError,
+    ZhipuRuleCandidateModel,
+)
 
 __all__ = [
     "Action",
+    "DEFAULT_ZHIPU_API_KEY_ENV",
+    "DEFAULT_ZHIPU_MODEL_ENV",
+    "DEFAULT_ZHIPU_RULE_MODEL",
     "Direction",
     "DynamicMatchState",
     "DynamicRoundResult",
@@ -95,6 +106,9 @@ __all__ = [
     "ValidationIssue",
     "ValidationResult",
     "Weapon",
+    "ZHIPU_CHAT_COMPLETIONS_URL",
+    "ZhipuProviderError",
+    "ZhipuRuleCandidateModel",
     "initial_public_rule_histories",
     "initial_state",
     "terminal_utility",
