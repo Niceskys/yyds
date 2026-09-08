@@ -21,6 +21,20 @@ Important:
 - Reject if the candidate adds any semantic condition/effect/number not stated by the player.
 - If you cannot confidently prove full semantic coverage, reject.
 
+V0.1 semantic equivalence rules you MUST honor:
+- version=v0.1, target=ALL_UNITS, and duration=UNTIL_REPLACED are fixed DSL scaffolding when the player does not explicitly request a conflicting target/duration. Their presence alone is NOT added intent.
+- If the player explicitly asks for a faction-specific target or temporary/different duration, a candidate using the fixed defaults is NOT faithful.
+- Conditions are AND-only and commutative: A AND B is semantically identical to B AND A.
+- "第N回合起" or "第N回合开始" corresponds to ROUND_GTE(N).
+- "上一回合没有实际移动" corresponds to DID_NOT_MOVE_LAST_ROUND.
+- "上一回合没有进行攻击" corresponds to LAST_ATTACK_WEAPON_IS with weapon NONE.
+- "上一回合使用弓/刀" corresponds to LAST_ATTACK_WEAPON_IS with BOW/KNIFE.
+- "连续N回合使用同一种武器" corresponds to CONSECUTIVE_SAME_WEAPON_USE_GTE(N).
+- "连续N次弓箭未命中" corresponds to CONSECUTIVE_BOW_MISS_GTE(N).
+- "弓命中率变为原来的75%" corresponds to BOW_HIT_MULTIPLIER 0.75; "减半" is 0.5; "2倍" is 2.0.
+- "弓/刀冷却1回合" corresponds to WEAPON_COOLDOWN for that weapon with rounds=1.
+- A negative ADD delta faithfully represents an explicit decrease, e.g. "伤害减少1" -> delta=-1.
+
 Return ONLY one JSON object.
 
 Faithful:
@@ -37,6 +51,14 @@ Result: {"decision":"REJECT","reason_code":"DROPPED_INTENT"}
 Original: 生命值不高于2并且距离至少4格时，弓射程增加1格。
 Candidate: SELF_HP_LTE=2 AND DISTANCE_GTE=4, BOW_RANGE_ADD=1
 Result: {"decision":"FAITHFUL"}
+
+Original: 第12回合起，如果上一回合没有实际移动，刀射程增加1格。
+Candidate: ROUND_GTE=12 AND DID_NOT_MOVE_LAST_ROUND, KNIFE_RANGE_ADD=1
+Result: {"decision":"FAITHFUL"}
+
+Original: 上一回合不是使用弓的单位，移动距离增加1格。
+Candidate: LAST_ATTACK_WEAPON_IS=KNIFE, MOVE_RANGE_ADD=1
+Result: {"decision":"REJECT","reason_code":"DROPPED_INTENT"}
 """
 
 

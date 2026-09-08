@@ -16,6 +16,8 @@ from .natural_language_benchmark import (
 )
 from .natural_language_rule_adapter import NaturalLanguageRuleAdapter
 from .rule_faithfulness import NaturalLanguageRuleFaithfulnessVerifier
+from .rule_semantics import semantically_equal_candidates
+from .translator_guidance import GuidedRuleCandidateModel
 from .verified_natural_language_rule_adapter import (
     VerifiedNaturalLanguageRuleAdapter,
     VerifiedTranslationStatus,
@@ -85,7 +87,12 @@ def run_verified_benchmark(
 
         if case.expected_decision == "CANDIDATE":
             legal_total += 1
-            candidate_correct = accepted and actual_candidate == case.expected_candidate
+            candidate_correct = bool(
+                accepted
+                and actual_candidate is not None
+                and case.expected_candidate is not None
+                and semantically_equal_candidates(actual_candidate, case.expected_candidate)
+            )
             if candidate_correct:
                 legal_semantic_correct += 1
             elif accepted:
@@ -154,7 +161,7 @@ def main() -> None:
     provider = _build_provider(args.provider, args.model, args.timeout_seconds)
 
     adapter = VerifiedNaturalLanguageRuleAdapter(
-        NaturalLanguageRuleAdapter(provider),
+        NaturalLanguageRuleAdapter(GuidedRuleCandidateModel(provider)),
         NaturalLanguageRuleFaithfulnessVerifier(provider),
     )
     summary = run_verified_benchmark(
