@@ -1,129 +1,107 @@
 # Handoff — Natural Language Rule Adapter V0.1
 
 > 日期：2026-09-08  
-> 分支：`feat/natural-language-rule-adapter`  
-> 状态：Adapter 边界实现完成；等待 PR CI。
+> 最新修订分支：`fix/natural-language-rejection-envelope`  
+> 状态：Adapter 已增加显式 `NO_CANDIDATE` 语义安全出口；等待 PR CI。
 
-## 1. 前置状态
+## 1. 当前已完成
 
-PR #14 已合并，`main` 已具备确定性 DynamicRuleController：
-
-```text
-开局前规则阶段
-→ Round 1-3
-→ Round 3 后规则阶段
-→ 新合法规则从 Round 4 生效
-→ 无合法新规则则旧规则继续
-```
-
-因此现在开始建立自然语言输入层。
-
-## 2. 本分支新增
+主分支已具备：
 
 ```text
-src/rules_beyond/natural_language_rule_adapter.py
-tests/test_natural_language_rule_adapter.py
-docs/NATURAL_LANGUAGE_RULE_ADAPTER_V0.1.md
+DynamicRuleController
++
+NaturalLanguageRuleAdapter
 ```
 
-并更新：
+本次修订解决真实 Provider 接入前发现的语义安全缺口。
+
+## 2. 为什么修订
+
+原协议只允许模型输出 Candidate。
+
+风险：玩家明确要求非法/偏置规则时，模型可能为了满足系统限制，把玩家原意“洗白”为另一条合法规则，例如：
 
 ```text
-src/rules_beyond/__init__.py
+玩家：只给红方伤害 +1
+模型：双方伤害 +1
 ```
 
-## 3. 核心边界
+Validator 会接受后者，但语义已经被改变。
+
+因此必须允许模型明确拒绝映射。
+
+## 3. 新输出 envelope
+
+合法且可忠实映射：
+
+```json
+{
+  "decision": "CANDIDATE",
+  "candidate": { ...V0.1 Rule Candidate... }
+}
+```
+
+不能安全映射：
+
+```json
+{
+  "decision": "NO_CANDIDATE",
+  "reason_code": "DISALLOWED_INTENT"
+}
+```
+
+`reason_code` 只允许：
 
 ```text
-Natural Language
-→ RuleCandidateModel
-→ raw string
-→ strict JSON decode
-→ RuleValidator
-→ accepted / rejected
+DISALLOWED_INTENT
+UNSUPPORTED_CAPABILITY
+AMBIGUOUS
+CANNOT_MAP_SAFELY
 ```
 
-模型没有 Engine / GameState / DynamicRuleController 写权限。
+## 4. 不变量
 
-Prompt 不是安全边界，RuleValidator 才是确定性边界。
+- `NO_CANDIDATE` 不会产生 RuleAST；
+- Candidate 仍必须经过 deterministic RuleValidator；
+- DynamicRuleController 仍会再次验证 forwarded candidate；
+- Prompt 仍不是安全边界；
+- Adapter 不写 GameState / active_rule。
 
-## 4. Provider-neutral
+## 5. 测试新增
 
-当前只定义：
+覆盖：
 
-```python
-RuleCandidateModel.generate_candidate(...)->str
-```
+- 正常 CANDIDATE envelope；
+- 正常 NO_CANDIDATE；
+- 非法 reason_code；
+- envelope 多余字段；
+- unknown decision；
+- candidate 非 object；
+- 原有 faction / injection / bounds 防护；
+- Controller defense-in-depth。
 
-没有引入任何真实 LLM SDK、API key 或厂商依赖。
+## 6. 并行开发边界
 
-因此下一位开发者不要把本 PR 描述成“GLM 已接入”。
-
-## 5. 严格失败策略
-
-当前不会自动修复：
-
-- Markdown fenced JSON；
-- JSON 前后解释文字；
-- array；
-- unknown fields；
-- faction target；
-- bounds violation。
-
-模型返回结果只要不满足严格契约，就明确失败。
-
-## 6. 测试覆盖
-
-当前测试覆盖：
-
-- 合法精确 JSON；
-- 空输入不调用模型；
-- Provider exception；
-- Provider 返回非字符串；
-- Markdown fenced JSON；
-- JSON array；
-- RED faction target；
-- `winner=RED` prompt-injection 型未知字段；
-- 数值越界；
-- 超大输出；
-- System Prompt 包含最小权限边界。
-
-## 7. 并行开发边界
-
-本 PR 合并前，其他 AI / 开发者不要同时修改：
+在本修订合并前，其他 AI 不要同时修改：
 
 ```text
 natural_language_rule_adapter.py
-Natural Language -> Candidate JSON trust boundary
-provider protocol
+natural-language output envelope
+NO_CANDIDATE reason codes
 ```
 
-可以低冲突并行：
+`feat/zhipu-rule-provider` 分支已经创建但尚未实现 Provider；应等待本修订合并后再从最新 main 继续，避免基于旧 bare-candidate 协议开发。
 
-- 真实 Provider 选型/接口研究，但不要直接合入本分支；
-- UI 草图；
-- Replay 数据需求；
-- 独立安全 review。
+## 7. 下一步
 
-## 8. 明确未完成
-
-- 真实 GLM API；
-- Provider retry / timeout policy；
-- semantic accuracy benchmark；
-- 端到端自然语言动态对局；
-- 两个真实 LLM Agent；
-- 正式产品 UI。
-
-## 9. 下一 Gate
-
-只有本 PR CI 通过并合并后，才进入：
+本修订通过并合并后：
 
 ```text
-真实 LLM Provider adapter
-+
-固定自然语言测试语料集
-+
-合法/非法/注入/模糊输入评测
+真实智谱 Provider
+→ response_format=json_object
+→ GLM-5.1 baseline（model name configurable）
+→ 固定自然语言语料集 benchmark
 ```
 
-该阶段重点是测“模型结构化自然语言是否可靠”，而不是让模型获得更多权限。
+不要在没有 benchmark 数据时直接把产品模型切到更新模型。
