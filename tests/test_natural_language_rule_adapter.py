@@ -260,3 +260,15 @@ def test_system_prompt_provides_safe_no_candidate_path() -> None:
     assert "NO_CANDIDATE" in SYSTEM_PROMPT_V0_1
     assert "Never silently rewrite" in SYSTEM_PROMPT_V0_1
     assert "Never target RED, BLUE" in SYSTEM_PROMPT_V0_1
+
+
+def test_system_prompt_locks_exact_ruleast_json_shapes_and_no_guessing() -> None:
+    assert '"type": "SELF_HP_LTE", "value": <integer>' in SYSTEM_PROMPT_V0_1
+    assert '"type": "DID_NOT_MOVE_LAST_ROUND"' in SYSTEM_PROMPT_V0_1
+    assert '"type": "BOW_RANGE_ADD", "delta": <integer>' in SYSTEM_PROMPT_V0_1
+    assert '"type": "BOW_HIT_MULTIPLIER", "multiplier": <number>' in SYSTEM_PROMPT_V0_1
+    assert '"type": "WEAPON_COOLDOWN", "weapon": "KNIFE|BOW", "rounds": 1' in SYSTEM_PROMPT_V0_1
+    assert "Never emit a condition as a string" in SYSTEM_PROMPT_V0_1
+    assert "Never emit shorthand" in SYSTEM_PROMPT_V0_1
+    assert "Never invent a number" in SYSTEM_PROMPT_V0_1
+    assert "Vague terms" in SYSTEM_PROMPT_V0_1
