@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import asdict, dataclass
 import json
+import os
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -12,7 +13,10 @@ from .natural_language_rule_adapter import (
     TranslationStatus,
 )
 from .rule_validator import RuleValidator
-from .zhipu_rule_provider import DEFAULT_ZHIPU_RULE_MODEL, ZhipuRuleCandidateModel
+from .zhipu_rule_provider import (
+    DEFAULT_ZHIPU_API_KEY_ENV,
+    ZhipuRuleCandidateModel,
+)
 
 
 DEFAULT_CORPUS_PATH = Path("evals/natural_language_rule_corpus_v0.1.json")
@@ -220,13 +224,16 @@ def main() -> None:
     cases = load_corpus(args.corpus)
     validate_corpus_against_rule_validator(cases)
 
-    provider = ZhipuRuleCandidateModel.from_env(
-        model_env="ZHIPU_RULE_MODEL",
-        timeout_seconds=args.timeout_seconds,
-    )
-    if args.model is not None:
+    if args.model is None:
         provider = ZhipuRuleCandidateModel.from_env(
-            model_env="__RULE_MODEL_ENV_NOT_EXPECTED_TO_EXIST__",
+            timeout_seconds=args.timeout_seconds,
+        )
+    else:
+        api_key = os.getenv(DEFAULT_ZHIPU_API_KEY_ENV, "")
+        if not api_key.strip():
+            raise ValueError(f"{DEFAULT_ZHIPU_API_KEY_ENV} is not set")
+        provider = ZhipuRuleCandidateModel(
+            api_key,
             model_name=args.model,
             timeout_seconds=args.timeout_seconds,
         )
