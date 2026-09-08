@@ -1,0 +1,8 @@
+{
+  "schema_version": "mvp-v0.2",
+  "error": {
+    "code": "REVISION_CONFLICT",
+    "message": "对局状态已经变化，请刷新后重试。",
+    "retryable": true
+  }
+}
