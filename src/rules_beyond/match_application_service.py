@@ -42,13 +42,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import secrets
-from typing import Any, Mapping
+from typing import Any, Mapping, TypeVar
 
 from .api_contract import (
     ActionPublicView,
     AdvanceResult,
     BattleEscalationSnapshot,
     BoardSnapshot,
+    ContractModel,
     DirectionPublic,
     EffectiveStatsPublicView,
     ErrorCode,
@@ -156,6 +157,21 @@ class RecoverableMatchFailure(MatchApplicationError):
 # ---------------------------------------------------------------------------
 # Public projection helpers
 # ---------------------------------------------------------------------------
+
+_PublicModelT = TypeVar("_PublicModelT", bound=ContractModel)
+
+
+def _public_copy(model: _PublicModelT) -> _PublicModelT:
+    """Return a caller-owned deep copy of a public response DTO.
+
+    ``ContractModel`` is deliberately not frozen, so every public service return
+    value must be detached from the aggregate's internal model instances. This is
+    the single defensive-copy boundary for ``MatchSnapshot`` / ``AdvanceResult`` /
+    ``RuleSubmissionResult`` / ``ReplaySnapshot``.
+    """
+
+    return model.model_copy(deep=True)
+
 
 def _rule_ast_public(rule: RuleAST) -> RuleAstPublicView:
     conditions = [
@@ -379,12 +395,6 @@ class MatchApplicationService:
     def seed(self) -> int | None:
         return None if self._match is None else self._match.seed
 
-    @property
-    def controller_state(self) -> DynamicMatchState:
-        """A1 diagnostic accessor (not part of the public contract)."""
-
-        return self._require_match().state
-
     # -- application API -----------------------------------------------------
 
     def create_match(
@@ -406,11 +416,12 @@ class MatchApplicationService:
             seed=seed if seed is not None else secrets.randbits(31),
             state=started.state,
         )
-        return self.get_match_snapshot()
+        match = self._require_match()
+        return _public_copy(self._snapshot(match, match.state))
 
     def get_match_snapshot(self) -> MatchSnapshot:
         match = self._require_match()
-        return self._snapshot(match, match.state)
+        return _public_copy(self._snapshot(match, match.state))
 
     def submit_public_rule(self, player_text: str) -> RuleSubmissionResult:
         """Attempt one public-rule replacement inside the open intermission."""
@@ -463,7 +474,7 @@ class MatchApplicationService:
         )
 
         accepted = accepted_rule_view is not None
-        return RuleSubmissionResult(
+        result = RuleSubmissionResult(
             accepted=accepted,
             public_code=code,
             message=_SUBMISSION_MESSAGES.get(code, "规则提交未生效。"),
@@ -478,6 +489,7 @@ class MatchApplicationService:
             rule_id=accepted_rule_view.rule_id if accepted_rule_view is not None else None,
             match=self._snapshot(match, match.state),
         )
+        return _public_copy(result)
 
     def advance_match(self) -> AdvanceResult:
         """Atomically resolve one complete round and return the stable snapshot.
@@ -626,7 +638,7 @@ class MatchApplicationService:
             rule=working.active_rule,
         )
 
-        return advance_result
+        return _public_copy(advance_result)
 
     def get_replay(self) -> ReplaySnapshot:
         """Return the recorded public timeline. Never calls a model or the Engine."""
@@ -634,7 +646,7 @@ class MatchApplicationService:
         match = self._require_match()
         state = match.state
         config = self.config
-        return ReplaySnapshot(
+        replay = ReplaySnapshot(
             match_id=match.match_id,
             seed=match.seed,
             initial_config=GameConfigPublicView(
@@ -649,11 +661,12 @@ class MatchApplicationService:
                 knife_damage=config.knife_damage,
                 bow_damage=config.bow_damage,
             ),
-            timeline=[entry.model_copy(deep=True) for entry in match.timeline],
+            timeline=list(match.timeline),
             terminal_result=_result_public(state.game_state.result),
             score_rounds=state.completed_rounds,
             rule_change_count=state.rule_change_count,
         )
+        return _public_copy(replay)
 
     # -- projection ----------------------------------------------------------
 

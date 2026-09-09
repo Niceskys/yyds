@@ -550,17 +550,18 @@ def test_rule_replacement_preserves_public_history_and_no_damage_streak() -> Non
     service.create_match(seed=1_270_000)
     service.advance_match()
 
-    state_before = service.controller_state
-    histories_before = dict(state_before.histories)
-    streak_before = state_before.game_state.no_damage_streak
+    streak_before = service.get_match_snapshot().battle_escalation.no_damage_streak
+    # White-box test-only path: A1 deliberately exposes no production accessor
+    # for the authoritative DynamicMatchState / PublicRuleHistory.
+    histories_before = dict(service._match.state.histories)
 
     service.submit_public_rule(MOVE_RULE_TEXT)
 
-    state_after = service.controller_state
-    assert dict(state_after.histories) == histories_before
-    assert state_after.game_state.no_damage_streak == streak_before
-    assert state_after.active_rule is not None
-    assert state_after.rule_change_count == 1
+    snapshot_after = service.get_match_snapshot()
+    assert snapshot_after.battle_escalation.no_damage_streak == streak_before
+    assert snapshot_after.rule_change_count == 1
+    assert snapshot_after.active_rule is not None
+    assert dict(service._match.state.histories) == histories_before
 
     result = service.advance_match()
     assert result.match.rule_change_count == 1
@@ -745,3 +746,75 @@ def test_fallback_strategy_is_committed_after_successful_round() -> None:
     assert [entry.round_no for entry in blue_agent.private_memory] == [1]
     assert red_agent.private_memory[0].intent is StrategyIntent.PRESSURE
     assert blue_agent.private_memory[0].intent is StrategyIntent.KITE
+
+
+# defensive-copy boundary ---------------------------------------------------
+
+
+def test_create_match_response_is_caller_owned_copy() -> None:
+    service, *_ = _service()
+    created = service.create_match(seed=1_270_000)
+    baseline = service.get_match_snapshot()
+
+    created.units.RED.hp = 0
+    created.player_decision.can_advance = False
+    created.battle_escalation.level = 4
+
+    assert service.get_match_snapshot() == baseline
+
+
+def test_snapshot_response_is_caller_owned_copy() -> None:
+    service, *_ = _service()
+    service.create_match(seed=1_270_000)
+    service.advance_match()
+    baseline = service.get_match_snapshot()
+
+    tampered = service.get_match_snapshot()
+    tampered.units.RED.hp = 999
+    tampered.effective_stats.RED.bow_range = 99
+    tampered.player_decision.can_submit_rule = False
+    assert tampered.latest_strategy.RED is not None
+    tampered.latest_strategy.RED.intent = StrategyIntentPublic.HOLD
+
+    assert service.get_match_snapshot() == baseline
+
+
+def test_accepted_rule_response_is_caller_owned_copy() -> None:
+    service, *_ = _service(responses={MOVE_RULE_TEXT: MOVE_RULE_JSON})
+    service.create_match(seed=1_270_000)
+    service.advance_match()
+    result = service.submit_public_rule(MOVE_RULE_TEXT)
+    baseline_snapshot = service.get_match_snapshot()
+    baseline_replay = service.get_replay()
+
+    assert result.match.active_rule is not None
+    assert result.candidate_preview is not None
+    result.match.active_rule.player_text = "被篡改"
+    result.match.active_rule.ast.effect.delta = 99
+    result.candidate_preview.effect.delta = 99
+
+    assert service.get_match_snapshot() == baseline_snapshot
+    assert service.get_replay() == baseline_replay
+    assert service.get_match_snapshot().active_rule.player_text == MOVE_RULE_TEXT
+    intermission = service.get_replay().timeline[1]
+    assert isinstance(intermission, ReplayIntermissionEntry)
+    assert intermission.accepted_rule is not None
+    assert intermission.accepted_rule.player_text == MOVE_RULE_TEXT
+    assert intermission.accepted_rule.ast.effect.delta == 1
+
+
+def test_advance_response_is_caller_owned_copy() -> None:
+    service, *_ = _service()
+    service.create_match(seed=1_270_000)
+    result = service.advance_match()
+    baseline_snapshot = service.get_match_snapshot()
+    baseline_replay = service.get_replay()
+
+    result.round.strategies.RED.intent = StrategyIntentPublic.HOLD
+    result.round.actions.RED.attack = None
+    result.round.events.clear()
+    assert result.match.latest_strategy.RED is not None
+    result.match.latest_strategy.RED.intent = StrategyIntentPublic.HOLD
+
+    assert service.get_match_snapshot() == baseline_snapshot
+    assert service.get_replay() == baseline_replay
