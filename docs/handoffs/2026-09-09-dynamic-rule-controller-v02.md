@@ -4,7 +4,7 @@
 > 分支：`backend/controller-v02-intermission`
 > 对应 Issue：#37
 > 基线：`main@6a930d7ae67dbc5d703bae15d669545fc272fc4e`
-> 状态：**Controller cadence migration + controller/NL tests PASS；等待 PR CI。**
+> 状态：**A0 COMPLETED；review blocker 已修复；等待最终 PR CI。**
 
 ## 1. 本轮目标
 
@@ -66,6 +66,24 @@ continue_match(state)                          -> DynamicContinueResult
 - `continue_match()` 关闭 intermission；只有 continue 之后才允许解析下一完整回合。
 - terminal 回合不产生 intermission，`can_submit_rule = False`、`can_advance = False`。
 
+### 2.1 continue_match 不是对外状态
+
+`continue_match()` **只是 Controller 内部关闭 intermission**。
+
+V0.2 HTTP `/advance` 必须在应用层一个原子操作内完成：
+
+```text
+intermission close
+→ RED / BLUE strategy
+→ Planner
+→ resolve one complete round
+→ Replay
+→ public MatchSnapshot
+```
+
+A1 不得把 `continue_match()` 之后、下一回合尚未 resolve 的中间状态作为正常对外
+`PLAYER_DECISION` 结果持久化/返回。
+
 ## 3. 删除的 V0.1 产品逻辑
 
 ```text
@@ -90,42 +108,115 @@ DynamicRuleController.start_match(initial_submission)
 - 只有 Engine 实际应用伤害才会重置 `no_damage_streak`。
 - Engine / RuleValidator / Rule DSL / bow 命中率 / HP / damage 均未修改。
 
-## 5. 受影响的调用方
+## 5. Review 修复：历史 Gate identity 不再被污染
 
-Controller cadence 变化会传导到以下 V0.1 实验/连通性 harness，本轮一并迁移到 V0.2
-回合间 cadence：
+PR #48 第一次 CI（`tests` / `behavior-diagnostics` / `dynamic-rule-replacement`）已全绿，
+但 review 发现一个治理 blocker：为了适配新 cadence，直接在**已冻结且已有 PASS/FAIL 证据**
+的旧 Gate 模块名下改写了实验定义。
+
+### 5.1 已冻结的历史身份
 
 ```text
-src/rules_beyond/natural_language_dynamic_controller.py
-src/rules_beyond/dynamic_rule_experiment.py
-src/rules_beyond/live_agent_planner_match.py
-src/rules_beyond/live_natural_language_dynamic_match.py
-src/rules_beyond/live_natural_language_dynamic_match_v02.py
+Natural-Language Dynamic Match Gate V0.1
+  FAIL, head 9239cfa876f5a7fb3d050ad960ceacf851e43324
+  workflow: live-natural-language-dynamic-match
+  evidence: docs/experiments/MIMO_V25_PRO_NL_DYNAMIC_MATCH_V01_FAIL_2026-09-08.md
+
+Natural-Language Dynamic Match Gate V0.2
+  FAIL, head 62a1ec52899ab16e47fcf957ab9a246b0452c658
+  workflow: live-natural-language-dynamic-match-v02
+  evidence: docs/experiments/MIMO_V25_PRO_NL_DYNAMIC_MATCH_V02_FAIL_2026-09-08.md
+
+Agent / Planner Integration Gate V0.1
+  PASS, head 5c1aeccc7d9ef1727c01f416695415f5a9c9477f
+  workflow: live-agent-planner-match
+  evidence: docs/experiments/LIVE_AGENT_PLANNER_GATE_PASS_2026-09-08.md
+
+V0.1 Dynamic Public-Rule Replacement Experiment
+  PASS, results commit d8e5ec00f9e4116bc43d8e05ffdc674dcb064a27
+  workflow: dynamic-rule-replacement
+  evidence: docs/experiments/DYNAMIC_RULE_REPLACEMENT_2026-09-08.md
 ```
 
-这些 harness 的 schedule 现在以“已结算回合”为 key（例如 `1:` 表示第 1 回合结束后的
-intermission），不再以 phase index 为 key。
+### 5.2 分版方案
 
-`live_natural_language_dynamic_match*` 的“行为改变”观测点从 Round 1 改为 Round 2：
+历史 workflow 全部改为 **historical-only + 明确 pin 到冻结 head**，只复现历史代码，不再执行
+当前 cadence 定义：
+
+```text
+.github/workflows/live-natural-language-dynamic-match.yml      -> pin 9239cfa...
+.github/workflows/live-natural-language-dynamic-match-v02.yml  -> pin 62a1ec5...
+.github/workflows/live-agent-planner-match.yml                 -> pin 5c1aecc...
+.github/workflows/dynamic-rule-replacement.yml                 -> pin d8e5ec0... + workflow_dispatch only
+```
+
+当前 cadence 使用新版本名 / 新模块 / 新 workflow：
+
+```text
+src/rules_beyond/live_natural_language_dynamic_match_v03.py
+  workflow: live-natural-language-dynamic-match-v03 (workflow_dispatch)
+
+src/rules_beyond/live_agent_planner_match_v02.py
+  workflow: live-agent-planner-match-v02 (workflow_dispatch)
+
+src/rules_beyond/dynamic_rule_experiment_v02.py
+  workflow: dynamic-rule-replacement-v02 (pull_request + workflow_dispatch)
+```
+
+新版本定义文档：
+
+```text
+docs/experiments/NATURAL_LANGUAGE_DYNAMIC_MATCH_GATE_V0.3.md
+docs/experiments/AGENT_PLANNER_INTEGRATION_GATE_V0.2.md
+docs/experiments/DYNAMIC_RULE_REPLACEMENT_V0.2.md
+```
+
+三份新文档与模块 docstring 都明确写明：这是 cadence migration 后的新 smoke/gate，
+**不是**历史 V0.1 / V0.2 FAIL 或 Agent V0.1 PASS 的 rerun。
+
+历史 PASS/FAIL 文档本身未做任何修改。
+
+历史 cadence 的旧模块（`live_agent_planner_match.py`、
+`live_natural_language_dynamic_match.py`、`live_natural_language_dynamic_match_v02.py`、
+`dynamic_rule_experiment.py`）及其专属测试已从当前 HEAD 移除；其可复现入口是上面的 pinned
+historical workflows，代码可从冻结 head 完整检出。
+
+### 5.3 当前 cadence 与历史观测点差异
 
 ```text
 Round 1 在 V0.2 中必须无玩家规则，因此不可能被规则改变。
 第一次可观测的 planner 行为改变发生在第 1 个 intermission 之后，即 Round 2。
 ```
 
-为了让该断言仍然可观测，第一个 intermission 的规则改为 `KNIFE_RANGE_ADD +1`
-（改变 Round 2 的武器选择），其余 schedule 文本保持不变。
+V0.3 NL Gate 的第一个 intermission 使用 `KNIFE_RANGE_ADD +1`，使 Round 2 的武器选择变化可观测。
 
-## 6. 测试
+## 6. Active baseline 文档已同步
 
-重写/迁移：
+以下 active source-of-truth 已从“Controller 仍是 V0.1 / A0 未完成”更新为 A0 COMPLETED：
+
+```text
+AI_DEVELOPER_START_HERE.md
+docs/MVP_FIRST_TASKS.md
+docs/MVP_API_CONTRACT_V0.2.md §14（仅 implementation/current-status，不改 normative gameplay）
+```
+
+当前后端顺序：
+
+```text
+A1 MatchApplicationService
+-> A2 in-memory repository + revision / per-match lock / idempotency
+-> A3 real FastAPI five-route vertical slice
+-> Developer B B4 real API integration
+```
+
+## 7. 测试
 
 ```text
 tests/test_dynamic_rule_controller.py
 tests/test_natural_language_dynamic_controller.py
-tests/test_live_natural_language_dynamic_match.py
-tests/test_live_natural_language_dynamic_match_v02.py
 tests/test_natural_language_rule_adapter.py
+tests/test_live_agent_planner_match_v02.py          (current cadence)
+tests/test_live_natural_language_dynamic_match_v03.py (current cadence)
 ```
 
 新增覆盖：
@@ -146,28 +237,21 @@ terminal → 无 intermission、不可提交/推进
 RULE_PHASE_INTERVAL 已从模块删除
 ```
 
-移除的旧 cadence 断言（已被 V0.2 正式规范取代，不是为了让测试通过而保留两套逻辑）：
+## 8. 验证
 
 ```text
-pre-game phase 0 接受初始规则
-round 3/6/9 才开放规则阶段
-no-submission carry-forward 作为 phase 语义
-due rule phase 必须在下一回合前处理
+pytest                                                                 195 passed
+python -m rules_beyond.dynamic_rule_experiment_v02 --matches-per-pair 500   PASS
+python -m rules_beyond.diagnostics --matches-per-pair 2000                  PASS
 ```
 
-## 7. 验证
+## 9. 未完成 / 下一步
 
-```text
-pytest                                     196 passed
-python -m rules_beyond.dynamic_rule_experiment --matches-per-pair 500   PASS
-python -m rules_beyond.diagnostics --matches-per-pair 2000               PASS
-```
-
-## 8. 未完成 / 下一步
-
-- A1 `MatchApplicationService`（create / snapshot / submit_rule / advance / replay）
-- A2 in-memory repository + revision / per-match lock / Idempotency-Key
-- A3 FastAPI 五路由 vertical slice
+- A1 `MatchApplicationService`（create / snapshot / submit_rule / advance / replay）**尚未开始**。
+- A2 in-memory repository + revision / per-match lock / Idempotency-Key。
+- A3 real FastAPI 五路由 vertical slice。
+- A3 之后 Developer B B4 real API integration。
 - Controller 目前仍不负责 Replay entry 组装；A1 需要把 `INTERMISSION_OPENED` /
   `PLAYER_RULE_REJECTED` / `PLAYER_RULE_REPLACED` / `PLAYER_CONTINUED` 映射到
   `ReplayIntermissionEntry`。
+- `live-natural-language-benchmark.yml` 等与本轮无关的历史 workflow 未改动。
