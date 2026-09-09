@@ -2,9 +2,9 @@
 
 > 日期：2026-09-09
 > 分支：`backend/match-service-v02`
-> 对应 Issue：#49
+> 对应 Issue：#49 / PR：#50（Draft）
 > 基线：`main@2fcdedf7233cd321f4baff89e84e6632b53dacb3`
-> 状态：**A1 IMPLEMENTED；等待 PR CI。未合并、未自动 merge。**
+> 状态：**A1 IMPLEMENTED + review blocker 已修复；等待 PR CI 与 re-review。未合并、未 merge。**
 
 ## 1. 本轮目标
 
@@ -30,7 +30,8 @@ web/**
 
 ```text
 src/rules_beyond/match_application_service.py    新增：A1 应用层
-tests/test_match_application_service.py          新增：20 个测试
+src/rules_beyond/strategy_agent.py               A1 review 最小修改：memory commit 边界
+tests/test_match_application_service.py          28 个测试
 docs/handoffs/2026-09-09-match-application-service-v02.md
 ```
 
@@ -44,6 +45,7 @@ src/rules_beyond/rule_validator.py        未改
 src/rules_beyond/dynamic_rule_controller.py
 docs/GAMEPLAY_FLOW_V0.2.md                normative gameplay 未改
 web/**
+历史 Gate PASS/FAIL 定义未改
 ```
 
 ## 3. 应用层 API
@@ -97,15 +99,19 @@ can_advance = true
 
 ```text
 若 PLAYER_DECISION：controller.continue_match()（内部步骤）
-→ RED strategy + BLUE strategy（各自独立 IsolatedStrategyAgent）
+→ RED strategy + BLUE strategy（各自独立 IsolatedStrategyAgent，remember=False）
 → DeterministicIntentPlanner → RED / BLUE concrete Action
 → controller.resolve_round() 一个完整回合
-→ Replay INTERMISSION(CONTINUE) + Replay ROUND
-→ completed_rounds / score_rounds / battle escalation / effective_stats
+→ 构建 Replay INTERMISSION(CONTINUE) + ROUND 与返回 DTO
+→ 一次性提交 aggregate
+→ 最后提交 RED / BLUE strategy private memory
 → 非终局 PLAYER_DECISION；终局 TERMINAL
 ```
 
 - 所有 aggregate 变更都在完整回合 resolve 之后一次性提交；异常不会留下半回合。
+- **strategy private memory 也纳入该原子边界**：`decide(remember=False)` 只产生决策不写
+  memory，只有完整回合成功后才调用 `commit_decision_memory`。失败 / 放弃的回合不会留下
+  phantom memory。
 - 第一次 advance 从 RUNNING 直接执行 Round 1，Round 1 前不存在 INTERMISSION。
 - `continue_match()` 之后、下一回合尚未 resolve 的 RUNNING 中间态**不返回、不写入
   aggregate、也不作为任何 Replay `pre_round`**。
@@ -148,7 +154,29 @@ VERIFIER_ERROR                           -> MODEL_UNAVAILABLE
 ### 3.5 get_replay
 
 只读取已保存的 timeline；不调用 Agent / translator / provider / Engine，也不重新模拟。
-返回前对每个 entry 做 deep copy，防止调用方修改内部记录。
+返回前经统一的 defensive-copy 边界。
+
+### 3.6 public response defensive-copy 边界
+
+`ContractModel` 故意不是 frozen。所有 public 返回值都经单一 helper：
+
+```text
+_public_copy(model) -> model.model_copy(deep=True)
+```
+
+覆盖：
+
+```text
+create_match()
+get_match_snapshot()
+submit_public_rule()
+advance_match()
+get_replay()
+```
+
+调用方修改返回 DTO（含 nested model / list）不会反向污染
+`aggregate.active_rule_view` / `aggregate.latest_strategy` / `aggregate.timeline`，
+也不会污染后续 snapshot / replay。
 
 ## 4. 投影规则（不复制权威计算）
 
@@ -159,6 +187,8 @@ VERIFIER_ERROR                           -> MODEL_UNAVAILABLE
   3/6/9/12 阈值；`hard` 时 `next_level_at_no_damage = null`。
 - 换规则只替换 `active_rule`，不触碰 `PublicRuleHistory` 与 `no_damage_streak`。
 - `MatchSnapshot` 严格使用现有 `mvp-v0.2` schema，未新增 lifecycle 值。
+- **不提供 production accessor 暴露 `DynamicMatchState` / `PublicRuleHistory`**；
+  continuity 验证使用 public `battle_escalation.no_damage_streak` + 测试内明确 private 路径。
 - `PlayerDecisionSnapshot`：
   - 创建 / RUNNING：`after_round=null`、`can_submit_rule=false`、`can_advance=true`；
   - 非终局回合后：`after_round=completed_rounds`、`can_submit_rule=true`；
@@ -205,21 +235,63 @@ RecoverableMatchFailure         -> INTERNAL_ERROR (retryable)
 ```
 
 - strategy model 失败由 `IsolatedStrategyAgent` 现有 fallback 处理
-  （`FALLBACK_MODEL_ERROR` / degraded=true），回合仍完整结算。
-- strategy/planner/resolve 阶段意外异常包装为 `RecoverableMatchFailure`，aggregate 不变。
+  （`FALLBACK_MODEL_ERROR` / degraded=true），回合仍完整结算；
+- fallback 策略在回合成功提交后同样写入 private memory；
+- strategy/planner/resolve 阶段意外异常包装为 `RecoverableMatchFailure`，aggregate、
+  Replay、RED/BLUE private memory 全部不变。
 
-## 6. 测试
+## 6. PR #50 review 修复记录
+
+第一次 A1 实现 CI 为 **215 passed**（195 基线 + 20 新增）。review 判定 merge blocked：
+
+### 6.1 Blocker 1 — advance 原子性未覆盖 agent private memory
+
+问题：`IsolatedStrategyAgent.decide()` 会立即写 `_private_memory`，而 `advance_match()` 在
+RED/BLUE decide 之后才提交 aggregate。若 RED 成功、BLUE / Planner / resolve 之后失败，
+aggregate 与 Replay 停留在上一回合，但 private memory 已包含未提交回合 → phantom memory。
+
+修复（最小兼容）：
 
 ```text
-tests/test_match_application_service.py   20 tests
+IsolatedStrategyAgent.decide(..., remember: bool = True)   默认行为不变
+IsolatedStrategyAgent.commit_decision_memory(decision, *, round_no, rule)
+MatchApplicationService.advance_match():
+    decide(..., remember=False) x2
+    → planner → resolve_round
+    → aggregate commit
+    → commit_decision_memory x2（最后一步）
 ```
 
-覆盖：
+- 现有普通调用方（harness / tests）继续使用默认 `remember=True`，行为不变。
+- private memory 仍只存 `round_no` / `active_rule_signature` / `intent`。
+- failed / abandoned round 不写 memory；retry 不产生重复 Round N。
+- 未通过跨类访问私有字段实现。
+
+### 6.2 Blocker 2 — public DTO 与内部 aggregate 对象别名
+
+问题：aggregate 的 `active_rule_view` / `latest_strategy` / `timeline` Pydantic 实例被直接
+嵌入返回 DTO；`ContractModel` 非 frozen，调用方可反向污染内部状态。
+
+修复：`_public_copy()` 统一 deep copy 边界，覆盖全部五个 public method；
+未修改 `api_contract.ContractModel`。
+
+### 6.3 封装 — 移除 `controller_state`
+
+删除 production accessor `MatchApplicationService.controller_state`；测试改为：
+
+- `no_damage_streak` → public `battle_escalation.no_damage_streak`；
+- `PublicRuleHistory` continuity → `tests/**` 内明确 private 路径。
+
+## 7. 测试
+
+```text
+tests/test_match_application_service.py   28 tests
+```
+
+覆盖（原 20 + review 新增 8）：
 
 ```text
 create：RUNNING / completed_rounds=0 / no rule / 零 provider 调用
-create 两次拒绝；未创建时 not found
-create 后第一次 advance 前 submit 被拒且零模型调用
 first advance：Round 1 完整执行、completed_rounds=1、PLAYER_DECISION
 Round 1 前不存在 Replay INTERMISSION
 advance 生成 RED/BLUE strategy + action + ROUND entry + Engine events
@@ -231,26 +303,30 @@ accepted → advance → CONTINUE + Round N + 新稳定 snapshot
 terminal：TERMINAL / 不可 submit / 不可 advance
 get_replay + get_match_snapshot 零模型调用（counting fake）
 public projection 不含 private_memory / raw_model_output / system_prompt 等
-get_replay 返回 defensive copy
 换规则保留 PublicRuleHistory 与 no_damage_streak
 timeline 顺序与 active_rule_before/after 事实一致
 provider 失败走 fallback、不产生半回合
-agent 异常时 aggregate 不变
+BLUE 在 RED decide 后失败：aggregate / Replay / RED+BLUE memory 不变
+Planner 在双方 decide 后失败：RED+BLUE memory 不变
+失败后 retry：Round N memory 只出现一次，无 phantom duplicate
+fallback 策略在成功回合后写入 memory
+defensive copy：create / snapshot / accepted rule / advance 返回对象被篡改不污染内部
+get_replay defensive copy
 ```
 
 所有测试使用 deterministic fake provider / counting fake，禁止真实网络。
 
-## 7. 验证
+## 8. 验证
 
 ```text
-pytest                                                              215 passed
+pytest -o addopts="" -q                                                 223 passed
 python -m rules_beyond.dynamic_rule_experiment_v02 --matches-per-pair 500   PASS
 python -m rules_beyond.diagnostics --matches-per-pair 2000                  PASS
 ```
 
-（基线为 195 passed；本 PR 新增 20 个测试。）
+（第一次 A1 CI 为 215 passed；review 修复后为 223 passed。未删除测试、未放松断言。）
 
-## 8. 未完成 / 下一步
+## 9. 未完成 / 下一步
 
 留给 A2：
 
@@ -262,6 +338,13 @@ Idempotency-Key
 public/private projection 的应用层缓存
 ```
 
+A2 必须注意：
+
+```text
+- 保证 match_id 全局唯一，rule_id = rule_{match_id}_{rule_change_count} 才安全；
+- 幂等重试不得生成新的 rule_id，也不得重复 rule_change_count。
+```
+
 留给 A3：
 
 ```text
@@ -271,13 +354,9 @@ ErrorEnvelope mapping
 
 留给 B4：真实 API 联调。
 
-## 9. 需要审核的设计决定
+## 10. 需要审核
 
-1. `advance_match()` 返回冻结契约的 `AdvanceResult(round=..., match=...)`，其中
-   `match` 是**新的稳定 MatchSnapshot**。没有暴露 `continue_match()` 之后、Round 未 resolve
-   的中间态。若要求只返回裸 `MatchSnapshot`，需要 A3 层再裁剪。
-2. `rule_id` 采用确定性 `rule_{match_id}_{rule_change_count}`；A1 未引入随机 id。
-3. 提供只读诊断属性 `controller_state`（不进入公共 DTO），仅用于测试 / 诊断；
-   如认为应完全隐藏，可移除并改用其他方式验证历史连续性。
-4. 单一 aggregate 的 A1 限制：一个 service 实例只服务一个 match；A2 必须改造成
-   repository + `match_id` 参数，这是计划内的 API 变更。
+1. `advance_match()` 返回冻结契约的 `AdvanceResult(round, match)`；review 已确认正确，不改。
+2. `rule_id = rule_{match_id}_{rule_change_count}` A1 保留；A2 必须保证唯一性与幂等语义。
+3. 单一 aggregate 的 A1 边界：review 已确认可接受，A2 再引入 repository + `match_id`。
+4. `controller_state` production accessor 已移除。
