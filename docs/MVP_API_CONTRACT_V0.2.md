@@ -518,7 +518,7 @@ DynamicRuleController = V0.2 intermission cadence
 
 旧 V0.1 cadence（pre-game phase 0 / rounds 3/6/9...）已从产品路径删除，仅作为历史证据保留。
 
-A1 已实现（Issue #49，分支 `backend/match-service-v02`，PR 审核中）：
+A1 已完成并合并（Issue #49 / PR #50，分支 `backend/match-service-v02`）：
 
 ```text
 src/rules_beyond/match_application_service.py
@@ -529,6 +529,19 @@ src/rules_beyond/match_application_service.py
 - 未实现 repository / revision CAS / per-match lock / Idempotency-Key / FastAPI（A2 / A3）
 ```
 
+A2 已实现（Issue #51，分支 `backend/repository-concurrency-v02`，PR 审核中）：
+
+```text
+src/rules_beyond/match_repository.py
+- InMemoryMatchRepository：match_id lookup / 唯一性与碰撞重试
+- MatchServiceFactory：每个 match 一套独立 MatchApplicationService + RED/BLUE session
+- per-match threading.Lock：不同 match 可并发，provider/Planner/Engine 不在全局锁内
+- expected_revision CAS：不匹配抛 RevisionConflictError(REVISION_CONFLICT)
+- Idempotency-Key：lookup 在 revision check 之前；fingerprint = operation + expected_revision (+ player_text)
+- 缓存 accepted/rejected rule 与 successful advance 的第一次 public result；异常不缓存
+- 未实现 FastAPI route / HTTP status / ErrorEnvelope（A3）
+```
+
 当前后端顺序：
 
 ```text
@@ -536,8 +549,8 @@ V0.2 gameplay contract
 → V0.2 Pydantic/OpenAPI/fixtures
 → DynamicRuleController cadence migration        [DONE]
 → controller regression tests                     [DONE]
-→ MatchApplicationService                        [A1 IMPLEMENTED — PR 审核中]
-→ in-memory repository / revision / lock / idempotency
+→ MatchApplicationService                        [DONE]
+→ in-memory repository / revision / lock / idempotency   [A2 IMPLEMENTED — PR 审核中]
 → real FastAPI five-route vertical slice
 → Developer B B4 real API integration
 ```
