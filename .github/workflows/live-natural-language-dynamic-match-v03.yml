@@ -1,15 +1,9 @@
-name: live-natural-language-dynamic-match-v02 (historical V0.2 FAIL)
+name: live-natural-language-dynamic-match-v03 (current V0.2 cadence)
 
-# HISTORICAL-ONLY REPRODUCTION ENTRY.
-#
-# Frozen Natural-Language Dynamic Match Gate V0.2 FAIL:
-#   run_id: 34185343863
-#   head:   62a1ec52899ab16e47fcf957ab9a246b0452c658
-#   evidence: docs/experiments/MIMO_V25_PRO_NL_DYNAMIC_MATCH_V02_FAIL_2026-09-08.md
-#
-# This workflow deliberately checks out that frozen commit so the historical
-# V0.2 FAIL definition can never be replaced by the current V0.2 intermission
-# cadence. Current cadence Gate: .github/workflows/live-natural-language-dynamic-match-v03.yml
+# Current-cadence natural-language dynamic match Gate.
+# This is a NEW Gate for the V0.2 intermission state machine, not a rerun of the
+# frozen Natural-Language Dynamic Match Gate V0.1 (FAIL, head 9239cfa...) or
+# V0.2 (FAIL, head 62a1ec5...).
 on:
   workflow_dispatch:
     inputs:
@@ -20,7 +14,7 @@ on:
         type: string
 
 jobs:
-  live-dynamic-match-v02:
+  live-dynamic-match-v03:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -29,8 +23,6 @@ jobs:
       MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: 62a1ec52899ab16e47fcf957ab9a246b0452c658
 
       - uses: actions/setup-python@v5
         with:
@@ -47,7 +39,7 @@ jobs:
             exit 1
           fi
 
-      - name: Run historical V0.2 natural-language dynamic match gate
+      - name: Run current-cadence V0.3 natural-language dynamic match gate
         id: live
         continue-on-error: true
         shell: bash
@@ -55,18 +47,18 @@ jobs:
           MODEL_NAME: ${{ inputs.model }}
         run: |
           mkdir -p live-match-output
-          python -m rules_beyond.live_natural_language_dynamic_match_v02 \
+          python -m rules_beyond.live_natural_language_dynamic_match_v03 \
             --model "$MODEL_NAME" \
             > live-match-output/result.json
 
-      - name: Upload V0.2 live match trace
+      - name: Upload V0.3 live match trace
         uses: actions/upload-artifact@v4
         with:
-          name: live-natural-language-dynamic-match-v02
+          name: live-natural-language-dynamic-match-v03
           path: live-match-output/result.json
           if-no-files-found: error
           retention-days: 30
 
-      - name: Enforce V0.2 live gate result
+      - name: Enforce V0.3 live gate result
         if: steps.live.outcome != 'success'
         run: exit 1
