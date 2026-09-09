@@ -518,6 +518,17 @@ DynamicRuleController = V0.2 intermission cadence
 
 旧 V0.1 cadence（pre-game phase 0 / rounds 3/6/9...）已从产品路径删除，仅作为历史证据保留。
 
+A1 已实现（Issue #49，分支 `backend/match-service-v02`，PR 审核中）：
+
+```text
+src/rules_beyond/match_application_service.py
+- create_match()：RUNNING、active_rule=null、completed_rounds=0、不执行回合、不调用 provider
+- advance_match()：原子完成 continue → RED/BLUE strategy → Planner → 一个完整回合 → Replay
+- submit_public_rule()：复用 verified NL pipeline；rejected 可重试、不计数；accepted 不自动推进
+- get_match_snapshot() / get_replay()：只做 public projection，不重新调用模型或 Engine
+- 未实现 repository / revision CAS / per-match lock / Idempotency-Key / FastAPI（A2 / A3）
+```
+
 当前后端顺序：
 
 ```text
@@ -525,7 +536,7 @@ V0.2 gameplay contract
 → V0.2 Pydantic/OpenAPI/fixtures
 → DynamicRuleController cadence migration        [DONE]
 → controller regression tests                     [DONE]
-→ MatchApplicationService                        [当前第一优先级]
+→ MatchApplicationService                        [A1 IMPLEMENTED — PR 审核中]
 → in-memory repository / revision / lock / idempotency
 → real FastAPI five-route vertical slice
 → Developer B B4 real API integration
