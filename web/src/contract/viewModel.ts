@@ -131,12 +131,43 @@ export interface GameErrorViewModel {
   retryable: boolean;
 }
 
-export interface ReplayEntryViewModel {
+interface ReplayEntryBaseViewModel {
   key: string;
   kindLabel: string;
   headline: string;
   lines: string[];
 }
+
+export interface ReplayRoundEntryViewModel extends ReplayEntryBaseViewModel {
+  kind: 'ROUND';
+  roundNo: number;
+  beforeBoard: BoardViewModel;
+  afterBoard: BoardViewModel;
+  teamsBefore: { RED: TeamViewModel; BLUE: TeamViewModel };
+  teamsAfter: { RED: TeamViewModel; BLUE: TeamViewModel };
+  activeRule: RuleViewModel | null;
+  escalation: EscalationViewModel;
+  strategies: { RED: StrategyViewModel | null; BLUE: StrategyViewModel | null };
+  actions: { RED: ActionViewModel; BLUE: ActionViewModel };
+  events: EventViewModel[];
+  resultLabel: string | null;
+}
+
+export interface ReplayIntermissionEntryViewModel extends ReplayEntryBaseViewModel {
+  kind: 'INTERMISSION';
+  afterRound: number;
+  choiceLabel: string;
+  submittedPlayerText: string | null;
+  submissionResultLabel: string | null;
+  acceptedRule: RuleViewModel | null;
+  activeRuleBefore: RuleViewModel | null;
+  activeRuleAfter: RuleViewModel | null;
+  ruleChangeCountAfter: number;
+}
+
+export type ReplayEntryViewModel =
+  | ReplayRoundEntryViewModel
+  | ReplayIntermissionEntryViewModel;
 
 export interface ReplayViewModel {
   matchId: string;
