@@ -91,7 +91,7 @@ Engine 同步结算一个完整回合
 
 # 4. 当前最重要的开发顺序
 
-A0 Controller cadence migration 已完成。
+A0 Controller cadence migration 已完成并合并。A1 MatchApplicationService 已实现，等待 PR 审核。
 
 当前固定顺序：
 
@@ -104,7 +104,7 @@ DynamicRuleController cadence migration    [A0 DONE]
 ↓
 controller regression tests                [A0 DONE]
 ↓
-MatchApplicationService                    [A1 当前第一优先级]
+MatchApplicationService                    [A1 IMPLEMENTED — PR 审核中]
 ↓
 in-memory repository / revision / per-match lock / idempotency   [A2]
 ↓
@@ -161,7 +161,7 @@ docs/MVP_FIRST_TASKS.md
 下一步固定为：
 
 ```text
-A1 MatchApplicationService
+A1 MatchApplicationService                          [IMPLEMENTED — PR 审核中]
 -> A2 in-memory repository + revision / lock / idempotency
 -> A3 real FastAPI five-route vertical slice
 -> Developer B B4 real API integration
