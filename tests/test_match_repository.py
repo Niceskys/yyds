@@ -19,8 +19,8 @@ from rules_beyond.match_application_service import (
 )
 from rules_beyond.match_repository import (
     IdempotencyConflictError,
+    IdempotencyKeyRequiredError,
     InMemoryMatchRepository,
-    InvalidRequestError,
     MatchServiceFactory,
     RevisionConflictError,
 )
@@ -268,12 +268,40 @@ def test_unknown_match_id_raises_match_not_found() -> None:
         )
 
 
-def test_empty_idempotency_key_is_invalid_request() -> None:
+def test_empty_idempotency_key_raises_idempotency_key_required() -> None:
+    repo, red_models, blue_models, _ = _repository()
+    match = repo.create_match(seed=1)
+
+    with pytest.raises(IdempotencyKeyRequiredError) as error:
+        repo.advance_match(match.match_id, expected_revision=0, idempotency_key="")
+
+    assert error.value.error_code is ErrorCode.IDEMPOTENCY_KEY_REQUIRED
+    assert error.value.retryable is True
+    assert repo.get_match_snapshot(match.match_id).revision == 0
+    assert red_models[0].calls == 0
+    assert blue_models[0].calls == 0
+
+    with pytest.raises(IdempotencyKeyRequiredError) as rule_error:
+        repo.submit_public_rule(
+            match.match_id,
+            expected_revision=0,
+            idempotency_key="",
+            player_text=MOVE_RULE_TEXT,
+        )
+    assert rule_error.value.error_code is ErrorCode.IDEMPOTENCY_KEY_REQUIRED
+
+
+def test_whitespace_only_idempotency_key_raises_idempotency_key_required() -> None:
     repo, _, _, _ = _repository()
     match = repo.create_match(seed=1)
 
-    with pytest.raises(InvalidRequestError):
-        repo.advance_match(match.match_id, expected_revision=0, idempotency_key="")
+    for key in ("   ", "\t", "\n \t"):
+        with pytest.raises(IdempotencyKeyRequiredError) as error:
+            repo.advance_match(match.match_id, expected_revision=0, idempotency_key=key)
+        assert error.value.error_code is ErrorCode.IDEMPOTENCY_KEY_REQUIRED
+        assert error.value.retryable is True
+
+    assert repo.get_match_snapshot(match.match_id).revision == 0
 
 
 # 3/4/5. isolation ----------------------------------------------------------
@@ -357,6 +385,7 @@ def test_wrong_expected_revision_raises_conflict_without_side_effects() -> None:
     with pytest.raises(RevisionConflictError) as conflict:
         repo.advance_match(match.match_id, expected_revision=5, idempotency_key="adv")
     assert conflict.value.error_code is ErrorCode.REVISION_CONFLICT
+    assert conflict.value.retryable is True
 
     assert repo.get_match_snapshot(match.match_id).revision == 0
     assert repo.get_replay(match.match_id).timeline == []
@@ -372,6 +401,22 @@ def test_wrong_expected_revision_raises_conflict_without_side_effects() -> None:
         )
     assert rule_models[0].calls == 0
     assert repo.get_replay(match.match_id).timeline == []
+
+
+def test_revision_conflict_error_carries_frozen_code_and_retryable() -> None:
+    error = RevisionConflictError("stale revision")
+
+    assert error.error_code is ErrorCode.REVISION_CONFLICT
+    assert error.retryable is True
+    assert error.message == "stale revision"
+
+
+def test_idempotency_key_required_error_carries_frozen_code_and_retryable() -> None:
+    error = IdempotencyKeyRequiredError("missing key")
+
+    assert error.error_code is ErrorCode.IDEMPOTENCY_KEY_REQUIRED
+    assert error.retryable is True
+    assert error.message == "missing key"
 
 
 # 7/8/9. revision semantics -------------------------------------------------
@@ -512,13 +557,15 @@ def test_same_key_with_different_player_text_is_invalid_request() -> None:
     calls_after_first = rule_models[0].calls
     intermissions_after_first = _intermission_entries(repo, match.match_id)
 
-    with pytest.raises(IdempotencyConflictError):
+    with pytest.raises(IdempotencyConflictError) as conflict:
         repo.submit_public_rule(
             match.match_id,
             expected_revision=1,
             idempotency_key="shared",
             player_text="换一句完全不同的话",
         )
+    assert conflict.value.error_code is ErrorCode.INVALID_REQUEST
+    assert conflict.value.retryable is False
 
     assert rule_models[0].calls == calls_after_first
     assert _intermission_entries(repo, match.match_id) == intermissions_after_first
@@ -534,13 +581,14 @@ def test_same_key_across_operations_is_invalid_request() -> None:
     repo.advance_match(match.match_id, expected_revision=0, idempotency_key="shared")
     calls_after_advance = (red_models[0].calls, blue_models[0].calls)
 
-    with pytest.raises(IdempotencyConflictError):
+    with pytest.raises(IdempotencyConflictError) as rule_conflict:
         repo.submit_public_rule(
             match.match_id,
             expected_revision=1,
             idempotency_key="shared",
             player_text=MOVE_RULE_TEXT,
         )
+    assert rule_conflict.value.error_code is ErrorCode.INVALID_REQUEST
     assert (red_models[0].calls, blue_models[0].calls) == calls_after_advance
     assert rule_models[0].calls == 0
 
@@ -550,8 +598,9 @@ def test_same_key_across_operations_is_invalid_request() -> None:
         idempotency_key="rule-shared",
         player_text=MOVE_RULE_TEXT,
     )
-    with pytest.raises(IdempotencyConflictError):
+    with pytest.raises(IdempotencyConflictError) as advance_conflict:
         repo.advance_match(match.match_id, expected_revision=2, idempotency_key="rule-shared")
+    assert advance_conflict.value.error_code is ErrorCode.INVALID_REQUEST
 
 
 # 15. cache isolation -------------------------------------------------------

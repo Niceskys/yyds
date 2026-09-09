@@ -4,7 +4,7 @@
 > 分支：`backend/repository-concurrency-v02`
 > 对应 Issue：#51
 > 基线：`main@a932100ac543904f6dea17d459689ef5eae62d3f`
-> 状态：**A2 IMPLEMENTED；等待 PR CI 与 review。未合并、未自动 merge。**
+> 状态：**A2 IMPLEMENTED；首次 CI 245 passed，review 指出的两个 typed-error contract blocker 已修复，等待复审。未合并、未自动 merge。**
 
 ## 1. 本轮目标
 
@@ -109,8 +109,9 @@ if expected_revision != current.revision:
     raise RevisionConflictError(error_code=REVISION_CONFLICT)
 ```
 
-`RevisionConflictError` 继承 A1 `MatchApplicationError`，携带冻结 `ErrorCode.REVISION_CONFLICT`；
-A2 不映射 HTTP 409。
+`RevisionConflictError` 继承 A1 `MatchApplicationError`，携带冻结 `ErrorCode.REVISION_CONFLICT`，
+且 `retryable = True`（与 `contracts/fixtures/mvp-v0.2/error_revision_conflict.json` 一致：
+客户端刷新 snapshot/revision 后可以重试）；A2 不映射 HTTP 409，A3 直接读取 typed error 即可。
 
 revision mismatch 保证：
 
@@ -144,6 +145,17 @@ acquire per-match lock
 **lookup 必须在 revision check 之前**：第一次成功后 revision 已前进，网络重试携带旧的
 `expected_revision` 仍必须返回第一次结果，而不是 `REVISION_CONFLICT`。
 
+进入临界区之前先校验 key：空字符串或纯空白（`"   "` / `"\t"` / `"\n \t"`）抛
+`IdempotencyKeyRequiredError(ErrorCode.IDEMPOTENCY_KEY_REQUIRED, retryable=True)`。
+区分两类语义：
+
+```text
+没有提供有效 key          -> IdempotencyKeyRequiredError(IDEMPOTENCY_KEY_REQUIRED)
+提供了 key，但非法复用     -> IdempotencyConflictError(INVALID_REQUEST)
+```
+
+两者都不新增 public enum / schema。
+
 ### 7.1 request fingerprint
 
 ```text
@@ -172,7 +184,7 @@ successful AdvanceResult
 RevisionConflictError
 MatchNotFoundError
 RecoverableMatchFailure
-InvalidRequestError / IdempotencyConflictError
+IdempotencyKeyRequiredError / IdempotencyConflictError / InvalidRequestError
 ```
 
 异常不写入 success cache；故障恢复后同 key 可真正 retry（有测试）。
@@ -204,7 +216,7 @@ cache 保存 result.model_copy(deep=True)
 ## 10. 测试
 
 ```text
-tests/test_match_repository.py   22 tests
+tests/test_match_repository.py   25 tests
 ```
 
 覆盖：
@@ -213,17 +225,18 @@ tests/test_match_repository.py   22 tests
 create 两个 match：id 不同、revision 均 0
 match_id 碰撞不覆盖旧 match
 unknown match_id -> MatchNotFoundError
-空 Idempotency-Key -> INVALID_REQUEST
+空/纯空白 Idempotency-Key -> IdempotencyKeyRequiredError(IDEMPOTENCY_KEY_REQUIRED, retryable)
 两 match advance / rule / replay 完全隔离
 per-match RED/BLUE strategy session 与 private memory 隔离（observation 断言）
 wrong expected_revision -> REVISION_CONFLICT 且零 provider/零 Replay
+RevisionConflictError typed contract：error_code=REVISION_CONFLICT、retryable=True
 advance -> revision +1
 accepted rule -> revision +1；rejected rule -> revision 不变
 same advance key 重试：结果相同、零重复模型调用、ROUND 只有 1 条
 same accepted-rule key 重试：rule_id 相同、rule_change_count 不重复、Replay 不重复
 same rejected-rule key 重试：不新增第二条 INTERMISSION、不重新调用模型
-same key + 不同 player_text -> INVALID_REQUEST、零额外 side effect
-same key 跨 operation -> INVALID_REQUEST
+same key + 不同 player_text -> IdempotencyConflictError(INVALID_REQUEST, retryable=False)、零额外 side effect
+same key 跨 operation -> IdempotencyConflictError(INVALID_REQUEST, retryable=False)
 caller 篡改缓存返回 DTO 不污染 cache
 同 match 不同 key 并发：一个 success、一个 REVISION_CONFLICT，只执行一个 round
 同 match 同 key 并发：只执行一次，两结果等价
@@ -238,12 +251,18 @@ public/cached response 不含 private_memory / raw_model_output / system_prompt 
 ## 11. 验证
 
 ```text
+首次 A2 CI（commit 7a239c9）：
 pytest -o addopts="" -q                                                 245 passed
+python -m rules_beyond.dynamic_rule_experiment_v02 --matches-per-pair 500   PASS
+python -m rules_beyond.diagnostics --matches-per-pair 2000                  PASS
+
+review typed-error 修复后：
+pytest -o addopts="" -q                                                 248 passed
 python -m rules_beyond.dynamic_rule_experiment_v02 --matches-per-pair 500   PASS
 python -m rules_beyond.diagnostics --matches-per-pair 2000                  PASS
 ```
 
-（A1 基线 223 passed；本 PR 新增 22 个测试。）
+（A1 基线 223 passed；本 PR 最终新增 25 个测试，未删除测试、未放松断言。）
 
 ## 12. 留给 A3
 
@@ -255,8 +274,9 @@ FastAPI 五路由 adapter：
   POST /api/v1/matches/{match_id}/advance
   GET  /api/v1/matches/{match_id}/replay
 HTTP status / ErrorEnvelope mapping：
-  RevisionConflictError -> 409 REVISION_CONFLICT
+  RevisionConflictError -> 409 REVISION_CONFLICT (retryable=true，直接读 typed error)
   MatchNotFoundError    -> 404 MATCH_NOT_FOUND
+  IdempotencyKeyRequiredError -> 400 IDEMPOTENCY_KEY_REQUIRED (retryable=true)
   IdempotencyConflictError / InvalidRequestError -> 400 INVALID_REQUEST
   RecoverableMatchFailure -> 503 MODEL_UNAVAILABLE / INTERNAL_ERROR
 Idempotency-Key Header 解析
@@ -274,3 +294,32 @@ idempotency。
 3. `create_match` 的 match_id 碰撞重试上限 16 次，超过抛 `InvalidRequestError`。
 4. A2 不提供 match 删除/过期；A1 单 aggregate 的 API 变更（加入 match_id 参数）尚未发生，
    A3 通过 repository 调用即可。
+
+## 14. Review round — typed-error contract blockers（2026-09-09）
+
+PR #52 首次 CI：245 passed，主体设计（repository / per-match lock / registry lock /
+lookup-before-revision / fingerprint / deep-copy cache / multi-match isolation）通过审核。
+
+审核方转回 Draft，指出两个 contract-facing blocker，本轮只修这两个，不进入 A3：
+
+```text
+1. RevisionConflictError 继承 MatchApplicationError.retryable=False，
+   与冻结 fixture contracts/fixtures/mvp-v0.2/error_revision_conflict.json
+   （REVISION_CONFLICT, retryable=true）冲突。
+   修复：RevisionConflictError.retryable = True。
+   新增测试：error_code is REVISION_CONFLICT 且 retryable is True；
+   并保留 wrong expected_revision -> 零 provider / 零 Replay / 零 mutation 断言。
+
+2. _require_idempotency_key("") 抛 InvalidRequestError(INVALID_REQUEST)，
+   与 canonical ErrorCode.IDEMPOTENCY_KEY_REQUIRED 不一致。
+   修复：新增窄异常 IdempotencyKeyRequiredError(MatchApplicationError)，
+   error_code = ErrorCode.IDEMPOTENCY_KEY_REQUIRED，retryable = True；
+   空字符串与纯空白（"   " / "\t" / "\n \t"）都抛该异常。
+   未新增 public enum / schema；same key + changed payload / 跨 operation
+   仍为 IdempotencyConflictError(INVALID_REQUEST, retryable=False)。
+```
+
+验证：`pytest -o addopts="" -q` 248 passed；dynamic-rule-replacement-v02
+500/pair PASS；diagnostics 2000/pair PASS。
+
+A3 尚未开始：FastAPI 五路由 / HTTP status / ErrorEnvelope / Header parsing 均未实现。

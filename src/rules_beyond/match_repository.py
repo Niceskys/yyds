@@ -73,9 +73,27 @@ from .verified_natural_language_rule_adapter import VerifiedNaturalLanguageRuleA
 
 
 class RevisionConflictError(MatchApplicationError):
-    """``expected_revision`` did not match the authoritative match revision."""
+    """``expected_revision`` did not match the authoritative match revision.
+
+    The client can refresh its snapshot/revision and retry, so the frozen
+    contract (``contracts/fixtures/mvp-v0.2/error_revision_conflict.json``)
+    marks ``REVISION_CONFLICT`` as retryable. A3 must not re-derive this.
+    """
 
     error_code = ErrorCode.REVISION_CONFLICT
+    retryable = True
+
+
+class IdempotencyKeyRequiredError(MatchApplicationError):
+    """No usable Idempotency-Key was supplied (empty or whitespace-only).
+
+    Distinct from :class:`IdempotencyConflictError`: here the key is missing,
+    not illegally reused. A3 maps this to the frozen
+    ``ErrorCode.IDEMPOTENCY_KEY_REQUIRED``; it must not re-derive the code.
+    """
+
+    error_code = ErrorCode.IDEMPOTENCY_KEY_REQUIRED
+    retryable = True
 
 
 class IdempotencyConflictError(MatchApplicationError):
@@ -318,7 +336,9 @@ class InMemoryMatchRepository:
     @staticmethod
     def _require_idempotency_key(idempotency_key: str) -> None:
         if not isinstance(idempotency_key, str) or not idempotency_key.strip():
-            raise InvalidRequestError("Idempotency-Key must be a non-empty string")
+            raise IdempotencyKeyRequiredError(
+                "Idempotency-Key must be a non-empty, non-whitespace string"
+            )
 
     def _require_record(self, match_id: str) -> _MatchRecord:
         with self._registry_lock:
