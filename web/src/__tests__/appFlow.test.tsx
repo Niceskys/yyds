@@ -30,4 +30,12 @@ describe('初始页 → 游玩页', () => {
     expect(screen.getByTestId('rule-input')).not.toBeDisabled();
     expect(screen.getByTestId('advance-round')).not.toBeDisabled();
   });
+
+  it('开始游戏后保留第 1 回合实际行动和公开事件', () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: '开始游戏' }));
+    expect(screen.getByTestId('round-summary')).toHaveTextContent('第 1 回合结果');
+    expect(screen.getByTestId('action-RED')).toHaveTextContent('使用弓箭攻击');
+    expect(screen.getByTestId('round-summary')).toHaveTextContent('公开事件');
+  });
 });

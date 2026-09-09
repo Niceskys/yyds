@@ -29,8 +29,8 @@ export function App() {
 
   const handleStart = () => {
     // 产品流程：创建对局 → 第 1 回合自动执行 → 进入玩家决策阶段。
-    // Mock 阶段直接展示“第 1 回合已结算”的 PLAYER_DECISION fixture。
-    setScenario('player_decision');
+    // Mock 阶段使用 advance_round fixture，同时保留第 1 回合公开策略、实际行动与事件。
+    setScenario('advance_round');
     setRuleText('');
     setMockNotice(null);
     setScreen('game');
