@@ -11,7 +11,7 @@ from .dynamic_rule_controller import DynamicRuleController
 from .mimo_rule_provider import DEFAULT_MIMO_RULE_MODEL, MimoRuleCandidateModel
 from .model import Action, GameConfig, MatchResult, Team
 from .natural_language_dynamic_controller import (
-    NaturalLanguageDynamicPhase,
+    NaturalLanguageRuleAttempt,
     VerifiedNaturalLanguageDynamicController,
 )
 from .natural_language_rule_adapter import NaturalLanguageRuleAdapter
@@ -25,15 +25,17 @@ from .verified_natural_language_rule_adapter import VerifiedNaturalLanguageRuleA
 LIVE_MATCH_CONFIG = GameConfig(initial_hp=5, knife_damage=2)
 LIVE_MATCH_SEEDS = (1_260_000, 1_260_001, 1_260_002)
 
-# phase 0 is pre-game; later phases occur after rounds 3, 6, 9, 12...
-# Phase 2 is intentionally unsupported OR logic. The verified pipeline must
-# reject it and DynamicRuleController must carry the phase-1 rule forward.
+# V0.2 intermission cadence: keys are the completed round after which the player
+# submits one natural-language text, then continues. Round 1 always resolves
+# without a player rule. The round-3 text is intentionally unsupported OR logic:
+# the verified pipeline must reject it, the previous legal rule must be carried
+# forward, and the intermission must stay usable for a later legal replacement.
 LIVE_NL_SCHEDULE: Mapping[int, str] = {
-    0: "双方弓的最大射程增加1格。",
-    1: "双方移动距离增加1格。",
-    2: "生命值不超过2或者上一回合没移动时，弓射程增加1格。",
-    3: "双方相距至少3格时，弓箭命中率按原来的一半计算。",
-    4: "连续2回合使用同一种武器后，弓冷却1回合。",
+    1: "双方刀的攻击距离增加1格。",
+    2: "双方移动距离增加1格。",
+    3: "生命值不超过2或者上一回合没移动时，弓射程增加1格。",
+    4: "双方相距至少3格时，弓箭命中率按原来的一半计算。",
+    5: "连续2回合使用同一种武器后，弓冷却1回合。",
 }
 
 
@@ -69,9 +71,9 @@ class LiveMatchTrace:
     seed: int
     result: str
     rounds: int
-    baseline_round1_actions: tuple[str, str]
-    live_round1_actions: tuple[str, str]
-    round1_behavior_changed: bool
+    baseline_round2_actions: tuple[str, str]
+    live_round2_actions: tuple[str, str]
+    post_intermission_behavior_changed: bool
     rule_modifier_events: int
     phases: tuple[LivePhaseTrace, ...]
     rounds_trace: tuple[LiveRoundTrace, ...]
@@ -126,8 +128,8 @@ def _rule_to_mapping(rule: RuleAST | None) -> dict[str, object] | None:
     }
 
 
-def _phase_trace(phase: NaturalLanguageDynamicPhase) -> LivePhaseTrace:
-    translation = phase.translation
+def _phase_trace(attempt: NaturalLanguageRuleAttempt, after_round: int) -> LivePhaseTrace:
+    translation = attempt.translation
     base_status = None
     faithfulness_decision = None
     intent_guard_allowed = None
@@ -140,32 +142,59 @@ def _phase_trace(phase: NaturalLanguageDynamicPhase) -> LivePhaseTrace:
         if translation.intent_guard is not None:
             intent_guard_allowed = translation.intent_guard.allowed
 
-    controller_phase = phase.controller_phase
+    outcome = attempt.outcome
     return LivePhaseTrace(
-        phase_index=controller_phase.phase_index,
-        after_round=controller_phase.after_round,
-        player_text=phase.player_text,
+        phase_index=after_round - 1,
+        after_round=after_round,
+        player_text=attempt.player_text,
         translation_status=translation_status,
         base_status=base_status,
         faithfulness_decision=faithfulness_decision,
         intent_guard_allowed=intent_guard_allowed,
-        controller_submitted=controller_phase.submitted,
-        controller_accepted=controller_phase.accepted,
-        controller_replaced=controller_phase.replaced,
+        controller_submitted=outcome.submitted,
+        controller_accepted=outcome.accepted,
+        controller_replaced=outcome.replaced,
         carried_forward_after_translation_rejection=(
-            phase.carried_forward_after_translation_rejection
+            attempt.carried_forward_after_translation_rejection
         ),
-        active_rule=_rule_to_mapping(controller_phase.active_rule),
+        active_rule=_rule_to_mapping(outcome.active_rule),
     )
 
 
-def _baseline_round1_actions(config: GameConfig, seed: int) -> tuple[str, str]:
+def _baseline_round2_actions(config: GameConfig, seed: int) -> tuple[str, str]:
+    """Round-2 actions of a no-player-rule match.
+
+    Baseline deliberately bypasses all natural-language code so the comparison
+    isolates whether the public rule accepted in the first intermission changes
+    planner behavior on the following round. Round 1 is identical by design:
+    V0.2 never allows a player rule before round 1.
+    """
+
     bot = RuleAwareAttackFirstBot()
-    # Baseline deliberately bypasses all natural-language code so the comparison
-    # isolates whether the accepted phase-0 public rule changes planner behavior.
     dynamic = DynamicRuleController(config)
-    started = dynamic.start_match(None)
-    state = started.state
+    state = dynamic.start_match().state
+    red = bot.choose_action(
+        state.game_state,
+        Team.RED,
+        dynamic.engine,
+        rule=None,
+        histories=state.histories,
+        match_seed=seed,
+    )
+    blue = bot.choose_action(
+        state.game_state,
+        Team.BLUE,
+        dynamic.engine,
+        rule=None,
+        histories=state.histories,
+        match_seed=seed,
+    )
+    state = dynamic.resolve_round(
+        state,
+        {Team.RED: red, Team.BLUE: blue},
+        match_seed=seed,
+    ).state
+    state = dynamic.continue_match(state).state
     red = bot.choose_action(
         state.game_state,
         Team.RED,
@@ -192,14 +221,14 @@ def play_live_match(
     schedule: Mapping[int, str] = LIVE_NL_SCHEDULE,
 ) -> LiveMatchTrace:
     bot = RuleAwareAttackFirstBot()
-    baseline_round1 = _baseline_round1_actions(controller.config, seed)
+    baseline_round2 = _baseline_round2_actions(controller.config, seed)
 
-    started = controller.start_match(schedule.get(0))
+    started = controller.start_match()
     state = started.state
-    phase_traces: list[LivePhaseTrace] = [_phase_trace(started.phase)]
+    phase_traces: list[LivePhaseTrace] = []
     round_traces: list[LiveRoundTrace] = []
     event_counts: Counter[str] = Counter(event.kind for event in started.events)
-    live_round1: tuple[str, str] | None = None
+    live_round2: tuple[str, str] | None = None
 
     while not state.game_state.is_terminal:
         played_round = state.game_state.round_no
@@ -220,8 +249,8 @@ def play_live_match(
             match_seed=seed,
         )
         action_pair = (_action_signature(red_action), _action_signature(blue_action))
-        if played_round == 1:
-            live_round1 = action_pair
+        if played_round == 2:
+            live_round2 = action_pair
 
         active_before = _rule_to_mapping(state.active_rule)
         resolved = controller.controller.resolve_round(
@@ -243,15 +272,18 @@ def play_live_match(
             )
         )
 
-        if state.rule_phase_due:
-            next_phase = state.last_phase_index + 1
-            applied = controller.apply_due_rule_phase(state, schedule.get(next_phase))
-            event_counts.update(event.kind for event in applied.events)
-            phase_traces.append(_phase_trace(applied.phase))
-            state = applied.state
+        if state.in_intermission:
+            after_round = state.pending_intermission_after_round
+            player_text = schedule.get(after_round)
+            if player_text is not None:
+                applied = controller.submit_rule(state, player_text)
+                event_counts.update(event.kind for event in applied.events)
+                phase_traces.append(_phase_trace(applied.attempt, after_round))
+                state = applied.state
+            state = controller.continue_match(state).state
 
-    if live_round1 is None:
-        raise AssertionError("live match did not resolve round 1")
+    if live_round2 is None:
+        raise AssertionError("live match did not resolve round 2")
     if state.game_state.result is None:
         raise AssertionError("live match ended without a terminal result")
 
@@ -259,9 +291,9 @@ def play_live_match(
         seed=seed,
         result=state.game_state.result.value,
         rounds=len(round_traces),
-        baseline_round1_actions=baseline_round1,
-        live_round1_actions=live_round1,
-        round1_behavior_changed=live_round1 != baseline_round1,
+        baseline_round2_actions=baseline_round2,
+        live_round2_actions=live_round2,
+        post_intermission_behavior_changed=live_round2 != baseline_round2,
         rule_modifier_events=event_counts["RULE_MODIFIER_APPLIED"],
         phases=tuple(phase_traces),
         rounds_trace=tuple(round_traces),
@@ -275,9 +307,10 @@ def evaluate_live_dynamic_match_gate(traces: tuple[LiveMatchTrace, ...]) -> tupl
     if any(trace.result == MatchResult.TIMEOUT.value for trace in traces):
         failures.append("live natural-language schedule ended in TIMEOUT")
     for trace in traces:
-        if not trace.round1_behavior_changed:
+        if not trace.post_intermission_behavior_changed:
             failures.append(
-                f"seed {trace.seed}: phase-0 natural-language rule did not change round-1 behavior"
+                f"seed {trace.seed}: first-intermission natural-language rule did not "
+                "change round-2 behavior"
             )
         if trace.rule_modifier_events <= 0:
             failures.append(f"seed {trace.seed}: no RULE_MODIFIER_APPLIED Engine event")

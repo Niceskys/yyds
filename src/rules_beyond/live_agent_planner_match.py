@@ -24,22 +24,24 @@ AGENT_GATE_SEED = 1_270_000
 
 # Fixed, closed candidates deliberately decouple this Gate from the natural-language
 # compiler. Dynamic natural-language translation has its own evidence and failure log.
+# V0.2 intermission cadence: keys are the completed round after which the player
+# attempts the replacement. Round 1 always resolves without a player rule.
 AGENT_RULE_SCHEDULE: Mapping[int, Mapping[str, object] | None] = {
-    0: {
+    1: {
         "version": "v0.1",
         "target": "ALL_UNITS",
         "conditions": [],
         "effect": {"type": "BOW_RANGE_ADD", "delta": 1},
         "duration": "UNTIL_REPLACED",
     },
-    1: {
+    2: {
         "version": "v0.1",
         "target": "ALL_UNITS",
         "conditions": [],
         "effect": {"type": "MOVE_RANGE_ADD", "delta": 1},
         "duration": "UNTIL_REPLACED",
     },
-    2: {
+    3: {
         "version": "v0.1",
         "target": "ALL_UNITS",
         "conditions": [{"type": "DISTANCE_GTE", "value": 3}],
@@ -51,6 +53,8 @@ AGENT_RULE_SCHEDULE: Mapping[int, Mapping[str, object] | None] = {
 
 @dataclass(frozen=True, slots=True)
 class AgentDecisionTrace:
+    # Number of completed rounds when this strategy decision was taken. 0 is the
+    # initial decision before round 1; later values are post-intermission decisions.
     phase_index: int
     round_no: int
     team: str
@@ -125,7 +129,7 @@ def evaluate_agent_gate(summary: AgentPlannerMatchSummary) -> tuple[str, ...]:
             trace.phase_index == 0 and trace.status == StrategyDecisionStatus.ACCEPTED.value
             for trace in traces
         ):
-            failures.append(f"{team} phase-0 strategy decision was not accepted")
+            failures.append(f"{team} initial no-rule strategy decision was not accepted")
         if not any(
             trace.phase_index >= 1 and trace.status == StrategyDecisionStatus.ACCEPTED.value
             for trace in traces
@@ -159,9 +163,7 @@ def play_agent_match(
 
     controller = DynamicRuleController(config)
     planner = DeterministicIntentPlanner()
-    started = controller.start_match(rule_schedule.get(0))
-    if not started.phase.accepted or not started.phase.replaced:
-        raise AssertionError("frozen phase-0 rule candidate was rejected")
+    started = controller.start_match()
     state = started.state
     event_counts: Counter[str] = Counter(event.kind for event in started.events)
 
@@ -248,32 +250,48 @@ def play_agent_match(
             )
         )
 
-        if state.rule_phase_due:
-            phase_index = state.last_phase_index + 1
-            applied = controller.apply_due_rule_phase(state, rule_schedule.get(phase_index))
-            event_counts.update(event.kind for event in applied.events)
-            state = applied.state
+        if state.in_intermission:
+            after_round = state.pending_intermission_after_round
+            candidate = rule_schedule.get(after_round)
+            replaced = False
+            if candidate is not None:
+                applied = controller.submit_rule(state, candidate)
+                event_counts.update(event.kind for event in applied.events)
+                replaced = applied.outcome.replaced
+                state = applied.state
+            state = controller.continue_match(state).state
 
-            red_decision = red_agent.decide(
-                state.game_state,
-                controller.engine,
-                rule=state.active_rule,
-                histories=state.histories,
-            )
-            blue_decision = blue_agent.decide(
-                state.game_state,
-                controller.engine,
-                rule=state.active_rule,
-                histories=state.histories,
-            )
-            red_intent = red_decision.intent
-            blue_intent = blue_decision.intent
-            decision_traces.extend(
-                (
-                    _decision_trace(phase_index, state.game_state.round_no, Team.RED, red_decision),
-                    _decision_trace(phase_index, state.game_state.round_no, Team.BLUE, blue_decision),
+            if replaced:
+                red_decision = red_agent.decide(
+                    state.game_state,
+                    controller.engine,
+                    rule=state.active_rule,
+                    histories=state.histories,
                 )
-            )
+                blue_decision = blue_agent.decide(
+                    state.game_state,
+                    controller.engine,
+                    rule=state.active_rule,
+                    histories=state.histories,
+                )
+                red_intent = red_decision.intent
+                blue_intent = blue_decision.intent
+                decision_traces.extend(
+                    (
+                        _decision_trace(
+                            state.completed_rounds,
+                            state.game_state.round_no,
+                            Team.RED,
+                            red_decision,
+                        ),
+                        _decision_trace(
+                            state.completed_rounds,
+                            state.game_state.round_no,
+                            Team.BLUE,
+                            blue_decision,
+                        ),
+                    )
+                )
 
     result = state.game_state.result
     if result is None:

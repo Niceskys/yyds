@@ -18,14 +18,16 @@ from .model import MatchResult
 from .natural_language_rule_adapter import RuleCandidateModel
 
 
-# V0.2 intentionally stops after phase 3. Phases 0/1 prove legal replacement,
-# phase 2 proves fail-closed rejection/carry-forward, and phase 3 proves the
-# match can recover and accept a new legal rule after that rejection.
+# V0.2 intermission cadence: keys are the completed round after which the player
+# submits one natural-language text. The schedule intentionally stops after the
+# fourth intermission. Intermissions 1/2 prove legal replacement, intermission 3
+# proves fail-closed rejection/carry-forward, and intermission 4 proves the match
+# can recover and accept a new legal rule after that rejection.
 LIVE_NL_SCHEDULE_V02: Mapping[int, str] = {
-    0: "双方弓的最大射程增加1格。",
-    1: "双方移动距离增加1格。",
-    2: "生命值不超过2或者上一回合没移动时，弓射程增加1格。",
-    3: "双方相距至少3格时，弓箭命中率按原来的一半计算。",
+    1: "双方刀的攻击距离增加1格。",
+    2: "双方移动距离增加1格。",
+    3: "生命值不超过2或者上一回合没移动时，弓射程增加1格。",
+    4: "双方相距至少3格时，弓箭命中率按原来的一半计算。",
 }
 
 
@@ -77,9 +79,10 @@ def evaluate_v02_gate(traces: tuple[LiveMatchTrace, ...]) -> tuple[str, ...]:
 
     phase3_seen = False
     for trace in traces:
-        if not trace.round1_behavior_changed:
+        if not trace.post_intermission_behavior_changed:
             failures.append(
-                f"seed {trace.seed}: phase-0 accepted rule did not change round-1 planner behavior"
+                f"seed {trace.seed}: first-intermission accepted rule did not change "
+                "round-2 planner behavior"
             )
         if trace.rule_modifier_events <= 0:
             failures.append(f"seed {trace.seed}: no RULE_MODIFIER_APPLIED Engine event")
