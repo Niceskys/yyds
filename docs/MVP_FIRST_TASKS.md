@@ -8,7 +8,7 @@ docs/MVP_API_CONTRACT_V0.2.md
 docs/SECOND_AUDIT_ACTION_PLAN_2026-09-08.md
 ```
 
-> 当前顺序：**A0 Controller 状态机迁移已完成并合并；A1 MatchApplicationService 已实现，等待 PR 审核；前端可继续按 V0.2 fixture 推进，A3 后再做 B4 真实 API 联调。**
+> 当前顺序：**A0 Controller 状态机迁移已完成并合并；A1 MatchApplicationService 已完成并合并（PR #50）；A2 repository / revision / lock / idempotency 已实现，等待 PR 审核；前端可继续按 V0.2 fixture 推进，A3 后再做 B4 真实 API 联调。**
 
 ---
 
@@ -106,7 +106,7 @@ src/rules_beyond/dynamic_rule_controller.py
 docs/handoffs/2026-09-09-dynamic-rule-controller-v02.md
 ```
 
-## A1 — Match Application Service【IMPLEMENTED — PR 审核中】
+## A1 — Match Application Service【COMPLETED】
 
 建议分支：
 
@@ -117,7 +117,7 @@ backend/match-service-v02
 状态：
 
 ```text
-A1 = IMPLEMENTED
+A1 = COMPLETED（PR #50）
 src/rules_beyond/match_application_service.py
 docs/handoffs/2026-09-09-match-application-service-v02.md
 ```
@@ -156,7 +156,24 @@ intermission close
 不得把 `continue_match()` 之后、下一回合尚未 resolve 的中间状态作为正常对外
 PLAYER_DECISION 结果持久化/返回。
 
-## A2 — In-memory repository + revision / lock / idempotency
+## A2 — In-memory repository + revision / lock / idempotency【IMPLEMENTED — PR 审核中】
+
+建议分支：
+
+```text
+backend/repository-concurrency-v02
+```
+
+状态：
+
+```text
+A2 = IMPLEMENTED
+src/rules_beyond/match_repository.py
+docs/handoffs/2026-09-09-match-repository-concurrency-v02.md
+```
+
+A2 只做多对局 registry / per-match lock / revision CAS / Idempotency-Key replay，
+复用 A1 的 MatchApplicationService，不复制 gameplay；FastAPI 属于 A3。
 
 ```text
 in-memory repository
