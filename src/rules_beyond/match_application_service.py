@@ -157,7 +157,6 @@ class RecoverableMatchFailure(MatchApplicationError):
 # Public projection helpers
 # ---------------------------------------------------------------------------
 
-
 def _rule_ast_public(rule: RuleAST) -> RuleAstPublicView:
     conditions = [
         RuleConditionPublicView(
@@ -528,12 +527,14 @@ class MatchApplicationService:
                 engine,
                 rule=working.active_rule,
                 histories=working.histories,
+                remember=False,
             )
             blue_decision = self._blue_agent.decide(
                 working.game_state,
                 engine,
                 rule=working.active_rule,
                 histories=working.histories,
+                remember=False,
             )
             red_action = self._planner.choose_action(
                 working.game_state,
@@ -572,6 +573,10 @@ class MatchApplicationService:
         # Engine facts only: the controller's INTERMISSION_OPENED event is
         # represented by the intermission timeline entry, not as an Engine event.
         events = _events_public(resolved.resolution.events)
+        next_latest_strategy: dict[Team, PublicStrategyDecision | None] = {
+            Team.RED: red_public,
+            Team.BLUE: blue_public,
+        }
 
         round_entry = ReplayRoundEntry(
             round_no=played_round,
@@ -585,22 +590,43 @@ class MatchApplicationService:
             result=_result_public(next_state.game_state.result),
         )
 
-        # Atomic commit.
-        match.state = next_state
-        match.latest_strategy = {Team.RED: red_public, Team.BLUE: blue_public}
-        match.revision += 1
-        match.timeline.extend(pending_entries)
-        match.timeline.append(round_entry)
-
-        return AdvanceResult(
+        # Build the whole response before mutating anything, so a projection
+        # failure cannot leave a partially committed round.
+        advance_result = AdvanceResult(
             round=RoundExecutionPublicView(
                 round_no=played_round,
                 strategies=strategies,
                 actions=actions,
                 events=events,
             ),
-            match=self._snapshot(match, next_state),
+            match=self._snapshot(
+                match,
+                next_state,
+                revision=match.revision + 1,
+                latest_strategy=next_latest_strategy,
+            ),
         )
+
+        # Atomic commit. Strategy memory is committed last and only after the
+        # complete round succeeded, so a failed advance cannot leave phantom
+        # round memory in either isolated agent.
+        match.state = next_state
+        match.latest_strategy = next_latest_strategy
+        match.revision += 1
+        match.timeline.extend(pending_entries)
+        match.timeline.append(round_entry)
+        self._red_agent.commit_decision_memory(
+            red_decision,
+            round_no=played_round,
+            rule=working.active_rule,
+        )
+        self._blue_agent.commit_decision_memory(
+            blue_decision,
+            round_no=played_round,
+            rule=working.active_rule,
+        )
+
+        return advance_result
 
     def get_replay(self) -> ReplaySnapshot:
         """Return the recorded public timeline. Never calls a model or the Engine."""
@@ -690,9 +716,17 @@ class MatchApplicationService:
                 return None
             probe += 1
 
-    def _snapshot(self, match: _MatchAggregate, state: DynamicMatchState) -> MatchSnapshot:
+    def _snapshot(
+        self,
+        match: _MatchAggregate,
+        state: DynamicMatchState,
+        *,
+        revision: int | None = None,
+        latest_strategy: Mapping[Team, PublicStrategyDecision | None] | None = None,
+    ) -> MatchSnapshot:
         game = state.game_state
         completed = state.completed_rounds
+        latest = match.latest_strategy if latest_strategy is None else latest_strategy
 
         if game.is_terminal:
             lifecycle = MatchLifecycle.TERMINAL
@@ -721,7 +755,7 @@ class MatchApplicationService:
 
         return MatchSnapshot(
             match_id=match.match_id,
-            revision=match.revision,
+            revision=match.revision if revision is None else revision,
             lifecycle=lifecycle,
             seed=match.seed,
             round_no=game.round_no,
@@ -734,8 +768,8 @@ class MatchApplicationService:
             player_decision=player_decision,
             effective_stats=self._stats_map(state),
             latest_strategy=TeamLatestStrategyMap(
-                RED=match.latest_strategy.get(Team.RED),
-                BLUE=match.latest_strategy.get(Team.BLUE),
+                RED=latest.get(Team.RED),
+                BLUE=latest.get(Team.BLUE),
             ),
             battle_escalation=self._escalation(state),
             result=_result_public(game.result),

@@ -34,7 +34,11 @@ from rules_beyond.natural_language_dynamic_controller import (
 from rules_beyond.natural_language_rule_adapter import NaturalLanguageRuleAdapter
 from rules_beyond.rule_faithfulness import NaturalLanguageRuleFaithfulnessVerifier
 from rules_beyond.rule_validator import RuleValidator
-from rules_beyond.strategy_agent import IsolatedStrategyAgent
+from rules_beyond.strategy_agent import (
+    DeterministicIntentPlanner,
+    IsolatedStrategyAgent,
+    StrategyIntent,
+)
 from rules_beyond.verified_natural_language_rule_adapter import (
     VerifiedNaturalLanguageRuleAdapter,
 )
@@ -93,20 +97,48 @@ class CountingStrategyModel:
         return json.dumps({"intent": self.intent})
 
 
-class FailAfterAgent:
-    """Test double that forwards to a real agent for N calls, then explodes."""
+class FlakyStrategyAgent:
+    """Forward to a real agent, raising exactly once on a chosen decide() call."""
 
-    def __init__(self, team: Team, agent: IsolatedStrategyAgent, *, fail_after: int) -> None:
+    def __init__(self, team: Team, agent: IsolatedStrategyAgent, *, fail_on_call: int) -> None:
         self.team = team
         self._agent = agent
-        self._fail_after = fail_after
+        self._fail_on_call = fail_on_call
         self.calls = 0
 
-    def decide(self, *args, **kwargs):  # noqa: ANN002, ANN003
+    def decide(self, state, engine, *, rule, histories, remember: bool = True):  # noqa: ANN001
         self.calls += 1
-        if self.calls > self._fail_after:
+        if self.calls == self._fail_on_call:
             raise RuntimeError("agent exploded")
-        return self._agent.decide(*args, **kwargs)
+        return self._agent.decide(
+            state,
+            engine,
+            rule=rule,
+            histories=histories,
+            remember=remember,
+        )
+
+    def commit_decision_memory(self, decision, *, round_no, rule):  # noqa: ANN001
+        self._agent.commit_decision_memory(decision, round_no=round_no, rule=rule)
+
+    @property
+    def private_memory(self):
+        return self._agent.private_memory
+
+
+class FlakyPlanner:
+    """Forward to the real planner, raising exactly once on a chosen call."""
+
+    def __init__(self, planner: DeterministicIntentPlanner, *, fail_on_call: int) -> None:
+        self._planner = planner
+        self._fail_on_call = fail_on_call
+        self.calls = 0
+
+    def choose_action(self, *args, **kwargs):  # noqa: ANN002, ANN003
+        self.calls += 1
+        if self.calls == self._fail_on_call:
+            raise RuntimeError("planner exploded")
+        return self._planner.choose_action(*args, **kwargs)
 
 
 def _service(
@@ -118,6 +150,7 @@ def _service(
     config: GameConfig | None = None,
     red_agent=None,
     blue_agent=None,
+    planner=None,
 ) -> tuple[MatchApplicationService, CountingRuleModel, CountingStrategyModel, CountingStrategyModel]:
     config = config or GameConfig()
     rule_model = CountingRuleModel(responses, faithful=faithful)
@@ -134,6 +167,7 @@ def _service(
         red_agent=red_agent or IsolatedStrategyAgent(Team.RED, red_model),
         blue_agent=blue_agent or IsolatedStrategyAgent(Team.BLUE, blue_model),
         rule_pipeline=rules,
+        planner=planner,
     )
     return service, rule_model, red_model, blue_model
 
@@ -593,18 +627,19 @@ def test_provider_failure_uses_agent_fallback_without_half_round() -> None:
     assert second.round.strategies.RED.status is StrategyDecisionStatusPublic.FALLBACK_MODEL_ERROR
 
 
-def test_agent_failure_leaves_aggregate_unchanged() -> None:
-    flaky_red = FailAfterAgent(
+def test_agent_failure_leaves_aggregate_and_memory_unchanged() -> None:
+    red_agent = FlakyStrategyAgent(
         Team.RED,
         IsolatedStrategyAgent(Team.RED, CountingStrategyModel("PRESSURE")),
-        fail_after=1,
+        fail_on_call=2,
     )
-    service, rule_model, _, _ = _service(red_agent=flaky_red)
+    service, rule_model, _, _ = _service(red_agent=red_agent)
     service.create_match(seed=1_270_000, match_id="match_atomic")
     service.advance_match()
 
     revision_before = service.get_match_snapshot().revision
     timeline_before = len(service.get_replay().timeline)
+    memory_before = red_agent.private_memory
 
     with pytest.raises(RecoverableMatchFailure):
         service.advance_match()
@@ -614,4 +649,99 @@ def test_agent_failure_leaves_aggregate_unchanged() -> None:
     assert snapshot.completed_rounds == 1
     assert snapshot.lifecycle is MatchLifecycle.PLAYER_DECISION
     assert len(service.get_replay().timeline) == timeline_before
+    assert red_agent.private_memory == memory_before
     assert rule_model.calls == 0
+
+
+def test_blue_failure_after_red_decision_leaves_no_private_memory() -> None:
+    red_agent = IsolatedStrategyAgent(Team.RED, CountingStrategyModel("PRESSURE"))
+    blue_agent = FlakyStrategyAgent(
+        Team.BLUE,
+        IsolatedStrategyAgent(Team.BLUE, CountingStrategyModel("KITE")),
+        fail_on_call=2,
+    )
+    service, *_ = _service(red_agent=red_agent, blue_agent=blue_agent)
+    service.create_match(seed=1_270_000)
+    service.advance_match()
+
+    revision_before = service.get_match_snapshot().revision
+    timeline_before = len(service.get_replay().timeline)
+    red_before = red_agent.private_memory
+    blue_before = blue_agent.private_memory
+
+    with pytest.raises(RecoverableMatchFailure):
+        service.advance_match()
+
+    snapshot = service.get_match_snapshot()
+    assert snapshot.revision == revision_before
+    assert snapshot.completed_rounds == 1
+    assert len(service.get_replay().timeline) == timeline_before
+    assert red_agent.private_memory == red_before
+    assert blue_agent.private_memory == blue_before
+    assert [entry.round_no for entry in red_agent.private_memory] == [1]
+    assert [entry.round_no for entry in blue_agent.private_memory] == [1]
+
+
+def test_planner_failure_after_both_decisions_leaves_no_private_memory() -> None:
+    red_agent = IsolatedStrategyAgent(Team.RED, CountingStrategyModel("PRESSURE"))
+    blue_agent = IsolatedStrategyAgent(Team.BLUE, CountingStrategyModel("KITE"))
+    planner = FlakyPlanner(DeterministicIntentPlanner(), fail_on_call=3)
+    service, *_ = _service(red_agent=red_agent, blue_agent=blue_agent, planner=planner)
+    service.create_match(seed=1_270_000)
+    service.advance_match()
+
+    red_before = red_agent.private_memory
+    blue_before = blue_agent.private_memory
+    timeline_before = len(service.get_replay().timeline)
+
+    with pytest.raises(RecoverableMatchFailure):
+        service.advance_match()
+
+    assert red_agent.private_memory == red_before
+    assert blue_agent.private_memory == blue_before
+    assert service.get_match_snapshot().completed_rounds == 1
+    assert len(service.get_replay().timeline) == timeline_before
+
+
+def test_retry_after_failure_commits_round_memory_once() -> None:
+    red_agent = IsolatedStrategyAgent(Team.RED, CountingStrategyModel("PRESSURE"))
+    blue_agent = FlakyStrategyAgent(
+        Team.BLUE,
+        IsolatedStrategyAgent(Team.BLUE, CountingStrategyModel("KITE")),
+        fail_on_call=2,
+    )
+    service, *_ = _service(red_agent=red_agent, blue_agent=blue_agent)
+    service.create_match(seed=1_270_000)
+    service.advance_match()
+
+    with pytest.raises(RecoverableMatchFailure):
+        service.advance_match()
+
+    result = service.advance_match()
+
+    assert result.match.completed_rounds == 2
+    assert [entry.round_no for entry in red_agent.private_memory] == [1, 2]
+    assert [entry.round_no for entry in blue_agent.private_memory] == [1, 2]
+    assert [entry.intent for entry in red_agent.private_memory] == [
+        StrategyIntent.PRESSURE,
+        StrategyIntent.PRESSURE,
+    ]
+
+
+def test_fallback_strategy_is_committed_after_successful_round() -> None:
+    red_agent = IsolatedStrategyAgent(Team.RED, CountingStrategyModel("PRESSURE", fail=True))
+    blue_agent = IsolatedStrategyAgent(
+        Team.BLUE,
+        CountingStrategyModel("KITE", fail=True),
+        fallback_intent=StrategyIntent.KITE,
+    )
+    service, *_ = _service(red_agent=red_agent, blue_agent=blue_agent)
+    service.create_match(seed=1_270_000)
+
+    result = service.advance_match()
+
+    assert result.round.strategies.RED.status is StrategyDecisionStatusPublic.FALLBACK_MODEL_ERROR
+    assert [entry.round_no for entry in red_agent.private_memory] == [1]
+    assert [entry.round_no for entry in blue_agent.private_memory] == [1]
+    assert red_agent.private_memory[0].intent is StrategyIntent.PRESSURE
+    assert blue_agent.private_memory[0].intent is StrategyIntent.KITE

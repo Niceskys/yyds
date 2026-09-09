@@ -196,6 +196,46 @@ class IsolatedStrategyAgent:
         *,
         rule: RuleAST | None,
         histories: Mapping[Team, PublicRuleHistory],
+        remember: bool = True,
+    ) -> StrategyDecision:
+        """Produce one strategy decision.
+
+        ``remember=False`` produces the decision without touching this session's
+        private memory. Application layers that must make "produce decision" and
+        "commit memory" separate steps of one atomic business action call this
+        with ``remember=False`` and then ``commit_decision_memory`` exactly once
+        after the round is fully resolved. Failed or abandoned rounds must not
+        call it, so a partial round cannot leave phantom strategy memory.
+        """
+
+        decision = self._decide(state, engine, rule=rule, histories=histories)
+        if remember:
+            self._remember(state.round_no, rule, decision.intent)
+        return decision
+
+    def commit_decision_memory(
+        self,
+        decision: StrategyDecision,
+        *,
+        round_no: int,
+        rule: RuleAST | None,
+    ) -> None:
+        """Commit one already-produced decision into this session's private memory.
+
+        Pair this with exactly one ``decide(..., remember=False)`` call per
+        committed round. The stored entry still contains only
+        ``round_no`` / ``active_rule_signature`` / ``intent``.
+        """
+
+        self._remember(round_no, rule, decision.intent)
+
+    def _decide(
+        self,
+        state: GameState,
+        engine: RuleAwareGameEngine,
+        *,
+        rule: RuleAST | None,
+        histories: Mapping[Team, PublicRuleHistory],
     ) -> StrategyDecision:
         observation = self._build_observation(state, engine, rule=rule, histories=histories)
         serialized = json.dumps(
@@ -227,7 +267,6 @@ class IsolatedStrategyAgent:
             )
         except Exception as exc:
             return self._fallback(
-                state.round_no,
                 rule,
                 StrategyDecisionStatus.FALLBACK_MODEL_ERROR,
                 f"strategy model failed: {type(exc).__name__}",
@@ -235,7 +274,6 @@ class IsolatedStrategyAgent:
 
         if not isinstance(raw, str) or len(raw) > self.max_output_chars:
             return self._fallback(
-                state.round_no,
                 rule,
                 StrategyDecisionStatus.FALLBACK_PROTOCOL_ERROR,
                 "strategy model returned invalid output type or size",
@@ -245,7 +283,6 @@ class IsolatedStrategyAgent:
             decoded = json.loads(raw)
         except json.JSONDecodeError:
             return self._fallback(
-                state.round_no,
                 rule,
                 StrategyDecisionStatus.FALLBACK_PROTOCOL_ERROR,
                 "strategy output must be one JSON object",
@@ -253,7 +290,6 @@ class IsolatedStrategyAgent:
 
         if not isinstance(decoded, dict) or set(decoded) != {"intent"}:
             return self._fallback(
-                state.round_no,
                 rule,
                 StrategyDecisionStatus.FALLBACK_PROTOCOL_ERROR,
                 "strategy output must contain only intent",
@@ -263,13 +299,11 @@ class IsolatedStrategyAgent:
             intent = StrategyIntent(decoded.get("intent"))
         except (TypeError, ValueError):
             return self._fallback(
-                state.round_no,
                 rule,
                 StrategyDecisionStatus.FALLBACK_PROTOCOL_ERROR,
                 "strategy intent is not in the closed intent set",
             )
 
-        self._remember(state.round_no, rule, intent)
         return StrategyDecision(
             status=StrategyDecisionStatus.ACCEPTED,
             intent=intent,
@@ -279,12 +313,10 @@ class IsolatedStrategyAgent:
 
     def _fallback(
         self,
-        round_no: int,
         rule: RuleAST | None,
         status: StrategyDecisionStatus,
         message: str,
     ) -> StrategyDecision:
-        self._remember(round_no, rule, self.fallback_intent)
         return StrategyDecision(
             status=status,
             intent=self.fallback_intent,
