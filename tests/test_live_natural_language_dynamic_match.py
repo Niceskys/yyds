@@ -15,28 +15,28 @@ from rules_beyond.verified_natural_language_rule_adapter import VerifiedNaturalL
 
 
 PHASE_CANDIDATES = {
-    LIVE_NL_SCHEDULE[0]: {
+    LIVE_NL_SCHEDULE[1]: {
         "version": "v0.1",
         "target": "ALL_UNITS",
         "conditions": [],
-        "effect": {"type": "BOW_RANGE_ADD", "delta": 1},
+        "effect": {"type": "KNIFE_RANGE_ADD", "delta": 1},
         "duration": "UNTIL_REPLACED",
     },
-    LIVE_NL_SCHEDULE[1]: {
+    LIVE_NL_SCHEDULE[2]: {
         "version": "v0.1",
         "target": "ALL_UNITS",
         "conditions": [],
         "effect": {"type": "MOVE_RANGE_ADD", "delta": 1},
         "duration": "UNTIL_REPLACED",
     },
-    LIVE_NL_SCHEDULE[3]: {
+    LIVE_NL_SCHEDULE[4]: {
         "version": "v0.1",
         "target": "ALL_UNITS",
         "conditions": [{"type": "DISTANCE_GTE", "value": 3}],
         "effect": {"type": "BOW_HIT_MULTIPLIER", "multiplier": 0.5},
         "duration": "UNTIL_REPLACED",
     },
-    LIVE_NL_SCHEDULE[4]: {
+    LIVE_NL_SCHEDULE[5]: {
         "version": "v0.1",
         "target": "ALL_UNITS",
         "conditions": [{"type": "CONSECUTIVE_SAME_WEAPON_USE_GTE", "value": 2}],
@@ -76,7 +76,7 @@ def test_offline_oracle_exercises_full_dynamic_natural_language_gate() -> None:
 
     assert_live_dynamic_match_gate(traces)
 
-    assert all(trace.round1_behavior_changed for trace in traces)
+    assert all(trace.post_intermission_behavior_changed for trace in traces)
     assert all(trace.rule_modifier_events > 0 for trace in traces)
     assert all({0, 1, 2}.issubset({phase.phase_index for phase in trace.phases}) for trace in traces)
 
