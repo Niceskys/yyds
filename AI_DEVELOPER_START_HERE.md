@@ -503,7 +503,7 @@ Replay timeline
 ```text
 GAMEPLAY_FLOW_V0.2
 MVP_API_CONTRACT_V0.2
-OpenAPI canonical source
+OpenAPI canonical schema
 PublicStrategyDecision
 Replay schema/version
 privacy boundary
