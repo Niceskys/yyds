@@ -91,60 +91,80 @@ Engine 同步结算一个完整回合
 
 # 4. 当前最重要的开发顺序
 
-**不要直接开始旧计划里的 MatchApplicationService。**
+A0 Controller cadence migration 已完成。
 
 当前固定顺序：
 
 ```text
-Gameplay Flow V0.2
+Gameplay Flow V0.2                         [DONE]
 ↓
-API / Replay Contract V0.2
+API / Replay Contract V0.2                 [DONE]
 ↓
-DynamicRuleController cadence migration
+DynamicRuleController cadence migration    [A0 DONE]
 ↓
-controller regression tests
+controller regression tests                [A0 DONE]
 ↓
-MatchApplicationService
+MatchApplicationService                    [A1 当前第一优先级]
 ↓
-in-memory repository / revision / per-match lock / idempotency
+in-memory repository / revision / per-match lock / idempotency   [A2]
 ↓
-FastAPI five-route vertical slice
+real FastAPI five-route vertical slice     [A3]
 ↓
-Frontend real API integration
+Developer B B4 real API integration
 ↓
-Replay
-↓
-追逃/软死局实验 + Agent A/B/C
+Replay / 追逃/软死局实验 + Agent A/B/C
 ↓
 真人试玩
 ```
 
-Developer B 可以与 Controller migration 并行，直接使用：
+Developer B 可以继续用 fixture 开发，直接使用：
 
 ```text
 contracts/fixtures/mvp-v0.2/
 ```
 
+A3 完成后进入 B4 真实 API 联调。
+
 ---
 
 # 5. 当前 Controller 状态：必须注意
 
-当前 `main` 的 `DynamicRuleController` 在本次 V0.2 迁移完成前仍实现旧逻辑：
+`DynamicRuleController` 已完成 A0 V0.2 回合间迁移（Issue #37）：
 
 ```text
-phase 0 before Round1
-then Round3 / 6 / 9 ... rule phase
+start_match()                -> active_rule = null，Round 1 直接执行
+每个非终局完整回合            -> 进入 intermission / PLAYER_DECISION
+submit_rule()                -> rejected 可重试；同一 intermission 最多成功替换 1 次
+continue_match()             -> 显式 continue 后才执行下一完整回合
+terminal                     -> 不再进入 intermission
 ```
 
-这是**待迁移实现**，不是当前产品玩法。
-
-任何新 AI 不得因为看到旧 Controller 就反过来把产品文档改回旧 cadence。
-
-正确目标见：
+旧 V0.1 cadence 已从产品路径删除：
 
 ```text
+RULE_PHASE_INTERVAL = 3
+phase 0 before Round 1
+rounds 3 / 6 / 9 ... rule phase
+```
+
+任何新 AI 不得把产品文档改回旧 cadence，也不得在 `MatchApplicationService` 中重新引入
+每 3 回合一次或 Round 1 前制定规则。
+
+迁移细节见：
+
+```text
+docs/handoffs/2026-09-09-dynamic-rule-controller-v02.md
 docs/GAMEPLAY_FLOW_V0.2.md
 docs/MVP_FIRST_TASKS.md
+```
+
+下一步固定为：
+
+```text
+A1 MatchApplicationService
+-> A2 in-memory repository + revision / lock / idempotency
+-> A3 real FastAPI five-route vertical slice
+-> Developer B B4 real API integration
 ```
 
 ---

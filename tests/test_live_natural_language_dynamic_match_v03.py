@@ -1,29 +1,31 @@
 import json
 
-from rules_beyond.live_natural_language_dynamic_match import LIVE_MATCH_CONFIG, LIVE_MATCH_SEEDS, build_live_controller, play_live_match
-from rules_beyond.live_natural_language_dynamic_match_v02 import (
-    LIVE_NL_SCHEDULE_V02,
+from rules_beyond.live_natural_language_dynamic_match_v03 import (
+    LIVE_MATCH_SEEDS,
+    LIVE_NL_SCHEDULE_V03,
     MemoizedRuleCandidateModel,
-    evaluate_v02_gate,
+    build_live_controller_v03,
+    evaluate_v03_gate,
+    play_live_match_v03,
 )
 
 
 PHASE_CANDIDATES = {
-    LIVE_NL_SCHEDULE_V02[0]: {
+    LIVE_NL_SCHEDULE_V03[1]: {
         "version": "v0.1",
         "target": "ALL_UNITS",
         "conditions": [],
-        "effect": {"type": "BOW_RANGE_ADD", "delta": 1},
+        "effect": {"type": "KNIFE_RANGE_ADD", "delta": 1},
         "duration": "UNTIL_REPLACED",
     },
-    LIVE_NL_SCHEDULE_V02[1]: {
+    LIVE_NL_SCHEDULE_V03[2]: {
         "version": "v0.1",
         "target": "ALL_UNITS",
         "conditions": [],
         "effect": {"type": "MOVE_RANGE_ADD", "delta": 1},
         "duration": "UNTIL_REPLACED",
     },
-    LIVE_NL_SCHEDULE_V02[3]: {
+    LIVE_NL_SCHEDULE_V03[4]: {
         "version": "v0.1",
         "target": "ALL_UNITS",
         "conditions": [{"type": "DISTANCE_GTE", "value": 3}],
@@ -50,7 +52,7 @@ class CountingGateOracleModel:
 def test_memoized_model_returns_one_provider_decision_per_identical_request() -> None:
     underlying = CountingGateOracleModel()
     cached = MemoizedRuleCandidateModel(underlying)
-    player_text = LIVE_NL_SCHEDULE_V02[0]
+    player_text = LIVE_NL_SCHEDULE_V03[1]
 
     first = cached.generate_candidate(system_prompt="translator", player_text=player_text)
     second = cached.generate_candidate(system_prompt="translator", player_text=player_text)
@@ -61,21 +63,21 @@ def test_memoized_model_returns_one_provider_decision_per_identical_request() ->
     assert cached.cache_hits == 1
 
 
-def test_v02_offline_gate_compiles_each_semantic_request_once_across_combat_seeds() -> None:
+def test_v03_offline_gate_compiles_each_semantic_request_once_across_combat_seeds() -> None:
     underlying = CountingGateOracleModel()
     cached = MemoizedRuleCandidateModel(underlying)
 
     traces = tuple(
-        play_live_match(
-            build_live_controller(cached),  # type: ignore[arg-type]
+        play_live_match_v03(
+            build_live_controller_v03(cached),  # type: ignore[arg-type]
             seed=seed,
-            schedule=LIVE_NL_SCHEDULE_V02,
+            schedule=LIVE_NL_SCHEDULE_V03,
         )
         for seed in LIVE_MATCH_SEEDS
     )
 
-    assert evaluate_v02_gate(traces) == ()
-    assert all(trace.round1_behavior_changed for trace in traces)
+    assert evaluate_v03_gate(traces) == ()
+    assert all(trace.post_intermission_behavior_changed for trace in traces)
     assert all(trace.rule_modifier_events > 0 for trace in traces)
 
     # Three legal texts each require translator + verifier once. The explicit

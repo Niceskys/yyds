@@ -8,7 +8,7 @@ docs/MVP_API_CONTRACT_V0.2.md
 docs/SECOND_AUDIT_ACTION_PLAN_2026-09-08.md
 ```
 
-> 当前顺序：**先把新玩法状态机迁干净，再写 MatchApplicationService；前端可以同时按 V0.2 fixture 开工。**
+> 当前顺序：**A0 Controller 状态机迁移已完成；现在进入 A1 MatchApplicationService；前端可继续按 V0.2 fixture 推进，A3 后再做 B4 真实 API 联调。**
 
 ---
 
@@ -73,56 +73,40 @@ GET  /api/v1/matches/{match_id}/replay
 
 # Developer A — Backend / AI
 
-## A0 — DynamicRuleController Cadence Migration【当前第一优先级】
+## A0 — DynamicRuleController Cadence Migration【COMPLETED】
 
-建议分支：
+分支：
 
 ```text
 backend/controller-v02-intermission
 ```
 
-当前 Controller 仍是旧 V0.1：
+状态：
 
 ```text
-pre-game phase 0
-rounds 3 / 6 / 9 ... rule phase
+A0 = COMPLETED
+DynamicRuleController = V0.2 intermission cadence
 ```
 
-必须迁移为：
+已完成：
+
+- `start_match()` 不再接受初始规则；`active_rule = null`，Round 1 直接执行；
+- 删除 pre-game phase 0 与 `rounds 3 / 6 / 9 ...` 规则阶段；
+- 每个非终局完整回合后进入 intermission / PLAYER_DECISION；
+- rejected submission 可重试、不计数、不关闭 intermission；
+- 同一 intermission 最多成功替换一次规则；
+- accepted 后仍需显式 continue 才执行下一回合；
+- terminal 不再进入 intermission；
+- 换规则不重置 PublicRuleHistory / no_damage_streak。
+
+当前实现状态见：
 
 ```text
-start_match()
-→ active_rule = null
-→ Round 1 直接可执行
-
-每个非终局 round resolved
-→ 打开玩家决策阶段
-→ 允许 0 或多次失败的规则尝试
-→ 最多 1 次成功规则替换
-→ continue 后关闭本轮玩家决策阶段
-→ 下一回合
+src/rules_beyond/dynamic_rule_controller.py
+docs/handoffs/2026-09-09-dynamic-rule-controller-v02.md
 ```
 
-硬约束：
-
-- rule change 不清空 PublicRuleHistory；
-- rule change 不清空 `no_damage_streak`；
-- 只有实际伤害才能重置连续无伤害；
-- rejected submission 不消耗成功规则次数；
-- terminal match 不再进入玩家决策阶段；
-- 原有 Engine / RuleValidator 语义不因 cadence 迁移改变。
-
-完成标准：
-
-- 删除产品路径中的 Phase 0；
-- 每个非终局回合后均可进入 intermission；
-- 同一 intermission 最多接受一次新规则；
-- 新 controller tests 覆盖 Round1 / reject retry / accept lock / continue / terminal；
-- 原 Engine / Rule tests 全绿。
-
-## A1 — Match Application Service
-
-**只有 A0 完成后才开始。**
+## A1 — Match Application Service【当前第一优先级】
 
 建议分支：
 
@@ -140,7 +124,28 @@ advance_match()
 get_replay()
 ```
 
-同时实现：
+关键行为：
+
+- create 后第 1 回合前 `can_submit_rule = false`；
+- 前端随后调用第一次 advance，形成“第 1 回合自动开始”的体验；
+- 非终局 advance 完成后进入 `PLAYER_DECISION`；
+- rule accepted 后仍停在 `PLAYER_DECISION`；
+- 下一次 advance 才开始下一回合；
+- `continue_match()` 只是 Controller 内部关闭 intermission；HTTP `/advance` 必须在应用层一个原子操作内完成：
+
+```text
+intermission close
+→ RED / BLUE strategy
+→ Planner
+→ resolve one complete round
+→ Replay
+→ public MatchSnapshot
+```
+
+不得把 `continue_match()` 之后、下一回合尚未 resolve 的中间状态作为正常对外
+PLAYER_DECISION 结果持久化/返回。
+
+## A2 — In-memory repository + revision / lock / idempotency
 
 ```text
 in-memory repository
@@ -153,15 +158,7 @@ completed_rounds / score_rounds
 battle escalation public projection
 ```
 
-关键行为：
-
-- create 后第 1 回合前 `can_submit_rule = false`；
-- 前端随后调用第一次 advance，形成“第 1 回合自动开始”的体验；
-- 非终局 advance 完成后进入 `PLAYER_DECISION`；
-- rule accepted 后仍停在 `PLAYER_DECISION`；
-- 下一次 advance 才开始下一回合。
-
-## A2 — FastAPI Vertical Slice
+## A3 — Real FastAPI five-route vertical slice
 
 严格按 V0.2 contract 实现五个路由。
 
@@ -175,11 +172,15 @@ Celery
 复杂数据库
 ```
 
+## B4 — Real API integration
+
+Developer B 在 A3 五路由可用后，把 fixture UI 切到真实后端。B4 不属于 A0/A1/A2/A3。
+
 ---
 
 # Developer B — Frontend
 
-Developer B **不需要等待 A0/A1 完成**，可直接使用：
+Developer B **不需要等待 A1/A2/A3 完成**，可直接使用：
 
 ```text
 contracts/fixtures/mvp-v0.2/
@@ -319,15 +320,15 @@ contracts/fixtures/mvp-v0.2
 当前可以并行：
 
 ```text
-A：Controller cadence V0.2 migration
-B：React/Vite + V0.2 fixture UI
+A：A1 MatchApplicationService → A2 repository → A3 FastAPI
+B：继续 Board / Rule / Replay UI（fixture 阶段）
 ```
 
-A0 完成后：
+A3 完成后：
 
 ```text
-A：MatchApplicationService
-B：继续 Board / Rule / Replay UI
+A：支撑 B4 真实 API 联调
+B：B4 real API integration
 ```
 
 ---

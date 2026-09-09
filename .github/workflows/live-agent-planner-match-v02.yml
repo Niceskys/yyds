@@ -1,15 +1,9 @@
-name: live-agent-planner-match (historical V0.1 PASS)
+name: live-agent-planner-match-v02 (current V0.2 cadence)
 
-# HISTORICAL-ONLY REPRODUCTION ENTRY.
-#
-# Frozen Agent / Planner Integration Gate V0.1 PASS:
-#   run_id: 34186823597
-#   head:   5c1aeccc7d9ef1727c01f416695415f5a9c9477f
-#   evidence: docs/experiments/LIVE_AGENT_PLANNER_GATE_PASS_2026-09-08.md
-#
-# This workflow deliberately checks out that frozen commit so the historical
-# Gate definition can never be replaced by the current V0.2 intermission
-# cadence. Current cadence Gate: .github/workflows/live-agent-planner-match-v02.yml
+# Current-cadence Agent / Planner connectivity Gate.
+# This is a NEW Gate for the V0.2 intermission state machine, not a rerun of the
+# frozen Agent / Planner Integration Gate V0.1 PASS
+# (head 5c1aeccc7d9ef1727c01f416695415f5a9c9477f).
 on:
   workflow_dispatch:
     inputs:
@@ -20,7 +14,7 @@ on:
         type: string
 
 jobs:
-  live-agent-planner-match:
+  live-agent-planner-match-v02:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -30,8 +24,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: 5c1aeccc7d9ef1727c01f416695415f5a9c9477f
 
       - uses: actions/setup-python@v5
         with:
@@ -48,7 +40,7 @@ jobs:
             exit 1
           fi
 
-      - name: Run historical Agent Planner Gate V0.1
+      - name: Run current-cadence Agent Planner Gate V0.2
         id: live
         continue-on-error: true
         shell: bash
@@ -56,14 +48,14 @@ jobs:
           MODEL_NAME: ${{ inputs.model }}
         run: |
           mkdir -p live-agent-output
-          python -m rules_beyond.live_agent_planner_match \
+          python -m rules_beyond.live_agent_planner_match_v02 \
             --model "$MODEL_NAME" \
             > live-agent-output/result.json
 
       - name: Upload Agent Planner trace
         uses: actions/upload-artifact@v4
         with:
-          name: live-agent-planner-match
+          name: live-agent-planner-match-v02
           path: live-agent-output/result.json
           if-no-files-found: error
           retention-days: 30

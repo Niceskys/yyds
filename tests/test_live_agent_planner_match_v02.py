@@ -1,6 +1,6 @@
 import json
 
-from rules_beyond.live_agent_planner_match import play_agent_match
+from rules_beyond.live_agent_planner_match_v02 import play_agent_match
 from rules_beyond.model import Team
 from rules_beyond.strategy_agent import IsolatedStrategyAgent, StrategyDecisionStatus
 
@@ -18,7 +18,7 @@ class OracleStrategyModel:
         return json.dumps({"intent": intent})
 
 
-def test_offline_oracle_completes_full_agent_planner_gate() -> None:
+def test_offline_oracle_completes_full_v02_agent_planner_gate() -> None:
     model = OracleStrategyModel()
     red = IsolatedStrategyAgent(Team.RED, model)
     blue = IsolatedStrategyAgent(Team.BLUE, model)

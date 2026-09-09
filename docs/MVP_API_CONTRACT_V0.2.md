@@ -502,25 +502,46 @@ HOLD → 原地应对
 
 # 14. 当前实现迁移状态
 
-在 V0.2 合同冻结时，以下代码仍属于旧 V0.1 cadence，需要随后迁移：
+A0 已完成（Issue #37，分支 `backend/controller-v02-intermission`）：
 
 ```text
-DynamicRuleController:
-- pre-game phase 0
-- rounds 3/6/9... rule phase
+DynamicRuleController = V0.2 intermission cadence
+- start_match() 不再接受初始规则，active_rule = null
+- Round 1 无玩家规则直接执行
+- 每个非终局完整回合后进入 intermission / PLAYER_DECISION
+- rejected submission 可重试、不计数、不关闭 intermission
+- 同一 intermission 最多成功替换一次规则
+- accepted 后仍需显式 continue 才执行下一回合
+- terminal 不再进入 intermission
+- 换规则不重置 PublicRuleHistory / no_damage_streak
 ```
 
-因此 `MatchApplicationService` 暂停继续实现，直到 Controller cadence 与本合同一致。
+旧 V0.1 cadence（pre-game phase 0 / rounds 3/6/9...）已从产品路径删除，仅作为历史证据保留。
 
-正确顺序：
+当前后端顺序：
 
 ```text
 V0.2 gameplay contract
 → V0.2 Pydantic/OpenAPI/fixtures
-→ DynamicRuleController cadence migration
-→ controller regression tests
-→ MatchApplicationService
+→ DynamicRuleController cadence migration        [DONE]
+→ controller regression tests                     [DONE]
+→ MatchApplicationService                        [当前第一优先级]
 → in-memory repository / revision / lock / idempotency
-→ real FastAPI routes
-→ React integration
+→ real FastAPI five-route vertical slice
+→ Developer B B4 real API integration
 ```
+
+`continue_match()` 只是 Controller 内部关闭 intermission。HTTP `/advance` 必须在应用层
+一个原子操作内完成：
+
+```text
+intermission close
+→ RED / BLUE strategy
+→ Planner
+→ resolve one complete round
+→ Replay
+→ public MatchSnapshot
+```
+
+不得把 `continue_match()` 之后、下一回合尚未 resolve 的中间状态作为正常对外
+PLAYER_DECISION 结果持久化/返回。

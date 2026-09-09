@@ -1,5 +1,15 @@
-name: live-natural-language-dynamic-match
+name: live-natural-language-dynamic-match (historical V0.1 FAIL)
 
+# HISTORICAL-ONLY REPRODUCTION ENTRY.
+#
+# Frozen Natural-Language Dynamic Match Gate V0.1 FAIL:
+#   run_id: 34184281670
+#   head:   9239cfa876f5a7fb3d050ad960ceacf851e43324
+#   evidence: docs/experiments/MIMO_V25_PRO_NL_DYNAMIC_MATCH_V01_FAIL_2026-09-08.md
+#
+# This workflow deliberately checks out that frozen commit so the historical
+# FAIL definition can never be replaced by the current V0.2 intermission
+# cadence. Current cadence Gate: .github/workflows/live-natural-language-dynamic-match-v03.yml
 on:
   workflow_dispatch:
     inputs:
@@ -20,6 +30,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: 9239cfa876f5a7fb3d050ad960ceacf851e43324
 
       - uses: actions/setup-python@v5
         with:
@@ -35,7 +47,7 @@ jobs:
             exit 1
           fi
 
-      - name: Run live natural-language dynamic match gate
+      - name: Run historical natural-language dynamic match gate V0.1
         id: live_gate
         continue-on-error: true
         env:

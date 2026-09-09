@@ -1,3 +1,11 @@
+"""V0.2 intermission-cadence dynamic public-rule replacement experiment.
+
+This is a NEW experiment for the V0.2 DynamicRuleController cadence. It is NOT a
+rerun of the frozen V0.1 "Dynamic Public-Rule Replacement Experiment"
+(2026-09-08 PASS, docs/experiments/DYNAMIC_RULE_REPLACEMENT_2026-09-08.md).
+That historical experiment remains reproducible from its pinned commit through
+.github/workflows/dynamic-rule-replacement.yml.
+"""
 from __future__ import annotations
 
 from collections import Counter
@@ -15,16 +23,17 @@ from .rule_experiment import RULE_CANDIDATES
 
 DYNAMIC_EXPERIMENT_CONFIG = GameConfig(initial_hp=5, knife_damage=2)
 
-# phase 0 is pre-game; phases 1, 2, ... occur after rounds 3, 6, ...
+# V0.2 intermission cadence: keys are the completed round after which the
+# player attempts a replacement. Round 1 always resolves without a player rule.
 DYNAMIC_SCHEDULE: Mapping[int, RuleCandidate] = {
-    0: RULE_CANDIDATES["always_bow_range_plus_1"],
-    1: RULE_CANDIDATES["always_move_range_plus_1"],
+    1: RULE_CANDIDATES["always_bow_range_plus_1"],
     2: RULE_CANDIDATES["distance_ge_3_bow_hit_half"],
-    3: RULE_CANDIDATES["low_hp_bow_damage_plus_1"],
-    4: RULE_CANDIDATES["repeat_bow_cooldown"],
+    3: RULE_CANDIDATES["repeat_bow_cooldown"],
+    4: RULE_CANDIDATES["low_hp_bow_damage_plus_1"],
+    5: RULE_CANDIDATES["always_move_range_plus_1"],
 }
 STATIC_SCHEDULE: Mapping[int, RuleCandidate] = {
-    0: RULE_CANDIDATES["always_bow_range_plus_1"],
+    1: RULE_CANDIDATES["always_bow_range_plus_1"],
 }
 
 
@@ -70,12 +79,12 @@ def play_scheduled_match(
     config: GameConfig = DYNAMIC_EXPERIMENT_CONFIG,
 ) -> DynamicTrace:
     controller = DynamicRuleController(config)
-    started = controller.start_match(schedule.get(0))
+    started = controller.start_match()
     state = started.state
 
-    accepted_phases = int(started.phase.accepted)
-    replacement_phases = int(started.phase.replaced)
-    carry_phases = int(not started.phase.submitted)
+    accepted_phases = 0
+    replacement_phases = 0
+    carry_phases = 0
     rounds = 0
     round4_actions: tuple[str, str] | None = None
 
@@ -107,13 +116,17 @@ def play_scheduled_match(
         state = resolved.state
         rounds += 1
 
-        if state.rule_phase_due:
-            next_phase = state.last_phase_index + 1
-            phase_result = controller.apply_due_rule_phase(state, schedule.get(next_phase))
-            accepted_phases += int(phase_result.phase.accepted)
-            replacement_phases += int(phase_result.phase.replaced)
-            carry_phases += int(not phase_result.phase.submitted)
-            state = phase_result.state
+        if state.in_intermission:
+            after_round = state.pending_intermission_after_round
+            candidate = schedule.get(after_round)
+            if candidate is None:
+                carry_phases += 1
+                state = controller.continue_match(state).state
+            else:
+                submission = controller.submit_rule(state, candidate)
+                accepted_phases += int(submission.outcome.accepted)
+                replacement_phases += int(submission.outcome.replaced)
+                state = controller.continue_match(submission.state).state
 
     assert state.game_state.result is not None
     return DynamicTrace(
@@ -201,7 +214,9 @@ def assert_dynamic_gate(summaries: list[DynamicSummary]) -> None:
     if not comparable:
         raise AssertionError("no paired match reached round 4 in both static and dynamic runs")
     if not any((summary.round4_action_change_rate or 0.0) > 0 for summary in comparable):
-        raise AssertionError("first replacement produced no observable round-4 action change")
+        raise AssertionError(
+            "scheduled replacement effective on round 4 produced no observable action change"
+        )
 
 
 def main() -> None:

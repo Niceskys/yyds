@@ -231,11 +231,13 @@ def test_accepted_candidate_is_revalidated_by_dynamic_controller() -> None:
     assert translated.accepted is True
     assert translated.candidate is not None
 
-    started = DynamicRuleController().start_match(translated.candidate)
+    controller = DynamicRuleController()
+    state = controller.resolve_round(controller.start_match().state, {}, match_seed=1).state
+    applied = controller.submit_rule(state, translated.candidate)
 
-    assert started.phase.accepted is True
-    assert started.state.active_rule is not None
-    assert started.state.active_rule.effect.type is RuleEffectType.BOW_RANGE_ADD
+    assert applied.outcome.accepted is True
+    assert applied.state.active_rule is not None
+    assert applied.state.active_rule.effect.type is RuleEffectType.BOW_RANGE_ADD
 
 
 def test_rejected_candidate_still_cannot_bypass_controller_if_forwarded() -> None:
@@ -247,11 +249,14 @@ def test_rejected_candidate_still_cannot_bypass_controller_if_forwarded() -> Non
     assert translated.status is TranslationStatus.RULE_REJECTED
     assert translated.candidate is not None
 
-    started = DynamicRuleController().start_match(translated.candidate)
+    controller = DynamicRuleController()
+    state = controller.resolve_round(controller.start_match().state, {}, match_seed=1).state
+    rejected = controller.submit_rule(state, translated.candidate)
 
-    assert started.phase.accepted is False
-    assert started.state.active_rule is None
-    assert "FACTION_NEUTRALITY" in {issue.code for issue in started.phase.issues}
+    assert rejected.outcome.accepted is False
+    assert rejected.state.active_rule is None
+    assert "FACTION_NEUTRALITY" in {issue.code for issue in rejected.outcome.issues}
+    assert rejected.state.in_intermission is True
 
 
 def test_system_prompt_provides_safe_no_candidate_path() -> None:

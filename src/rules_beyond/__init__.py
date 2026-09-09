@@ -1,13 +1,13 @@
 """Rules Beyond deterministic engine package."""
 
 from .dynamic_rule_controller import (
-    RULE_PHASE_INTERVAL,
+    DynamicContinueResult,
     DynamicMatchState,
     DynamicRoundResult,
     DynamicRuleController,
-    DynamicRulePhaseResult,
+    DynamicRuleSubmissionResult,
     DynamicStartResult,
-    RulePhaseOutcome,
+    IntermissionOutcome,
 )
 from .engine import GameEngine, RoundResolution
 from .mimo_rule_provider import (
@@ -79,14 +79,16 @@ __all__ = [
     "DEFAULT_ZHIPU_MODEL_ENV",
     "DEFAULT_ZHIPU_RULE_MODEL",
     "Direction",
+    "DynamicContinueResult",
     "DynamicMatchState",
     "DynamicRoundResult",
     "DynamicRuleController",
-    "DynamicRulePhaseResult",
+    "DynamicRuleSubmissionResult",
     "DynamicStartResult",
     "GameConfig",
     "GameEngine",
     "GameState",
+    "IntermissionOutcome",
     "MAX_MODEL_OUTPUT_CHARS",
     "MIMO_TOKEN_PLAN_CN_BASE_URL",
     "MatchResult",
@@ -97,7 +99,6 @@ __all__ = [
     "NoCandidateReason",
     "Position",
     "PublicRuleHistory",
-    "RULE_PHASE_INTERVAL",
     "RoundResolution",
     "RuleAST",
     "RuleAwareGameEngine",
@@ -110,7 +111,6 @@ __all__ = [
     "RuleEffectiveStats",
     "RuleEvaluator",
     "RuleModifiers",
-    "RulePhaseOutcome",
     "RuleRoundResolution",
     "RuleTarget",
     "RuleValidator",

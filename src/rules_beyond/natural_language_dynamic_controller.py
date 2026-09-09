@@ -4,10 +4,11 @@ from dataclasses import dataclass
 from typing import Mapping
 
 from .dynamic_rule_controller import (
+    DynamicContinueResult,
     DynamicMatchState,
     DynamicRoundResult,
     DynamicRuleController,
-    RulePhaseOutcome,
+    IntermissionOutcome,
 )
 from .model import Action, Event, GameConfig, Team
 from .rule_engine import RuleAwareGameEngine
@@ -18,22 +19,18 @@ from .verified_natural_language_rule_adapter import (
 
 
 @dataclass(frozen=True, slots=True)
-class NaturalLanguageDynamicPhase:
-    """One player-rule phase after natural-language safety processing.
+class NaturalLanguageRuleAttempt:
+    """One natural-language rule attempt inside a player-decision intermission.
 
-    `translation` is None only when the player made no text submission. A rejected
-    or failed translation is represented explicitly here while the wrapped
-    DynamicRuleController receives `None`, which preserves the previous legal
-    rule according to the frozen UNTIL_REPLACED semantics.
+    ``translation`` is None only when the submission was passed as no text. A
+    rejected or failed translation is represented explicitly here while the
+    wrapped DynamicRuleController receives no candidate, which keeps the previous
+    legal rule and leaves the intermission open for a retry.
     """
 
-    player_text: str | None
+    player_text: str
     translation: VerifiedNaturalLanguageTranslation | None
-    controller_phase: RulePhaseOutcome
-
-    @property
-    def text_submitted(self) -> bool:
-        return self.player_text is not None
+    outcome: IntermissionOutcome
 
     @property
     def translation_accepted(self) -> bool:
@@ -41,24 +38,25 @@ class NaturalLanguageDynamicPhase:
 
     @property
     def carried_forward_after_translation_rejection(self) -> bool:
-        return (
-            self.player_text is not None
-            and not self.translation_accepted
-            and not self.controller_phase.replaced
-        )
+        return not self.translation_accepted and not self.outcome.replaced
 
 
 @dataclass(frozen=True, slots=True)
 class NaturalLanguageDynamicStartResult:
     state: DynamicMatchState
-    phase: NaturalLanguageDynamicPhase
     events: tuple[Event, ...]
 
 
 @dataclass(frozen=True, slots=True)
-class NaturalLanguageDynamicRulePhaseResult:
+class NaturalLanguageRuleSubmissionResult:
     state: DynamicMatchState
-    phase: NaturalLanguageDynamicPhase
+    attempt: NaturalLanguageRuleAttempt
+    events: tuple[Event, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class NaturalLanguageContinueResult:
+    state: DynamicMatchState
     events: tuple[Event, ...]
 
 
@@ -68,7 +66,8 @@ class VerifiedNaturalLanguageDynamicController:
     Security/authority rules:
     - the verified adapter may only produce an untrusted candidate mapping;
     - every accepted mapping is revalidated by DynamicRuleController;
-    - rejected/model-error/verifier-error text becomes no valid submission;
+    - rejected/model-error/verifier-error text becomes a rejected rule attempt
+      that leaves the intermission open, never a silent continue;
     - no natural-language path mutates GameState directly;
     - the wrapped controller remains the owner of rule cadence and active_rule.
     """
@@ -97,19 +96,9 @@ class VerifiedNaturalLanguageDynamicController:
     def engine(self) -> RuleAwareGameEngine:
         return self.controller.engine
 
-    def start_match(self, initial_text: str | None = None) -> NaturalLanguageDynamicStartResult:
-        candidate, translation = self._translate(initial_text)
-        started = self.controller.start_match(candidate)
-        phase = NaturalLanguageDynamicPhase(
-            player_text=initial_text,
-            translation=translation,
-            controller_phase=started.phase,
-        )
-        return NaturalLanguageDynamicStartResult(
-            state=started.state,
-            phase=phase,
-            events=started.events,
-        )
+    def start_match(self) -> NaturalLanguageDynamicStartResult:
+        started = self.controller.start_match()
+        return NaturalLanguageDynamicStartResult(state=started.state, events=started.events)
 
     def resolve_round(
         self,
@@ -124,31 +113,32 @@ class VerifiedNaturalLanguageDynamicController:
             match_seed=match_seed,
         )
 
-    def apply_due_rule_phase(
+    def submit_rule(
         self,
         state: DynamicMatchState,
-        player_text: str | None = None,
-    ) -> NaturalLanguageDynamicRulePhaseResult:
+        player_text: str,
+    ) -> NaturalLanguageRuleSubmissionResult:
         candidate, translation = self._translate(player_text)
-        applied = self.controller.apply_due_rule_phase(state, candidate)
-        phase = NaturalLanguageDynamicPhase(
+        applied = self.controller.submit_rule(state, candidate)
+        attempt = NaturalLanguageRuleAttempt(
             player_text=player_text,
             translation=translation,
-            controller_phase=applied.phase,
+            outcome=applied.outcome,
         )
-        return NaturalLanguageDynamicRulePhaseResult(
+        return NaturalLanguageRuleSubmissionResult(
             state=applied.state,
-            phase=phase,
+            attempt=attempt,
             events=applied.events,
         )
 
+    def continue_match(self, state: DynamicMatchState) -> NaturalLanguageContinueResult:
+        continued = self.controller.continue_match(state)
+        return NaturalLanguageContinueResult(state=continued.state, events=continued.events)
+
     def _translate(
         self,
-        player_text: str | None,
+        player_text: str,
     ) -> tuple[Mapping[str, object] | None, VerifiedNaturalLanguageTranslation | None]:
-        if player_text is None:
-            return None, None
-
         translation = self.adapter.translate(player_text)
         if not translation.accepted or translation.candidate is None:
             return None, translation
