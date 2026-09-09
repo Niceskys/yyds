@@ -26,7 +26,7 @@ multi-match isolation
 
 ```text
 src/rules_beyond/match_repository.py     新增：A2 多对局 repository
-tests/test_match_repository.py           新增：22 个测试
+tests/test_match_repository.py           新增：25 个测试
 docs/handoffs/2026-09-09-match-repository-concurrency-v02.md
 ```
 
