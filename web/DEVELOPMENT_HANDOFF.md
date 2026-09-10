@@ -2,134 +2,260 @@
 
 ## 当前基线
 
-- integration baseline: `main@29eeb1950d911acba292625b30a38cc7857a87b9`
-- working branch: `frontend/npm-audit-v02`
-- current task: Issue #45 — 前端 npm audit 依赖漏洞审计与最小升级
+- integration baseline: `main@78b63ed704890ea3cd664c552784eada1e6ff409`
+- working branch: `frontend/openapi-types-prep-v02`
+- current task: Issue #55 — B4 前置：OpenAPI generated TypeScript types + transport-neutral API Adapter 边界
 - contract version: `mvp-v0.2`
-- B0: 完成并已合并（PR #43）
-- B1: 完成并已合并（PR #43）
-- B3: 完成并已合并（PR #47，merge `6a930d7ae67dbc5d703bae15d669545fc272fc4e`）
-- B4: **未开始且当前阻塞**；Developer A 的 A3 由根目录 `DEVELOPER_A_GATE.md` 暂停（`PAUSED_BY_OWNER`）
-- Shared frontend CI: `.github/workflows/frontend.yml` 已进入 main
+- B0 App Shell: DONE（PR #43）
+- B1 fixture UI: DONE（PR #43）
+- B3 selectable Replay: DONE（PR #47）
+- Issue #45 npm audit: DONE（PR #54，merge `6818dd58bdbe15b48e08fbb0320365a1c178edb9`）
+- Shared OpenAPI snapshot: DONE（Issue #56 / PR #57，merge `78b63ed704890ea3cd664c552784eada1e6ff409`）
+- B4 real HTTP integration: **BLOCKED**；Developer A A3 仍由 `DEVELOPER_A_GATE.md` 标记 `PAUSED_BY_OWNER`
 
-## 已完成
+## Issue #55：B4 前置实现
 
-- React + TypeScript + Vite 应用外壳，初始页《规则之外》+「开始游戏」。
-- fixture → adapter → ViewModel → React 组件的单向数据流。
-- 棋盘按 `board.rows` / `board.cols` 渲染；公共坐标保持 1-based。
-- 红蓝状态、当前规则、回合、规则制定次数、战局升温与规则输入交互。
-- accepted / rejected / terminal 三类状态渲染。
-- 中文映射集中管理；普通玩家 UI 不直接展示 `conflict_level` / `hard_liveness` / `hard_liveness_active`。
-- 开始游戏后消费 `advance_round.json`，保留 Round 1 的公开策略、实际行动和事件。
-- npm canonical `package-lock.json` 已入库；正式 frontend CI 使用 `npm ci` + typecheck + test + build。
-- B3 基础时间线第一条固定为 Round 1，不存在 Round 1 前规则阶段。
+### 1. OpenAPI 派生链
 
-## 本次 Issue #45 实现
-
-- 分支：`frontend/npm-audit-v02`（基于 `main@29eeb1950`）
-- 完整审计记录：`web/NPM_AUDIT_2026-09-09.md`
-- 最小升级：`vite` 5.4.11 → 5.4.21、`vitest` 2.1.8 → 2.1.9（均为同 major patch，精确版本锁定）
-- 结果：advisory 16 → 6（移除 critical `GHSA-9crc-q9x8-hgqq` + 9 条 vite dev-server advisory）
-- 未升级：vite 6/7/8、vitest 3/4、esbuild override；原因与触发条件见审计文档
-- 验证：`npm ci` / `typecheck` / 31 tests / `build` 全部 PASS；生产 bundle 哈希未变（`index-DQ3Uz6FI.js`）
-- 未执行 `npm audit fix --force`；未修改 backend / contracts / 业务 UI
-- B4 仍 blocked
-
-## B3 实现（已合并）
-
-Commit：`b2da3c9` — `feat(frontend): add selectable V0.2 replay inspection`
-
-### Replay Adapter / ViewModel
-
-只消费 authoritative `ReplaySnapshot` 公共字段，不重新模拟 Engine：
-
-- `ROUND.pre_round` → 回合开始棋盘 / 状态；
-- `ROUND.post_round_units` → 回合结束棋盘 / HP / 位置；
-- `ROUND.strategies / actions / events` → 公开策略、实际行动、公开事件；
-- `ROUND.effective_stats / battle_escalation` → 当前有效属性与战局升温展示；
-- `INTERMISSION.active_rule_before / active_rule_after` → 公共规则变化；
-- `choice / submitted_player_text / submission_public_code` → 玩家回合间决策。
-
-### Replay UI
-
-- 左侧/顶部时间线可选择任一 `ROUND` / `INTERMISSION` 节点；
-- 默认选择第一条 Round 1；
-- Round 节点同时显示“回合开始 / 回合结束”棋盘；
-- 显示红蓝 HP、位置、公开策略、实际行动、有效属性、公开事件、战局升温；
-- Intermission 节点显示玩家选择、规则制定次数、公共规则 before → after、提交结果；
-- 移动端降为单列布局；
-- 不调用模型，不展示 chain-of-thought / private memory。
-
-### 测试
-
-`replay.test.tsx` 从 2 个基础测试升级为 4 个 B3 测试：
-
-1. 时间线顺序 + 默认选择 Round 1；
-2. Round 1 pre/post 棋盘与 HP；
-3. 规则尝试 → continue → Round 2 节点切换，检查规则变化与移动距离 2 格；
-4. 隐私边界。
-
-合并前正式 frontend CI 预期：
+公共契约权威链现在固定为：
 
 ```text
-npm ci
-npm run typecheck
-npm run test   # 预计 5 文件 / 31 用例
-npm run build
+src/rules_beyond/api_contract.py              # canonical Pydantic source
+        ↓
+src/rules_beyond/openapi_contract.py          # canonical OpenAPI generator
+        ↓
+contracts/openapi/mvp-v0.2.json               # checked-in derived snapshot
+        ↓ openapi-typescript 7.13.0
+web/src/contract/generated/api.ts              # generated TypeScript, DO NOT EDIT
+        ↓
+web/src/contract/types.ts                      # thin aliases only
+        ↓
+Adapter / ViewModel / React
 ```
 
-## 当前可运行状态
+Shared PR #57 已加入 `tests/test_openapi_snapshot.py`，保证 checked-in OpenAPI JSON 必须结构等于 `contract_app.openapi()`；它不是第二 canonical source。
 
-```bash
-cd web
-npm ci
-npm run dev
+### 2. TypeScript generator
+
+精确锁定：
+
+```text
+openapi-typescript = 7.13.0
 ```
 
-当前 Mock 行为：
+`web/package.json`：
 
-- 初始页 → Round 1 自动完成 → PLAYER_DECISION；
-- Mock 提交 / 推进只切换 canonical fixture，不调用真实后端；
-- 终局进入 Replay 后可逐节点检查公开战局事实；
-- Replay 不自行推导规则是否合法、命中率、有效属性、升温或胜负。
+```text
+npm run contract:generate
+npm run contract:check
+```
 
-## 尚未完成
+其中：
 
-- B3：不做动画插值/自动播放进度条；如果后续需要，应另立产品任务。
-- B2 收尾：真实提交 / 推进时携带 `expected_revision` 与 `Idempotency-Key`，并处理服务端错误。
-- B4：真实 API Adapter + OpenAPI generated types。
-- B4 后删除 `MockScenarioBar` / `mock/scenarios.ts` 和临时手写 `src/contract/types.ts`。
+```text
+contract:generate
+→ openapi-typescript ../contracts/openapi/mvp-v0.2.json -o src/contract/generated/api.ts
 
-## Developer A 当前同步状态
+contract:check
+→ 重新生成
+→ git diff --exit-code -- src/contract/generated/api.ts
+```
 
-2026-09-09 核验：
+Node 20 GitHub runner 已实际生成成功；一次性 bootstrap workflow 已删除，不会进入最终 PR。
 
-- A0 DynamicRuleController V0.2：DONE（已合并）；
-- A1 MatchApplicationService：DONE（PR #50，main@a932100）；
-- A2 repository / revision / lock / idempotency：DONE（PR #52，main@ac44caeb）；
-- A3 FastAPI five-route vertical slice（Issue #53）：**PAUSED_BY_OWNER**，见根目录 `DEVELOPER_A_GATE.md`。
+### 3. 手写 contract 已收缩
 
-因此 B4 不得提前开始；必须等 `DEVELOPER_A_GATE.md` 改为 `READY` 且 A3 合并后，再进入 B4。
+`web/src/contract/types.ts` 不再人工声明完整：
 
-## 已知问题 / 技术债
+```text
+MatchSnapshot
+AdvanceResult
+RuleSubmissionResult
+ReplaySnapshot
+ErrorEnvelope
+以及其公共嵌套 DTO
+```
 
-- `src/contract/types.ts` 是 **TEMPORARY / NON-CANONICAL**；B4 必须由 OpenAPI generated types 替换。
-- Mock 的“继续下一回合”复用固定 `advance_round.json`，不会真实增加回合号；不得在前端模拟 Engine。
-- npm audit（Issue #45）：已用最小 patch 升级（vite 5.4.21 / vitest 2.1.9），advisory 16 → 6；剩余 6 条全部位于 dev/build/test 工具链且默认流程不可达，风险接受记录见 `web/NPM_AUDIT_2026-09-09.md`。
+现在这些类型全部是：
 
-## 下一步
+```ts
+components['schemas'][...]
+```
 
-1. Issue #45 PR（`frontend/npm-audit-v02`）通过正式 frontend CI 后等待 owner 复审，**不自动 merge**。
-2. Developer A 的 A3 仍由 `DEVELOPER_A_GATE.md` 暂停；解除后按 Issue #53 推进。
-3. A3 真实 FastAPI vertical slice 可调用且合并后，再进入 B4。
-4. 前端工具链 major 升级（vite ≥ 6.4.3 / vitest ≥ 4.1.11）另立任务，不在本次 PR 内。
+的薄 alias。
+
+由于 OpenAPI 对带默认值/nullable 字段可能生成 optional property，presentation adapter 只在 ViewModel 边界做安全归一化，例如：
+
+```text
+cooldown_weapons ?? []
+move_path ?? []
+after_round ?? null
+suggested_rephrase ?? null
+event.details ?? {}
+Replay optional nullable fields ?? null
+```
+
+这不是重新定义 API schema，也不改变游戏语义。
+
+### 4. API Adapter seam
+
+新增：
+
+```text
+web/src/contract/apiAdapter.ts
+```
+
+transport-neutral `MatchApiAdapter` 包含冻结五个操作：
+
+```text
+createMatch(seed?)
+getMatch(matchId)
+submitRule({ matchId, expectedRevision, idempotencyKey, playerText })
+advanceMatch({ matchId, expectedRevision, idempotencyKey })
+getReplay(matchId)
+```
+
+mutation command 的 `expectedRevision` 直接引用 generated request schema；`idempotencyKey` 明确存在于 transport command。
+
+**当前没有实现 fetch、base URL、CORS、HTTP status → UX 映射，也没有真实请求。**
+
+### 5. Mock / Replay 兼容
+
+现有链仍保持：
+
+```text
+checked-in fixtures
+→ mock/fixture adapter
+→ presentation ViewModel
+→ React
+```
+
+没有删除：
+
+```text
+MockScenarioBar
+mock/scenarios.ts
+fixtures
+```
+
+也没有让前端模拟 Engine、规则合法性、命中率、有效属性、战局升温或胜负。
+
+### 6. CI drift gate
+
+`.github/workflows/frontend.yml` 现在：
+
+- `contracts/openapi/mvp-v0.2.json` 变动也会触发 frontend CI；
+- `npm ci` 后先执行 `npm run contract:check`；
+- 然后才执行 typecheck / tests / production build。
+
+因此后端同步 OpenAPI snapshot 后如果忘记更新 `generated/api.ts`，前端 CI 会失败。
+
+### 7. 测试
+
+新增：
+
+```text
+web/src/__tests__/generatedContract.test.ts
+```
+
+覆盖：
+
+1. canonical fixture 可通过 generated `MatchSnapshot / AdvanceResult / RuleSubmissionResult / ReplaySnapshot` alias；
+2. adapter seam 五个操作可实现；
+3. rule mutation command 明确携带 `expectedRevision + idempotencyKey + playerText`；
+4. advance mutation command 明确携带 `expectedRevision + idempotencyKey`。
+
+现有 privacy / Replay / fixture tests 保持，不放松断言。
+
+最终正式 CI 测试数以 Issue #55 PR 的 GitHub Actions 为准。
+
+## npm dependency audit 状态
+
+Issue #45 已使用最小 patch 完成：
+
+```text
+vite   5.4.11 → 5.4.21
+vitest 2.1.8  → 2.1.9
+```
+
+完整记录：`web/NPM_AUDIT_2026-09-09.md`。
+
+Issue #55 加入 `openapi-typescript@7.13.0` 后，Node 20 runner 的真实 `npm audit --json` 仍为：
+
+```text
+5 package nodes
+3 moderate
+1 high
+1 critical
+```
+
+与 #45 合并后的已知状态一致；没有新增 high / critical。剩余均为已记录的 Vite/Vitest dev/build/test-only major-upgrade 风险。
+
+不得执行 `npm audit fix --force`。
+
+## 当前已完成能力
+
+- React/Vite 应用外壳与中文游玩 UI；
+- fixture → adapter → ViewModel → React 单向数据流；
+- Round 1 无 pre-game rule；
+- accepted/rejected/terminal 状态；
+- 5×5 board / HP / strategy / action / rule / rule count / 战局升温；
+- selectable Replay timeline；
+- privacy whitelist；
+- 正式 frontend CI；
+- npm audit 最小 patch + residual-risk record；
+- checked-in OpenAPI derived snapshot + Python parity gate；
+- OpenAPI generated TS contract；
+- transport-neutral five-operation adapter seam。
+
+## 当前 Mock 限制
+
+- “继续下一回合”仍复用静态 `advance_round.json`，不会真的推进任意回合；这是有意限制，前端不得模拟 Engine。
+- MockScenarioBar / scenarios 仍保留，直到真实 B4 完成。
+
+## Developer A 当前状态
+
+```text
+A0 DynamicRuleController V0.2                 DONE
+A1 MatchApplicationService                    DONE
+A2 repository / revision / lock / idempotency DONE
+A3 FastAPI five-route vertical slice          PAUSED_BY_OWNER
+```
+
+根目录：
+
+```text
+DEVELOPER_A_GATE.md
+```
+
+仍是 authoritative execution gate。
+
+因此即使前端 generated contract / adapter seam 已准备好，**不得提前实现真实 HTTP adapter**。必须等：
+
+```text
+DEVELOPER_A_GATE = READY
+A3 Issue #53 实现完成
+A3 PR 经审核并 merge
+```
+
+之后才进入真正 B4。
+
+## 后续仍未完成
+
+1. Issue #55：等待正式 frontend CI / PR review / merge。
+2. A3：仍暂停。
+3. B4 real HTTP adapter：A3 merge 后实现 `fetch`、错误处理、真实 create/rule/advance/replay flow。
+4. B4 完成后再删除临时 mock scenario machinery。
+5. 前端工具链 major 升级（Vite ≥6.4.3 / Vitest ≥4.1.11）保持独立任务，不混入 B4。
 
 ## 下一位开发者必须先读
 
-1. `docs/GAMEPLAY_FLOW_V0.2.md`
-2. `docs/MVP_API_CONTRACT_V0.2.md`
-3. `contracts/README.md`
-4. `web/DEVELOPMENT_HANDOFF.md`
-5. `web/NPM_AUDIT_2026-09-09.md`
-6. Issue #37、#38、#45、#46、#53
-7. 最近 5–10 个 Git commits
+1. `DEVELOPER_A_GATE.md`
+2. `docs/GAMEPLAY_FLOW_V0.2.md`
+3. `docs/MVP_API_CONTRACT_V0.2.md`
+4. `contracts/README.md`
+5. `contracts/openapi/mvp-v0.2.json`
+6. `web/DEVELOPMENT_HANDOFF.md`
+7. `web/NPM_AUDIT_2026-09-09.md`
+8. Issue #38、#53、#55、#56
+9. 最近 5–10 个 main commits
