@@ -55,14 +55,18 @@ Browser React
 ```text
 M1 — Integrated Playable Acceptance
 ↓ GATE 1
+B5A — Core Causal-feedback Motion（Issue #63）
+↓ UI PRESENTATION GATE
 M2 — Agent A/B/C Evidence
 ↓ GATE 2
 M3 — Human Playtest
 ↓
-根据证据决定 Agent / 玩法 / UI 下一轮改动
+B5B — 根据证据决定视觉润色，以及 Agent / 玩法 / UI 下一轮改动
 ```
 
-这三步跑通前，默认不增加新的玩法系统。
+B5A 只补足玩家理解回合、公共规则与 Replay 所必需的因果反馈，不增加玩法，也不是装饰性大改版。M1 未通过前保持阻塞。
+
+这条主顺序跑通前，默认不增加新的玩法系统。
 
 ---
 
@@ -138,7 +142,58 @@ Agent richer plan
 
 ---
 
-# 4. M2 — Agent A/B/C Evidence
+# 4. B5A — Core Causal-feedback Motion
+
+跟踪 Issue：[#63](https://github.com/Niceskys/yyds/issues/63)
+
+状态：
+
+```text
+OWNER = Developer B
+STATUS = BLOCKED_BY_M1_GATE
+MAY_START = false
+DEVELOPER_A_ACTION = NONE
+CONTRACT_CHANGE = NOT_PLANNED
+```
+
+目标不是让页面“更炫”，而是让普通玩家能直接看懂：
+
+- 上一权威状态如何经过红蓝公开行动变成下一权威状态；
+- 移动、刀/弓攻击、命中/未命中和 HP 变化之间的关系；
+- 公共规则 accepted 后哪些公开属性发生变化；
+- 战局升温何时变化；
+- Replay before/after 与真实对局事实一致。
+
+实现只允许在前端表现层暂存 advance 前的权威 snapshot，并用服务端返回结果做过渡。不得改变 Engine 的同步结算语义，不得伪造行动优先级，不得修改 revision / idempotency / public contract。
+
+最低验收：
+
+1. 一次完整回合演出约 0.8–1.5 秒，且不会触发重复 mutation；
+2. accepted / rejected / MODEL_UNAVAILABLE 有清晰、可恢复的反馈；
+3. accepted 后仍需玩家点击继续；
+4. Replay 动画不再次调用模型、不改写历史事实；
+5. 支持 `prefers-reduced-motion`；
+6. 动画结束后的 UI 必须与 authoritative snapshot 完全一致；
+7. frontend test / build / hosted CI 全绿。
+
+B5A 明确不包含：
+
+```text
+新玩法
+新武器 / 回血 / 地形 / 多单位
+Engine / Planner / Rule DSL 修改
+WebSocket
+完整角色美术系统
+持续粒子背景
+纯装饰性 UI 大改版
+Developer A 后端工作
+```
+
+只有 M1 GATE 1 通过、并在 Issue #63 留下 `READY — 可以开始` 后，Developer B 才能从最新 main 开工。
+
+---
+
+# 5. M2 — Agent A/B/C Evidence
 
 目标：**回答 LLM Agent 是否真的值得保留，以及当前四分类结构是否足够。**
 
@@ -212,7 +267,7 @@ SIMPLIFY / REMOVE LLM STRATEGY LAYER
 
 ---
 
-# 5. M3 — Human Playtest
+# 6. M3 — Human Playtest
 
 目标：**确认玩家是否真的理解规则影响、AI 适应和“延长战斗”的乐趣。**
 
@@ -243,7 +298,7 @@ UI
 
 ---
 
-# 6. 当前明确 Non-goals
+# 7. 当前明确 Non-goals
 
 在 M1–M3 得出结论前，继续推迟：
 
@@ -271,7 +326,7 @@ MCTS
 
 ---
 
-# 7. Developer A / B 调度规则
+# 8. Developer A / B 调度规则
 
 ## Developer A
 
@@ -291,9 +346,11 @@ B0–B4 已完成。新的前端工作必须建立新 Issue。
 
 M1 可以由 Shared / Developer B 执行 integration smoke 与必要的前端 integration bug 修复，但不能借 M1 扩大玩法范围。
 
+B5A 已建立 Issue #63，但状态为 `BLOCKED_BY_M1_GATE`。M1 GATE 1 通过并由 Shared Review 在 Issue 明确留下 READY 前，Developer B 不得开始复杂动效实现。
+
 ---
 
-# 8. 当前第一任务
+# 9. 当前第一任务
 
 **现在先做 M1 Integrated Playable Acceptance。**
 
@@ -301,7 +358,8 @@ M1 可以由 Shared / Developer B 执行 integration smoke 与必要的前端 in
 
 - 不解锁 Developer A 做新 Agent feature；
 - 不实现 C richer plan；
+- 不启动 Issue #63 / B5A；
 - 不做 UI 大改版；
 - 不提前做真人玩法扩展。
 
-M1 完成后，Shared Review 再决定 M2 的具体实验任务拆分。
+M1 完成后，Shared Review 先复核 Issue #63 的 contract 缺口并决定是否放行 B5A；B5A 的 UI PRESENTATION GATE 通过后再进入 M2。
