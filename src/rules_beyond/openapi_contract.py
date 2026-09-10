@@ -1,96 +1,31 @@
+"""Frozen V0.2 OpenAPI entry point.
+
+``contracts/openapi/mvp-v0.2.json`` is a checked-in derived artifact of
+``contract_app.openapi()`` and is consumed by Developer B's code generator
+(``web/src/contract/generated/api.ts``). ``tests/test_openapi_snapshot.py`` and the
+frontend ``contract:check`` job both fail if this app and the snapshot drift.
+
+A3 therefore wires the real five routes (see :mod:`rules_beyond.api_app`) into the
+same frozen OpenAPI surface: title / version / description / paths / methods /
+request bodies / response models / required ``Idempotency-Key`` header are
+unchanged. Any real schema change must be raised as ``CONTRACT CHANGE REQUIRED``.
+"""
+
 from __future__ import annotations
 
 import argparse
 import json
 from pathlib import Path
-from typing import Annotated
 
-from fastapi import FastAPI, Header, HTTPException, status
+from fastapi import FastAPI
 
-from .api_contract import (
-    AdvanceRequest,
-    AdvanceResult,
-    CreateMatchRequest,
-    ErrorEnvelope,
-    MatchSnapshot,
-    ReplaySnapshot,
-    RuleSubmissionRequest,
-    RuleSubmissionResult,
-)
-
-
-def _not_implemented() -> None:
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Contract-only route. MatchApplicationService is implemented after the V0.2 controller cadence migration.",
-    )
+from .api_app import build_app
 
 
 def build_contract_app() -> FastAPI:
-    app = FastAPI(
-        title="Rules Beyond MVP API",
-        version="0.2.0",
-        description=(
-            "Frozen MVP V0.2 public HTTP contract for the every-round player-decision flow. "
-            "Route bodies are implemented by MatchApplicationService later."
-        ),
-    )
+    """OpenAPI/contract app: the real five routes without runtime provider wiring."""
 
-    @app.post(
-        "/api/v1/matches",
-        response_model=MatchSnapshot,
-        status_code=status.HTTP_201_CREATED,
-        responses={400: {"model": ErrorEnvelope}},
-    )
-    async def create_match(request: CreateMatchRequest) -> MatchSnapshot:
-        del request
-        _not_implemented()
-
-    @app.get(
-        "/api/v1/matches/{match_id}",
-        response_model=MatchSnapshot,
-        responses={404: {"model": ErrorEnvelope}},
-    )
-    async def get_match(match_id: str) -> MatchSnapshot:
-        del match_id
-        _not_implemented()
-
-    @app.post(
-        "/api/v1/matches/{match_id}/rules",
-        response_model=RuleSubmissionResult,
-        responses={409: {"model": ErrorEnvelope}, 503: {"model": ErrorEnvelope}},
-    )
-    async def submit_rule(
-        match_id: str,
-        request: RuleSubmissionRequest,
-        idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
-    ) -> RuleSubmissionResult:
-        del match_id, request, idempotency_key
-        _not_implemented()
-
-    @app.post(
-        "/api/v1/matches/{match_id}/advance",
-        response_model=AdvanceResult,
-        responses={409: {"model": ErrorEnvelope}, 503: {"model": ErrorEnvelope}},
-    )
-    async def advance_match(
-        match_id: str,
-        request: AdvanceRequest,
-        idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
-    ) -> AdvanceResult:
-        del match_id, request, idempotency_key
-        _not_implemented()
-
-    @app.get(
-        "/api/v1/matches/{match_id}/replay",
-        response_model=ReplaySnapshot,
-        responses={404: {"model": ErrorEnvelope}},
-    )
-    async def get_replay(match_id: str) -> ReplaySnapshot:
-        del match_id
-        _not_implemented()
-
-    return app
+    return build_app()
 
 
 contract_app = build_contract_app()

@@ -91,7 +91,7 @@ Engine 同步结算一个完整回合
 
 # 4. 当前最重要的开发顺序
 
-A0 Controller cadence migration 已完成并合并。A1 MatchApplicationService 已完成并合并（PR #50）。A2 多对局 repository / revision / lock / idempotency 已实现，等待 PR 审核。
+A0 Controller cadence migration 已完成并合并。A1 MatchApplicationService 已完成并合并（PR #50）。A2 多对局 repository / revision / lock / idempotency 已完成并合并（PR #52）。A3 FastAPI 五路由 vertical slice 已实现，等待 PR 审核。
 
 当前固定顺序：
 
@@ -106,9 +106,9 @@ controller regression tests                [A0 DONE]
 ↓
 MatchApplicationService                    [A1 DONE]
 ↓
-in-memory repository / revision / per-match lock / idempotency   [A2 IMPLEMENTED — PR 审核中]
+in-memory repository / revision / per-match lock / idempotency   [A2 DONE]
 ↓
-real FastAPI five-route vertical slice     [A3]
+real FastAPI five-route vertical slice     [A3 IMPLEMENTED — PR 审核中]
 ↓
 Developer B B4 real API integration
 ↓
@@ -162,8 +162,8 @@ docs/MVP_FIRST_TASKS.md
 
 ```text
 A1 MatchApplicationService                          [DONE]
--> A2 in-memory repository + revision / lock / idempotency   [IMPLEMENTED — PR 审核中]
--> A3 real FastAPI five-route vertical slice
+-> A2 in-memory repository + revision / lock / idempotency   [DONE]
+-> A3 real FastAPI five-route vertical slice        [IMPLEMENTED — PR 审核中]
 -> Developer B B4 real API integration
 ```
 
@@ -219,6 +219,20 @@ battle_escalation
 ```
 
 Developer B 不得自行发明另一套类型。
+
+A3 已把五个路由接线为真实 HTTP 服务（分支 `backend/fastapi-v02`，PR 审核中）：
+
+```text
+src/rules_beyond/api_app.py      build_app(repository) + 五个真实路由
+src/rules_beyond/api_errors.py   唯一 typed error / RequestValidationError -> ErrorEnvelope 映射点
+src/rules_beyond/api_runtime.py  build_runtime_repository_from_env()
+src/rules_beyond/api_server.py   可执行 ASGI 入口
+
+启动（B4 用）：
+python -m rules_beyond.api_server --host 127.0.0.1 --port 8000
+```
+
+OpenAPI 与 `contracts/openapi/mvp-v0.2.json` 保持逐字节一致，未漂移。
 
 ---
 

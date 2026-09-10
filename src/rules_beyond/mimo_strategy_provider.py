@@ -11,6 +11,7 @@ from .mimo_rule_provider import (
     MimoJsonPostTransport,
     MimoProviderError,
     UrllibMimoJsonPostTransport,
+    ensure_https_url,
 )
 
 
@@ -35,8 +36,7 @@ class MimoStrategyModel:
             raise ValueError("api_key must be a non-empty string")
         if not isinstance(model_name, str) or not model_name.strip():
             raise ValueError("model_name must be a non-empty string")
-        if not isinstance(base_url, str) or not base_url.strip():
-            raise ValueError("base_url must be a non-empty string")
+        ensure_https_url(base_url, label="base_url")
         if timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
         if max_completion_tokens <= 0:

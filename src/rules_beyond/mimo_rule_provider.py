@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import os
 from typing import Any, Mapping, Protocol
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.parse import urlparse
+from urllib.request import HTTPRedirectHandler, OpenerDirector, Request, build_opener
 
 
 MIMO_TOKEN_PLAN_CN_BASE_URL = "https://token-plan-cn.xiaomimimo.com/v1"
@@ -18,6 +19,49 @@ MAX_HTTP_RESPONSE_BYTES = 1_048_576
 
 class MimoProviderError(RuntimeError):
     pass
+
+
+class MimoTransportSecurityError(MimoProviderError):
+    """Raised when a MiMo request would send credentials over an unsafe channel."""
+
+
+def ensure_https_url(url: str, *, label: str = "url") -> str:
+    """Reject a non-HTTPS URL before any ``api-key`` header can be transmitted."""
+
+    if not isinstance(url, str) or not url.strip():
+        raise ValueError(f"{label} must be a non-empty string")
+    if urlparse(url).scheme.lower() != "https":
+        raise ValueError(f"{label} must use https")
+    return url
+
+
+class CredentialSafeRedirectHandler(HTTPRedirectHandler):
+    """Refuse redirects that would resend the ``api-key`` header to another origin.
+
+    urllib follows 3xx responses automatically and replays the original request
+    headers, so a cross-host redirect would leak the API key to whatever host the
+    response points at. Only same-origin HTTPS redirects are followed.
+    """
+
+    def redirect_request(
+        self,
+        req: Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> Request | None:
+        origin = urlparse(req.full_url)
+        target = urlparse(newurl)
+        if (target.scheme.lower(), target.netloc.lower()) != (
+            origin.scheme.lower(),
+            origin.netloc.lower(),
+        ):
+            raise MimoTransportSecurityError(
+                "MiMo API transport refused a redirect that leaves the original origin"
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 class MimoJsonPostTransport(Protocol):
@@ -34,6 +78,11 @@ class MimoJsonPostTransport(Protocol):
 @dataclass(frozen=True, slots=True)
 class UrllibMimoJsonPostTransport:
     max_response_bytes: int = MAX_HTTP_RESPONSE_BYTES
+    opener: OpenerDirector = field(
+        default_factory=lambda: build_opener(CredentialSafeRedirectHandler()),
+        compare=False,
+        repr=False,
+    )
 
     def post_json(
         self,
@@ -43,11 +92,14 @@ class UrllibMimoJsonPostTransport:
         payload: Mapping[str, Any],
         timeout_seconds: float,
     ) -> Mapping[str, Any]:
+        # Cleartext is refused here as well, so a caller cannot bypass the
+        # provider-level base_url check and leak the api-key over HTTP.
+        ensure_https_url(url, label="MiMo endpoint URL")
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         request = Request(url, data=body, headers=dict(headers), method="POST")
 
         try:
-            with urlopen(request, timeout=timeout_seconds) as response:
+            with self.opener.open(request, timeout=timeout_seconds) as response:
                 raw = response.read(self.max_response_bytes + 1)
         except HTTPError as exc:
             raise MimoProviderError(f"MiMo API returned HTTP {exc.code}") from exc
@@ -75,6 +127,9 @@ class MimoRuleCandidateModel:
     The default endpoint targets the China Token Plan cluster. The provider only
     implements the narrow RuleCandidateModel contract and never receives Engine
     or GameState mutation capabilities.
+
+    ``base_url`` is required to be HTTPS, so a misconfigured deployment cannot send
+    the ``api-key`` header in cleartext.
     """
 
     def __init__(
@@ -91,8 +146,7 @@ class MimoRuleCandidateModel:
             raise ValueError("api_key must be a non-empty string")
         if not isinstance(model_name, str) or not model_name.strip():
             raise ValueError("model_name must be a non-empty string")
-        if not isinstance(base_url, str) or not base_url.strip():
-            raise ValueError("base_url must be a non-empty string")
+        ensure_https_url(base_url, label="base_url")
         if timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
         if max_completion_tokens <= 0:
