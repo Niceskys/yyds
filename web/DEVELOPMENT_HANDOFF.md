@@ -2,92 +2,120 @@
 
 ## 当前基线
 
-- integration baseline: `main@34df26d0d5fbda010b2ffed59df556246b34c0e6`
-- current Developer B state: **WAITING FOR A3 MERGE**
+- integration baseline: `main@873000a1c0c6b55835905bcaa94a5de07b60b581`
+- A3 merge: `b79b1da08a3ff5801b286b5f970f7e371fd85a08`（PR #59）
+- current Developer B state: **B4 CURRENT**
+- B4 Issue: #60
 - contract version: `mvp-v0.2`
 - B0 App Shell: DONE（PR #43）
 - B1 fixture UI: DONE（PR #43）
 - B3 selectable Replay: DONE（PR #47）
 - Issue #45 npm audit: DONE（PR #54）
 - Shared OpenAPI snapshot: DONE（Issue #56 / PR #57）
-- B4-prep generated TS + API adapter seam: DONE（Issue #55 / PR #58，merge `d34fa5cf6e301c585f662fd964e998820827e0dc`）
-- B4 real HTTP integration: **BLOCKED UNTIL A3 PR MERGES**
+- B4-prep generated TS + API adapter seam: DONE（Issue #55 / PR #58）
+- B4 real HTTP integration: **CURRENT — 可以开始**
 
-## 当前架构边界
-
-公共契约权威链：
+## 公共契约权威链
 
 ```text
-src/rules_beyond/api_contract.py              # canonical Pydantic source
+src/rules_beyond/api_contract.py
         ↓
-src/rules_beyond/openapi_contract.py          # canonical OpenAPI generator
+src/rules_beyond/openapi_contract.py
         ↓
-contracts/openapi/mvp-v0.2.json               # checked-in derived snapshot
+contracts/openapi/mvp-v0.2.json
         ↓ openapi-typescript 7.13.0
-web/src/contract/generated/api.ts              # generated TypeScript, DO NOT EDIT
+web/src/contract/generated/api.ts
         ↓
-web/src/contract/types.ts                      # thin aliases only
+web/src/contract/types.ts
         ↓
-Adapter / ViewModel / React
+MatchApiAdapter / ViewModel / React
 ```
 
-Mock 链继续保留：
+不要手写第二套 DTO；OpenAPI/generated TS 仍由现有 parity / `contract:check` 守卫。
+
+## A3 已完成能力
+
+真实 backend 已合并：
 
 ```text
-checked-in fixtures
-→ mock/fixture adapter
-→ presentation ViewModel
-→ React
+POST /api/v1/matches
+GET  /api/v1/matches/{match_id}
+POST /api/v1/matches/{match_id}/rules
+POST /api/v1/matches/{match_id}/advance
+GET  /api/v1/matches/{match_id}/replay
 ```
 
-前端不得计算/推导：
+本地启动：
+
+```bash
+python -m rules_beyond.api_server --host 127.0.0.1 --port 8000
+```
+
+或：
+
+```bash
+uvicorn rules_beyond.api_server:create_runtime_app --factory --host 127.0.0.1 --port 8000
+```
+
+A3 最终 CI / Shared Review：
 
 ```text
-Engine legality
-hit probability
-battle escalation
-terminal result
-effective stats
-rule validity
+308 tests PASS
+behavior-diagnostics PASS
+dynamic-rule-replacement-v02 PASS
+OpenAPI snapshot parity unchanged
 ```
 
-普通玩家 UI 继续隐藏：
+## Provider failure 的最终 B4 语义
+
+**不要把“模型失败”统一当成 HTTP 503。**
+
+### Strategy provider/model failure
 
 ```text
-conflict_level
-hard_liveness
-hard_liveness_active
-private_memory
-raw_model_output
-system_prompt
-provider body
-stack / traceback
+HTTP 200 AdvanceResult
+round 正常完成并提交
+失败方 PublicStrategyDecision.status = FALLBACK_MODEL_ERROR
+degraded = true
 ```
 
-## B4-prep（已合并）
+前端可显示非阻断的“模型降级策略”提示，但对局继续正常展示。
 
-### Generated contract
-
-精确锁定：
+### Rule provider/model failure
 
 ```text
-openapi-typescript = 7.13.0
+HTTP 200 RuleSubmissionResult
+accepted = false
+public_code = MODEL_UNAVAILABLE
+revision 不增加
+rule_change_count 不增加
+仍处于 PLAYER_DECISION
+can_submit_rule = true
 ```
 
-脚本：
+前端提示“模型暂时不可用，可稍后重新提交”，不要当 503。
+
+### 真正的 RecoverableMatchFailure
 
 ```text
-npm run contract:generate
-npm run contract:check
+HTTP 503
+ErrorEnvelope.error.code = INTERNAL_ERROR
+retryable = true
 ```
 
-`contract:check` 会重新生成 `web/src/contract/generated/api.ts` 并用 `git diff --exit-code` 检查漂移。
+前端保留原 authoritative snapshot，不自行推进；同一次未知结果的用户意图重试必须复用原 Idempotency-Key。
 
-`web/src/contract/types.ts` 已不再人工维护完整 `MatchSnapshot / AdvanceResult / RuleSubmissionResult / ReplaySnapshot / ErrorEnvelope`，只从 generated `components['schemas'][...]` 建薄 alias。
+## B4 当前任务
 
-### API adapter seam
+正式 Issue：#60。
 
-`web/src/contract/apiAdapter.ts` 定义 transport-neutral `MatchApiAdapter`：
+建议分支：
+
+```text
+frontend/real-api-v02
+```
+
+实现真实 `HttpMatchApiAdapter`，复用 #55 的 transport-neutral `MatchApiAdapter`：
 
 ```text
 createMatch(seed?)
@@ -97,140 +125,147 @@ advanceMatch({ matchId, expectedRevision, idempotencyKey })
 getReplay(matchId)
 ```
 
-当前仍**没有**真实 `fetch` / base URL / CORS / HTTP error UX；这些属于 A3 merge 后的 B4。
+主流程从：
 
-### CI
+```text
+fixtures/mock → ViewModel → React
+```
 
-`.github/workflows/frontend.yml`：
+切到：
+
+```text
+FastAPI V0.2 → HttpMatchApiAdapter → generated DTO → existing ViewModel → React
+```
+
+## Revision / Idempotency-Key
+
+- `expected_revision` 永远取当前服务端 snapshot；
+- 新用户意图生成新 Idempotency-Key；
+- 同一次用户意图因网络错误/结果未知而 retry，必须复用原 key；
+- 前端禁止本地 `revision + 1`；
+- 409 `REVISION_CONFLICT` 后重新 GET authoritative snapshot，不自动重放旧 mutation。
+
+## ErrorEnvelope UX
+
+集中处理，不要在组件里分散解析：
+
+```text
+MATCH_NOT_FOUND
+REVISION_CONFLICT
+IDEMPOTENCY_KEY_REQUIRED
+INVALID_REQUEST
+MATCH_TERMINAL
+RULE_SUBMISSION_NOT_ALLOWED
+ADVANCE_NOT_ALLOWED
+INTERNAL_ERROR
+```
+
+不得把 raw body、stack、provider raw error、system prompt、private memory、API key 显示到 UI。
+
+## 正式游玩流程
+
+```text
+开始游戏
+→ createMatch
+→ RUNNING / revision 0
+→ 用户继续
+→ advance Round 1
+→ PLAYER_DECISION
+→ rejected rule 可重试
+→ MODEL_UNAVAILABLE 可重试
+→ accepted 后锁规则输入，但不自动 advance
+→ 用户继续
+→ advance 下一完整 Round
+→ ...
+→ terminal
+```
+
+第一回合前规则输入仍不可用。前端不模拟 Engine、命中率、规则合法性、effective stats、battle escalation 或 terminal。
+
+## Replay
+
+正式 Replay 使用：
+
+```text
+GET /api/v1/matches/{match_id}/replay
+```
+
+继续复用现有 B3：
+
+```text
+ReplaySnapshot → Replay Adapter → Replay ViewModel → Replay UI
+```
+
+不要从当前 UI 反推 Replay，也不要重新计算 round/events。
+
+## Mock 收口
+
+B4 完成后，正式游玩路径不得继续依赖：
+
+```text
+advance_round.json
+rule_accepted.json
+rule_rejected.json
+match_terminal.json
+MockScenarioBar
+```
+
+但 `contracts/fixtures/mvp-v0.2/**` 继续保留作为 contract / ViewModel regression 资产。
+
+## 本地连接
+
+优先使用 Vite dev proxy / 同源风格连接 `/api/v1`，不要为了本地开发擅自在后端放开 `CORS *`。
+
+API base 必须可配置；production 不应硬编码 `127.0.0.1:8000`。
+
+## Loading / duplicate action
+
+mutation 进行中：
+
+- 对应按钮 loading；
+- 阻止重复点击生成多个不同 key；
+- 不锁死无关只读 UI；
+- 网络结果未知时保留原 snapshot，并用同 key retry。
+
+terminal 后 submit/advance 全禁用，Replay / 状态查看保持可用。
+
+## 最低验证
+
+至少通过：
 
 ```text
 npm ci
-→ npm run contract:check
-→ typecheck
-→ tests
-→ production build
+npm run contract:check
+npm run typecheck
+npm run test
+npm run build
 ```
 
-`contracts/openapi/mvp-v0.2.json` 变化也会触发 frontend CI。
+测试至少覆盖：create、Round 1、accepted/rejected、MODEL_UNAVAILABLE、FALLBACK_MODEL_ERROR、503、Idempotency-Key retry、409 resync、Replay、terminal、unknown event fallback、privacy、loading duplicate guard、正式主流程不再由 fixture 推进。
 
-PR #58 最终正式 CI：
-
-```text
-contract:check PASS
-typecheck PASS
-6 test files / 33 tests PASS
-production build PASS
-Python tests PASS
-```
-
-## npm audit 状态
-
-Issue #45 已做最小 patch：
-
-```text
-vite   5.4.11 → 5.4.21
-vitest 2.1.8  → 2.1.9
-```
-
-加入 `openapi-typescript@7.13.0` 后，runner 实际状态仍是：
-
-```text
-5 package nodes
-3 moderate
-1 high
-1 critical
-```
-
-没有新增 high / critical。完整风险记录见 `web/NPM_AUDIT_2026-09-09.md`。不得执行 `npm audit fix --force`。
-
-## 当前 UI / Mock 能力
-
-- 初始页《规则之外》+ 开始游戏；
-- Round 1 无 pre-game rule；
-- 5×5 board / HP / public strategy / action / rule / rule count / 战局升温；
-- accepted / rejected / terminal 状态；
-- selectable Replay timeline；
-- fixture → adapter → ViewModel → React；
-- privacy whitelist；
-- `MockScenarioBar` / `mock/scenarios.ts` / fixtures 仍保留。
-
-Mock 的“继续下一回合”仍复用静态 `advance_round.json`，不会真实推进任意回合；这是有意限制，前端不得模拟 Engine。
+不得执行 `npm audit fix --force`。
 
 ## Developer A 当前状态
 
-2026-09-10 Shared Review 已完成 MiMo/provider runtime 只读审计并解除 Gate。
-
-权威状态：
+根目录 `DEVELOPER_A_GATE.md`：
 
 ```text
-A0 DynamicRuleController V0.2                 DONE
-A1 MatchApplicationService                    DONE
-A2 repository / revision / lock / idempotency DONE
-A3 FastAPI five-route vertical slice          READY
+DEVELOPER_A_GATE = PAUSED_BY_OWNER
+LAST_COMPLETED_TASK = A3 FastAPI V0.2 five-route vertical slice
+DO_NOT_START = true
 ```
 
-根目录 `DEVELOPER_A_GATE.md` 当前：
+A0/A1/A2/A3 全部 DONE。Developer A 当前不应开始旧 Day 4/Day 5 或任何新后端任务，直到 Shared Review 明确批准新的 Issue。
 
-```text
-DEVELOPER_A_GATE = READY
-CURRENT_TASK = A3 FastAPI V0.2 five-route vertical slice
-ISSUE = #53
-DO_NOT_START = false
-```
-
-Gate 解除提交：
-
-```text
-34df26d0d5fbda010b2ffed59df556246b34c0e6
-```
-
-Issue #53 标题已改为 `[READY][Developer A]`，并有新的 READY 评论。A3 启动时必须从最新 main 新建 `backend/fastapi-v02`。
-
-A3 额外启动约束已写入 Gate / #53：
-
-- production `MIMO_BASE_URL` 必须 HTTPS；
-- 防止携带 `api-key` 的 urllib 请求跨主机 redirect；
-- TestClient 所需 `httpx` 必须显式加入 dev dependency；
-- A3 必须提供真正可启动给 B4 使用的 ASGI server 入口 + runtime dependency；
-- import/OpenAPI export 不得依赖 `MIMO_API_KEY`；
-- A3 不得自行改 `web/**` 或 public OpenAPI；需要改 contract 时必须 `CONTRACT CHANGE REQUIRED` 交 Shared Review 同步 snapshot + generated TS。
-
-## Developer B 下一步
-
-**现在不要实现真实 HTTP adapter。**
-
-等待：
-
-```text
-A3 implementation
-→ A3 PR
-→ Shared Review 审核五路由 / ErrorEnvelope / idempotency / provider safety / runnable server
-→ A3 merge
-```
-
-之后 Developer B 才进入 B4：
-
-```text
-真实 HTTP MatchApiAdapter
-→ create match
-→ Round 1 advance
-→ accepted/rejected rule submit
-→ next advance
-→ snapshot/replay
-→ revision + Idempotency-Key + ErrorEnvelope UX
-→ 最终删除 MockScenarioBar / mock scenarios（确认真实 flow 稳定后）
-```
-
-B4 优先采用 Vite dev proxy / 同源部署方式；不要在没有需要时扩大 CORS。
-
-## 下一位开发者必须先读
+## 下一位 Developer B 必须先读
 
 1. `DEVELOPER_A_GATE.md`
-2. `docs/GAMEPLAY_FLOW_V0.2.md`
-3. `docs/MVP_API_CONTRACT_V0.2.md`
-4. `contracts/README.md`
-5. `contracts/openapi/mvp-v0.2.json`
-6. `web/DEVELOPMENT_HANDOFF.md`
-7. `web/NPM_AUDIT_2026-09-09.md`
-8. Issue #38、#53、#55、#56
-9. 最近 5–10 个 main commits
+2. Issue #60
+3. PR #59 / A3 handoff
+4. `docs/GAMEPLAY_FLOW_V0.2.md`
+5. `docs/MVP_API_CONTRACT_V0.2.md`
+6. `contracts/README.md`
+7. `contracts/openapi/mvp-v0.2.json`
+8. `web/DEVELOPMENT_HANDOFF.md`
+9. `web/NPM_AUDIT_2026-09-09.md`
+10. 最近 5–10 个 main commits
