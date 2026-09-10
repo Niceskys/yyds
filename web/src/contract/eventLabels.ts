@@ -39,12 +39,13 @@ const KNOWN_PRESENTERS: Record<
   (event: RoundEventPublicView) => EventPresentation
 > = {
   ATTACK_RESOLVED: (event) => {
-    const weapon = labelWeapon(asString(event.details.weapon));
-    const hit = event.details.hit;
+    const details = event.details ?? {};
+    const weapon = labelWeapon(asString(details.weapon));
+    const hit = details.hit;
     const parts: string[] = [];
     if (weapon) parts.push(`武器：${weapon}`);
     if (typeof hit === 'boolean') parts.push(hit ? '命中' : '未命中');
-    const distance = asNumber(event.details.distance);
+    const distance = asNumber(details.distance);
     if (distance !== null) parts.push(`距离：${distance} 格`);
     return {
       label: '攻击结算',
@@ -52,11 +53,12 @@ const KNOWN_PRESENTERS: Record<
     };
   },
   DAMAGE_APPLIED: (event) => {
-    const amount = asNumber(event.details.amount);
-    const before = asNumber(event.details.hp_before);
-    const after = asNumber(event.details.hp_after);
-    const attacker = teamName(event.actor ?? event.details.attacker);
-    const target = teamName(event.details.target);
+    const details = event.details ?? {};
+    const amount = asNumber(details.amount);
+    const before = asNumber(details.hp_before);
+    const after = asNumber(details.hp_after);
+    const attacker = teamName(event.actor ?? details.attacker);
+    const target = teamName(details.target);
     const parts: string[] = [];
     if (amount !== null) parts.push(`造成 ${amount} 点伤害`);
     if (before !== null && after !== null) {
