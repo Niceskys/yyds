@@ -529,17 +529,29 @@ src/rules_beyond/match_application_service.py
 - 未实现 repository / revision CAS / per-match lock / Idempotency-Key / FastAPI（A2 / A3）
 ```
 
-A2 已实现（Issue #51，分支 `backend/repository-concurrency-v02`，PR 审核中）：
+A2 已完成并合并（Issue #51 / PR #52，分支 `backend/repository-concurrency-v02`）：
 
 ```text
 src/rules_beyond/match_repository.py
 - InMemoryMatchRepository：match_id lookup / 唯一性与碰撞重试
 - MatchServiceFactory：每个 match 一套独立 MatchApplicationService + RED/BLUE session
 - per-match threading.Lock：不同 match 可并发，provider/Planner/Engine 不在全局锁内
-- expected_revision CAS：不匹配抛 RevisionConflictError(REVISION_CONFLICT)
+- expected_revision CAS：不匹配抛 RevisionConflictError(REVISION_CONFLICT, retryable=true)
 - Idempotency-Key：lookup 在 revision check 之前；fingerprint = operation + expected_revision (+ player_text)
+- 空/纯空白 Idempotency-Key 抛 IdempotencyKeyRequiredError(IDEMPOTENCY_KEY_REQUIRED)；非法复用仍为 INVALID_REQUEST
 - 缓存 accepted/rejected rule 与 successful advance 的第一次 public result；异常不缓存
-- 未实现 FastAPI route / HTTP status / ErrorEnvelope（A3）
+```
+
+A3 已实现（Issue #53，分支 `backend/fastapi-v02`，PR 审核中）：
+
+```text
+src/rules_beyond/api_app.py / api_errors.py / api_runtime.py / api_server.py
+- 五个冻结路由接线到 InMemoryMatchRepository，route 不重实现 revision / lock / idempotency / gameplay
+- api_errors.py 是唯一 typed error / RequestValidationError -> ErrorEnvelope 映射点
+- 五个 endpoint 均为同步 def，由 Starlette 线程池执行，不阻塞 ASGI event loop
+- build_runtime_repository_from_env()：MIMO_API_KEY 必填、MIMO_BASE_URL 必须 HTTPS，provider 只在启动时构建
+- python -m rules_beyond.api_server / uvicorn rules_beyond.api_server:create_runtime_app --factory
+- OpenAPI 与 contracts/openapi/mvp-v0.2.json 保持逐字节一致（未漂移）
 ```
 
 当前后端顺序：
@@ -550,8 +562,8 @@ V0.2 gameplay contract
 → DynamicRuleController cadence migration        [DONE]
 → controller regression tests                     [DONE]
 → MatchApplicationService                        [DONE]
-→ in-memory repository / revision / lock / idempotency   [A2 IMPLEMENTED — PR 审核中]
-→ real FastAPI five-route vertical slice
+→ in-memory repository / revision / lock / idempotency   [DONE]
+→ real FastAPI five-route vertical slice         [A3 IMPLEMENTED — PR 审核中]
 → Developer B B4 real API integration
 ```
 
