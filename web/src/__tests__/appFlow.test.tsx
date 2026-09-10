@@ -6,9 +6,7 @@ import type {
   MatchApiAdapter,
   SubmitRuleCommand,
 } from '../contract/apiAdapter';
-import {
-  MatchApiRequestError,
-} from '../contract/httpApiAdapter';
+import { MatchApiRequestError } from '../contract/httpApiAdapter';
 import {
   loadAdvanceResult,
   loadMatchSnapshot,
@@ -19,6 +17,7 @@ import type {
   AdvanceResult,
   CreateMatchRequest,
   MatchSnapshot,
+  PublicStrategyDecision,
   ReplaySnapshot,
   RuleSubmissionResult,
 } from '../contract/types';
@@ -71,6 +70,15 @@ function sequentialKeyFactory() {
   return () => {
     count += 1;
     return `test-key-${count}`;
+  };
+}
+
+function degradedStrategy(strategy: PublicStrategyDecision | null): PublicStrategyDecision {
+  if (!strategy) throw new Error('test fixture expected a public strategy');
+  return {
+    ...strategy,
+    status: 'FALLBACK_MODEL_ERROR',
+    degraded: true,
   };
 }
 
@@ -202,28 +210,22 @@ describe('真实 API 游玩流程', () => {
 
   it('strategy fallback 是 200 正常 round，并以中文非阻断提示展示', async () => {
     const base = loadAdvanceResult();
+    const degradedLatest = degradedStrategy(base.match.latest_strategy.RED);
+    const degradedRound = degradedStrategy(base.round.strategies.RED);
     const degraded: AdvanceResult = {
       ...base,
       match: {
         ...base.match,
         latest_strategy: {
           ...base.match.latest_strategy,
-          RED: {
-            ...base.match.latest_strategy.RED,
-            status: 'FALLBACK_MODEL_ERROR',
-            degraded: true,
-          },
+          RED: degradedLatest,
         },
       },
       round: {
         ...base.round,
         strategies: {
           ...base.round.strategies,
-          RED: {
-            ...base.round.strategies.RED,
-            status: 'FALLBACK_MODEL_ERROR',
-            degraded: true,
-          },
+          RED: degradedRound,
         },
       },
     };
