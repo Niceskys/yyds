@@ -2,14 +2,14 @@
 
 ## 当前基线
 
-- integration baseline: `main@77b1b255`（PR #43 B0/B1、PR #44 frontend CI 已合并）
-- working branch: `frontend/replay-v02`
-- current task: Issue #46 — B3 可逐节点浏览的 V0.2 Replay
+- integration baseline: `main@29eeb1950d911acba292625b30a38cc7857a87b9`
+- working branch: `frontend/npm-audit-v02`
+- current task: Issue #45 — 前端 npm audit 依赖漏洞审计与最小升级
 - contract version: `mvp-v0.2`
-- B0: 完成并已合并
-- B1: 完成并已合并
-- B3: 本分支正在完成逐节点 Replay
-- B4: **未开始且当前阻塞**；Developer A 的 A0 尚未开始，FastAPI 五个 route 仍是 501
+- B0: 完成并已合并（PR #43）
+- B1: 完成并已合并（PR #43）
+- B3: 完成并已合并（PR #47，merge `6a930d7ae67dbc5d703bae15d669545fc272fc4e`）
+- B4: **未开始且当前阻塞**；Developer A 的 A3 由根目录 `DEVELOPER_A_GATE.md` 暂停（`PAUSED_BY_OWNER`）
 - Shared frontend CI: `.github/workflows/frontend.yml` 已进入 main
 
 ## 已完成
@@ -24,7 +24,18 @@
 - npm canonical `package-lock.json` 已入库；正式 frontend CI 使用 `npm ci` + typecheck + test + build。
 - B3 基础时间线第一条固定为 Round 1，不存在 Round 1 前规则阶段。
 
-## 本次 B3 实现
+## 本次 Issue #45 实现
+
+- 分支：`frontend/npm-audit-v02`（基于 `main@29eeb1950`）
+- 完整审计记录：`web/NPM_AUDIT_2026-09-09.md`
+- 最小升级：`vite` 5.4.11 → 5.4.21、`vitest` 2.1.8 → 2.1.9（均为同 major patch，精确版本锁定）
+- 结果：advisory 16 → 6（移除 critical `GHSA-9crc-q9x8-hgqq` + 9 条 vite dev-server advisory）
+- 未升级：vite 6/7/8、vitest 3/4、esbuild override；原因与触发条件见审计文档
+- 验证：`npm ci` / `typecheck` / 31 tests / `build` 全部 PASS；生产 bundle 哈希未变（`index-DQ3Uz6FI.js`）
+- 未执行 `npm audit fix --force`；未修改 backend / contracts / 业务 UI
+- B4 仍 blocked
+
+## B3 实现（已合并）
 
 Commit：`b2da3c9` — `feat(frontend): add selectable V0.2 replay inspection`
 
@@ -93,25 +104,25 @@ npm run dev
 
 2026-09-09 核验：
 
-- Issue #37 仍 open；
-- `backend/controller-v02-intermission` 分支不存在；
-- `DynamicRuleController` 仍是 V0.1 cadence；
-- FastAPI contract routes 仍全部返回 501。
+- A0 DynamicRuleController V0.2：DONE（已合并）；
+- A1 MatchApplicationService：DONE（PR #50，main@a932100）；
+- A2 repository / revision / lock / idempotency：DONE（PR #52，main@ac44caeb）；
+- A3 FastAPI five-route vertical slice（Issue #53）：**PAUSED_BY_OWNER**，见根目录 `DEVELOPER_A_GATE.md`。
 
-因此 B4 不得提前开始。Developer A 应先独立完成 A0，再按 A1 → A2 → A3 推进。
+因此 B4 不得提前开始；必须等 `DEVELOPER_A_GATE.md` 改为 `READY` 且 A3 合并后，再进入 B4。
 
 ## 已知问题 / 技术债
 
 - `src/contract/types.ts` 是 **TEMPORARY / NON-CANONICAL**；B4 必须由 OpenAPI generated types 替换。
 - Mock 的“继续下一回合”复用固定 `advance_round.json`，不会真实增加回合号；不得在前端模拟 Engine。
-- npm audit 报告 4 个传递依赖问题（Issue #45），禁止未经归因直接 `npm audit fix --force`。
+- npm audit（Issue #45）：已用最小 patch 升级（vite 5.4.21 / vitest 2.1.9），advisory 16 → 6；剩余 6 条全部位于 dev/build/test 工具链且默认流程不可达，风险接受记录见 `web/NPM_AUDIT_2026-09-09.md`。
 
 ## 下一步
 
-1. Issue #46 / B3 PR 通过正式 frontend CI 后合并。
-2. Developer A 同步启动 Issue #37 A0。
-3. A3 真实 FastAPI vertical slice 可调用后，再进入 B4。
-4. Issue #45 安全审计独立处理，不与 B3/B4 混 PR。
+1. Issue #45 PR（`frontend/npm-audit-v02`）通过正式 frontend CI 后等待 owner 复审，**不自动 merge**。
+2. Developer A 的 A3 仍由 `DEVELOPER_A_GATE.md` 暂停；解除后按 Issue #53 推进。
+3. A3 真实 FastAPI vertical slice 可调用且合并后，再进入 B4。
+4. 前端工具链 major 升级（vite ≥ 6.4.3 / vitest ≥ 4.1.11）另立任务，不在本次 PR 内。
 
 ## 下一位开发者必须先读
 
@@ -119,5 +130,6 @@ npm run dev
 2. `docs/MVP_API_CONTRACT_V0.2.md`
 3. `contracts/README.md`
 4. `web/DEVELOPMENT_HANDOFF.md`
-5. Issue #37、#38、#45、#46
-6. 最近 5–10 个 Git commits
+5. `web/NPM_AUDIT_2026-09-09.md`
+6. Issue #37、#38、#45、#46、#53
+7. 最近 5–10 个 Git commits
