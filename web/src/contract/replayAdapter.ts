@@ -140,13 +140,13 @@ function buildIntermissionEntryViewModel(
     lines: intermissionEntryLines(entry),
     afterRound: entry.after_round,
     choiceLabel: entry.choice === 'CONTINUE' ? '继续下一回合' : '尝试制定规则',
-    submittedPlayerText: entry.submitted_player_text,
+    submittedPlayerText: entry.submitted_player_text ?? null,
     submissionResultLabel: entry.submission_public_code
       ? labelSubmissionCode(entry.submission_public_code)
       : null,
-    acceptedRule: buildRuleViewModel(entry.accepted_rule),
-    activeRuleBefore: buildRuleViewModel(entry.active_rule_before),
-    activeRuleAfter: buildRuleViewModel(entry.active_rule_after),
+    acceptedRule: buildRuleViewModel(entry.accepted_rule ?? null),
+    activeRuleBefore: buildRuleViewModel(entry.active_rule_before ?? null),
+    activeRuleAfter: buildRuleViewModel(entry.active_rule_after ?? null),
     ruleChangeCountAfter: entry.rule_change_count_after,
   };
 }

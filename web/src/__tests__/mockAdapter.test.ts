@@ -108,8 +108,18 @@ describe('fixture → ViewModel adapter', () => {
     const round: RoundExecutionPublicView = {
       round_no: 7,
       strategies: {
-        RED: { intent: 'HOLD' },
-        BLUE: { intent: 'EVADE' },
+        RED: {
+          plan_version: 'intent-v0.1',
+          status: 'ACCEPTED',
+          intent: 'HOLD',
+          degraded: false,
+        },
+        BLUE: {
+          plan_version: 'intent-v0.1',
+          status: 'ACCEPTED',
+          intent: 'EVADE',
+          degraded: false,
+        },
       },
       actions: {
         RED: { attack: null, move_path: [] },

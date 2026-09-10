@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "contract:generate": "openapi-typescript ../contracts/openapi/mvp-v0.2.json -o src/contract/generated/api.ts",
+    "contract:check": "npm run contract:generate && git diff --exit-code -- src/contract/generated/api.ts"
   },
   "dependencies": {
     "react": "18.3.1",
@@ -24,6 +26,7 @@
     "@types/react-dom": "18.3.1",
     "@vitejs/plugin-react": "4.3.4",
     "jsdom": "25.0.1",
+    "openapi-typescript": "7.13.0",
     "typescript": "5.6.3",
     "vite": "5.4.21",
     "vitest": "2.1.9"
