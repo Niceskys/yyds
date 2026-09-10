@@ -121,6 +121,11 @@ export function App({
     try {
       const latest = await api.getMatch(matchId);
       setSnapshot(latest);
+      // MatchSnapshot cannot reconstruct the authoritative execution detail or
+      // previous submission result. Clear stale presentation state instead of
+      // pairing old round/feedback data with the newly resynced snapshot.
+      setLastRound(null);
+      setFeedback(null);
       setReplay(null);
     } catch {
       // Preserve the original authoritative snapshot and original conflict message.
