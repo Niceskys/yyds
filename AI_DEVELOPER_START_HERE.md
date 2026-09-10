@@ -104,7 +104,10 @@ richer-plan Agent
 WebSocket
 账号 / 排行
 UI 大改版
+B5A 动画实现
 ```
+
+核心因果反馈动画已建立 Developer B Issue #63，但当前为 `BLOCKED_BY_M1_GATE`，不是 M1 的并行实现任务。
 
 ---
 
@@ -152,6 +155,17 @@ Developer B 新工作必须建立新的 Issue。
 - 记录可复现 smoke 证据。
 
 不得借 M1 顺手加入新玩法。
+
+M1 通过后的下一项表现层任务已经预登记：
+
+```text
+B5A core causal-feedback motion
+Issue #63
+STATUS = BLOCKED_BY_M1_GATE
+DEVELOPER_A_ACTION = NONE
+```
+
+只有 M1 GATE 1 通过、Shared Review 在 Issue #63 留下 `READY — 可以开始` 后，Developer B 才能从最新 main 开工。该任务不得修改 Engine、Planner、Rule DSL、revision/idempotency 或 public contract。
 
 最新前端 handoff：
 
@@ -350,13 +364,17 @@ connectivity evidence
 
 ```text
 M1 Integrated Playable Acceptance   [CURRENT]
-↓
+↓ GATE 1
+B5A Core Causal-feedback Motion      [BLOCKED — Issue #63]
+↓ UI PRESENTATION GATE
 M2 Agent A/B/C Evidence              [NEXT]
-↓
+↓ GATE 2
 M3 Human Playtest                    [NEXT]
 ↓
-依据证据决定 Agent / 玩法 / UI 下一轮改动
+B5B / 依据证据决定 Agent、玩法、视觉与 UI 下一轮改动
 ```
+
+B5A 只负责让玩家看懂回合、规则影响、战局升温和 Replay，不等于完整美术升级。Developer A 继续保持 `PAUSED_BY_OWNER`，不会因为 Issue #63 被解锁。
 
 A/B/C 未出结果前，不因为“这是 AI 比赛”就默认继续增加 LLM 复杂度。
 
