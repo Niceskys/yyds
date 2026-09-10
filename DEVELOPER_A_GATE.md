@@ -14,7 +14,7 @@ LAST_COMPLETED_PR = #59
 A3_MERGE = b79b1da08a3ff5801b286b5f970f7e371fd85a08
 B4_MERGE = 8769649cf587862b72f241fc64b531e5fdbbdbe6
 CURRENT_APPROVED_BACKEND_TASK = NONE
-NEXT_SHARED_TASK = M1 Integrated Playable Acceptance
+NEXT_SHARED_TASK = M1 Integrated Playable Acceptance / Issue #64 / IN_PROGRESS
 PLANNED_FRONTEND_TASK = B5A / Issue #63 / BLOCKED_BY_M1_GATE
 DEVELOPER_A_ACTION_ON_B5A = NONE
 DO_NOT_START = true
@@ -32,11 +32,14 @@ A3 FastAPI five-route vertical slice                  DONE — PR #59
 B0/B1 React/Vite + fixture UI                         DONE
 B3 Replay                                             DONE
 B4 real HTTP integration                              DONE — PR #61
-M1 Integrated Playable Acceptance                      CURRENT
+M1 technical HTTP slice                                PASS — Issue #64
+M1 browser/live-provider Gate                          NOT PASSED — Issue #64
 B5A core causal-feedback motion / Issue #63            BLOCKED_BY_M1_GATE
 ```
 
 工程纵向切片已经接通。当前阶段不再是继续补 A0–A3 后端功能，而是进入新的 MVP 验收 / 实验阶段。
+
+M1 首轮记录见 `docs/experiments/M1_INTEGRATED_PLAYABLE_ACCEPTANCE_2026-09-10.md`。当前仅有确定性 Provider 的真实 HTTP 纵向切片证据；可见浏览器与 live Provider 尚未通过，所以 Developer A 继续保持暂停。
 
 Issue #63 是 Developer B 的后续表现层任务，不是 Developer A 授权。M1 GATE 1 与该 Issue 的 READY 均未完成前，任何人都不得把它当作当前开工任务；即使 B5A 后续放行，也不会自动解锁 Developer A。
 
