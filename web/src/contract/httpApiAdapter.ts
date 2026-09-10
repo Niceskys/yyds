@@ -48,8 +48,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+function isV02Payload(value: unknown): value is Record<string, unknown> {
+  return isRecord(value) && value.schema_version === 'mvp-v0.2';
+}
+
 function isErrorEnvelope(value: unknown): value is ErrorEnvelope {
-  if (!isRecord(value) || value.schema_version !== 'mvp-v0.2') return false;
+  if (!isV02Payload(value)) return false;
   const error = value.error;
   return (
     isRecord(error) &&
@@ -164,7 +168,7 @@ export class HttpMatchApiAdapter implements MatchApiAdapter {
       });
     }
 
-    if (payload === null) {
+    if (!isV02Payload(payload)) {
       throw new MatchApiRequestError({
         code: INVALID_RESPONSE_CODE,
         message: '游戏服务返回了无法识别的数据。',
