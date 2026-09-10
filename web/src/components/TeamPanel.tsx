@@ -28,6 +28,9 @@ export function TeamPanel({ team, action }: TeamPanelProps) {
               {strategy.label}
               {strategy.degraded ? '（已回退）' : ''}
             </li>
+            {strategy.degraded && strategy.statusLabel ? (
+              <li>策略状态：{strategy.statusLabel}</li>
+            ) : null}
             {strategy.shortTermGoalLabel ? (
               <li>本回合目标：{strategy.shortTermGoalLabel}</li>
             ) : null}
