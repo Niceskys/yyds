@@ -36,15 +36,35 @@ Fixture 生成器：
 src/rules_beyond/contract_fixtures.py
 ```
 
-## 生成 OpenAPI
+## OpenAPI 派生快照
 
-```bash
-python -m rules_beyond.openapi_contract --output /tmp/rules-beyond-openapi-v0.2.json
+从 B4 前置阶段开始，仓库固定保存：
+
+```text
+contracts/openapi/mvp-v0.2.json
 ```
 
-Developer B 可使用该 OpenAPI 生成 TypeScript 类型。不要手写另一套长期维护的 API schema。
+它是 `src/rules_beyond/openapi_contract.py` 的**派生快照**，用于前端生成 TypeScript 类型；它不是第二份 canonical schema，也禁止手工编辑。
 
-当前仓库**不要求 checked-in OpenAPI JSON 作为 B0/B1/B2/B3 的开工前提**。Mock 阶段允许使用：
+重新生成：
+
+```bash
+python -m rules_beyond.openapi_contract --output contracts/openapi/mvp-v0.2.json
+```
+
+`tests/test_openapi_snapshot.py` 保证：
+
+```text
+checked-in contracts/openapi/mvp-v0.2.json
+==
+contract_app.openapi() 当前生成结果
+```
+
+因此任何会改变 OpenAPI 的后端修改，都必须同步重新导出该 JSON；如果忘记同步，Python CI 必须失败。
+
+Developer B 可以直接使用该 checked-in OpenAPI 生成 TypeScript 类型，但不得手写另一套长期维护的 API schema。
+
+历史上 B0/B1/B2/B3 并不要求 checked-in OpenAPI JSON，Mock 阶段一直允许：
 
 ```text
 checked-in V0.2 fixtures
@@ -53,7 +73,7 @@ checked-in V0.2 fixtures
 → React components
 ```
 
-但 UI ViewModel 只是展示投影，不得复制完整 Python/Pydantic schema，也不得承载游戏裁判逻辑。真实 API 接入阶段应切换到 OpenAPI 生成类型。
+该历史结论仍然有效；现在新增 OpenAPI 派生快照，是为了 B4 / 真实 API 接入阶段建立可重复的代码生成链。UI ViewModel 仍只是展示投影，不得复制完整 Python/Pydantic schema，也不得承载游戏裁判逻辑。
 
 ## 完整 V0.2 fixture 集
 
@@ -173,6 +193,8 @@ BattleEscalationSnapshot → 战局升温
 
 - fixture 必须能够通过 Pydantic canonical schema 校验；
 - checked-in fixture 必须与 `build_fixtures()` 生成结果一致；
+- checked-in OpenAPI 必须与 `contract_app.openapi()` 生成结果一致；
+- `contracts/openapi/mvp-v0.2.json` 是派生资产，不得手工编辑；
 - `private_memory`、`raw_model_output`、system prompt、provider key、chain-of-thought 等不得进入本目录；
 - 修改公共 enum、字段名或字段语义前先判断是否属于 breaking change；
 - Engine / Rule DSL 的真实 enum 与公共 enum 由 contract tests 做一致性检查；
