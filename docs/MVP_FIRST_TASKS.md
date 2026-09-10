@@ -8,7 +8,7 @@ docs/MVP_API_CONTRACT_V0.2.md
 docs/SECOND_AUDIT_ACTION_PLAN_2026-09-08.md
 ```
 
-> 当前顺序：**A0 Controller 状态机迁移已完成并合并；A1 MatchApplicationService 已完成并合并（PR #50）；A2 repository / revision / lock / idempotency 已实现，等待 PR 审核；前端可继续按 V0.2 fixture 推进，A3 后再做 B4 真实 API 联调。**
+> 当前顺序：**A0 Controller 状态机迁移已完成并合并；A1 MatchApplicationService 已完成并合并（PR #50）；A2 repository / revision / lock / idempotency 已完成并合并（PR #52）；A3 FastAPI 五路由已实现，等待 PR 审核；前端可继续按 V0.2 fixture 推进，A3 merge 后再做 B4 真实 API 联调。**
 
 ---
 
@@ -156,7 +156,7 @@ intermission close
 不得把 `continue_match()` 之后、下一回合尚未 resolve 的中间状态作为正常对外
 PLAYER_DECISION 结果持久化/返回。
 
-## A2 — In-memory repository + revision / lock / idempotency【IMPLEMENTED — PR 审核中】
+## A2 — In-memory repository + revision / lock / idempotency【COMPLETED】
 
 建议分支：
 
@@ -167,7 +167,7 @@ backend/repository-concurrency-v02
 状态：
 
 ```text
-A2 = IMPLEMENTED
+A2 = COMPLETED（Issue #51 / PR #52）
 src/rules_beyond/match_repository.py
 docs/handoffs/2026-09-09-match-repository-concurrency-v02.md
 ```
@@ -186,9 +186,36 @@ completed_rounds / score_rounds
 battle escalation public projection
 ```
 
-## A3 — Real FastAPI five-route vertical slice
+## A3 — Real FastAPI five-route vertical slice【IMPLEMENTED — PR 审核中】
 
-严格按 V0.2 contract 实现五个路由。
+分支：
+
+```text
+backend/fastapi-v02
+```
+
+状态：
+
+```text
+A3 = IMPLEMENTED（Issue #53，PR 审核中）
+src/rules_beyond/api_app.py / api_errors.py / api_runtime.py / api_server.py
+docs/handoffs/2026-09-09-fastapi-vertical-slice-v02.md
+```
+
+五个路由已接线到 A2 repository；route 不重实现 revision / lock / idempotency / gameplay。
+typed error / RequestValidationError 由单一映射点转成 ErrorEnvelope。
+
+```text
+五个 endpoint 为同步 def（Starlette 线程池），不阻塞 ASGI event loop
+OpenAPI 与 contracts/openapi/mvp-v0.2.json 逐字节一致（未漂移）
+provider 只在真正启动时构建；import / export_openapi 不需要 MIMO_API_KEY
+```
+
+启动（B4 用）：
+
+```bash
+python -m rules_beyond.api_server --host 127.0.0.1 --port 8000
+```
 
 第一版继续不做：
 
@@ -198,6 +225,8 @@ Redis
 Celery
 微服务
 复杂数据库
+CORS 扩大配置
+鉴权 / 账号
 ```
 
 ## B4 — Real API integration
