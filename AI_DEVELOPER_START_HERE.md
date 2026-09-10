@@ -67,7 +67,15 @@ Developer B V0.2 umbrella Issue #38 已按 completed 关闭。
 
 ```text
 M1 — Integrated Playable Acceptance
+Issue #64
+STATUS = IN_PROGRESS
+TECHNICAL_HTTP_SLICE = PASS
+REAL_BROWSER_VISIBLE_FLOW = BLOCKED_BY_EXECUTION_ENVIRONMENT
+LIVE_PROVIDER_FLOW = NOT_RUN_NO_CREDENTIAL
+GATE_1 = NOT_PASSED
 ```
+
+首轮证据：`docs/experiments/M1_INTEGRATED_PLAYABLE_ACCEPTANCE_2026-09-10.md`。确定性 Provider 的真实 HTTP 通过不等于 live Provider 通过，HTTP/jsdom 也不等于可见浏览器通过。
 
 详见：
 
@@ -363,7 +371,7 @@ connectivity evidence
 # 12. 下一阶段顺序
 
 ```text
-M1 Integrated Playable Acceptance   [CURRENT]
+M1 Integrated Playable Acceptance   [CURRENT / Issue #64 / GATE NOT PASSED]
 ↓ GATE 1
 B5A Core Causal-feedback Motion      [BLOCKED — Issue #63]
 ↓ UI PRESENTATION GATE
