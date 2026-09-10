@@ -1,117 +1,164 @@
 # Developer A Execution Gate
 
-> **这是 Developer A / 负责后端的 AI 在开始任何非 trivial 开发前必须检查的执行闸门。**
+> **Developer A / 后端 AI 在进行任何非 trivial 开发前必须先检查本文件。**
 >
-> 本文件只决定“现在是否允许 Developer A 开始当前任务”，不替代 `AI_DEVELOPER_START_HERE.md`、Issue、API contract 或 handoff。
+> 本文件只决定“现在允许 Developer A 做什么”，不替代 `AI_DEVELOPER_START_HERE.md`、Issue、contract 或 handoff。
 
 ## CURRENT STATUS
 
 ```text
-DEVELOPER_A_GATE = READY
-CURRENT_TASK = A3 FastAPI V0.2 five-route vertical slice
+DEVELOPER_A_GATE = REVIEW_FIX_ONLY
+CURRENT_TASK = A3 PR #59 review-fix only
 ISSUE = #53
-DO_NOT_START = false
+PR = #59
+WORKING_BRANCH = backend/fastapi-v02
+DO_NOT_START_NEW_TASK = true
 ```
 
 ## 当前授权
 
-Developer A 现在可以开始 Issue #53 / A3，实现必须从最新远端 `main` 创建新的工作分支，不能继续使用暂停前缓存的工作区。
+A3 主体已经实现并进入 PR #59。Developer A **不得重新开始 A3，也不得开始旧 Day 4 / Day 5 或其他新的后端产品任务**。
 
-当前集成基线在解除 Gate 时为：
-
-```text
-main@d34fa5cf6e301c585f662fd964e998820827e0dc
-```
-
-开始前仍必须重新读取远端 `main`；如果 main 已前进，以最新远端为准。
-
-## A3 启动前必须重新读取
-
-1. `DEVELOPER_A_GATE.md`
-2. `AI_DEVELOPER_START_HERE.md`
-3. Issue #53 及其最新 READY 评论
-4. `docs/GAMEPLAY_FLOW_V0.2.md`
-5. `docs/MVP_API_CONTRACT_V0.2.md`
-6. A1/A2 handoff
-7. `contracts/README.md`
-8. 最近 10 个 main commits
-
-建议工作分支：
+当前只允许：
 
 ```text
-backend/fastapi-v02
+读取最新 main / Issue #53 / PR #59 / Shared Review 评论
+继续已有 backend/fastapi-v02
+修复 PR #59 明确列出的 review blocker
+运行测试 / CI
+更新 A3 handoff 与 PR 描述
+push 到原 PR #59
 ```
 
-## Shared Review 的 Provider/runtime 启动补充约束
+禁止：
 
-2026-09-10 在解除暂停前已对现有 MiMo provider 与 A1/A2 wiring 做只读审计。A3 除原 Issue #53 外必须同时满足以下要求：
+```text
+新建另一个 A3 分支或 PR
+开始新的 backend feature
+开始旧 Day 4 / Day 5
+修改 Developer B web/**
+扩大 public schema / OpenAPI
+重写 A1/A2 revision / lock / idempotency
+修改 gameplay / Engine / Controller cadence / Rule DSL / Validator
+引入 DB / Redis / Celery / WebSocket / 账号 / leaderboard
+```
 
-### 1. MiMo API key transport hardening
+## 当前唯一 review-fix
 
-现有 provider 使用同步 `urllib`，把 `api-key` 放在 HTTP Header 中；`MIMO_BASE_URL` 当前仅要求非空。
+PR #59 的 A3 主体已经通过 Shared Review。当前只剩一个 **B4-facing provider failure 语义收尾**：
 
-Production runtime 必须：
+### 1. Strategy provider failure
 
-- 拒绝非 HTTPS 的 `MIMO_BASE_URL`；
-- 防止带 `api-key` 的请求被自动跨主机 redirect 后继续发送；
-- 不把 API key、请求 Header、provider raw body、system prompt 或 private memory 写入日志 / ErrorEnvelope。
+Authoritative 语义：
 
-允许为完成此安全边界做**最小 provider transport hardening + tests**；这不构成 gameplay / public API scope expansion。
+```text
+strategy provider/model failure
+→ IsolatedStrategyAgent fallback
+→ HTTP 200 AdvanceResult
+→ round 正常完成并提交
+→ 失败方 PublicStrategyDecision.status = FALLBACK_MODEL_ERROR
+→ degraded = true
+```
 
-### 2. HTTP TestClient 依赖必须显式
+这不是 503。
 
-Issue #53 要求 FastAPI `TestClient` HTTP 测试，而当前 `pyproject.toml` 的 dev 依赖只有 `pytest`。
+必须新增 HTTP regression test，且 response 不得泄露 raw provider exception。
 
-A3 可以且应加入测试所需的 `httpx` dev dependency；不要依赖 runner 恰好预装。
+### 2. Rule provider failure
 
-### 3. A3 必须真正可供 B4 启动
+Authoritative 语义：
 
-A3 完成后不能只有 TestClient。必须提供可执行的本地 ASGI server 入口与文档化启动命令，使 Developer B 能真实发 HTTP 请求。
+```text
+rule provider/model failure
+→ HTTP 200 RuleSubmissionResult
+→ accepted = false
+→ public_code = MODEL_UNAVAILABLE
+→ revision 不增加
+→ rule_change_count 不增加
+→ intermission 保持可继续提交
+```
 
-如果仓库缺少 ASGI server runtime dependency，应加入最小、明确的 runtime dependency（例如 uvicorn 或等价方案），不要要求开发者依赖全局安装。
+这不是 503。
 
-同时：
+必须新增 HTTP regression test，且 response 不得泄露 raw provider exception。
 
-- import / OpenAPI export 不得要求 `MIMO_API_KEY`；
-- runtime repository/provider 只能在真正启动 runtime 时构建；
-- 不增加第六个业务 route，不用 health route 绕过冻结五路由约束。
+### 3. 真正的 503
 
-### 4. OpenAPI / frontend generated contract 协调
+只有真正的：
 
-Developer B 的 #55 已合并，当前存在：
+```text
+RecoverableMatchFailure
+```
+
+即完整 round / mutation 无法安全完成时，才映射：
+
+```text
+503 INTERNAL_ERROR
+retryable = true
+```
+
+### 4. 文档修正
+
+必须修正：
+
+```text
+docs/handoffs/2026-09-09-fastapi-vertical-slice-v02.md
+PR #59 描述
+```
+
+不得再写成“`/advance`、`/rules` 真实 provider 失败都会 503”。
+
+## A3 已通过的边界，不要重做
+
+Shared Review 已确认以下主体方向成立：
+
+- 五个 FastAPI 路由只调用 A2 repository；
+- ErrorEnvelope / RequestValidationError 集中映射；
+- route 使用同步 `def`，同步 provider/repository 不直接阻塞 ASGI event loop；
+- runtime ASGI server 入口存在；
+- OpenAPI snapshot 无漂移；
+- `MIMO_BASE_URL` HTTPS-only；
+- 防止携带 `api-key` 的跨主机 / scheme downgrade redirect；
+- `uvicorn` runtime dependency 与 `httpx` dev dependency 已显式声明；
+- import / OpenAPI export 不要求 `MIMO_API_KEY`。
+
+不要为了 review-fix 重构这些已经通过的部分。
+
+## 验证要求
+
+review-fix 后至少运行：
+
+```text
+python -m pytest -o addopts="" -q
+python -m rules_beyond.dynamic_rule_experiment_v02 --matches-per-pair 500
+python -m rules_beyond.diagnostics --matches-per-pair 2000
+```
+
+GitHub Actions：
+
+```text
+tests
+behavior-diagnostics
+dynamic-rule-replacement-v02
+```
+
+必须全部 success。
+
+不得改变：
 
 ```text
 contracts/openapi/mvp-v0.2.json
-→ web/src/contract/generated/api.ts
+web/src/contract/generated/api.ts
+public paths / schema / required Idempotency-Key header
 ```
 
-以及 Python snapshot parity + frontend `contract:check` drift gate。
-
-因此 A3 **不得顺手改变 public OpenAPI schema / paths / response contract**。如果实现过程中认为必须改 OpenAPI：
+如果发现必须改 public contract：
 
 ```text
 CONTRACT CHANGE REQUIRED
 ```
 
-停止自行修改 `web/**`，在 PR/Issue 报告最小差异，由 Shared Review 统一更新 snapshot + generated TS。
-
-运行时返回既有规范要求的 400/409/503 ErrorEnvelope 不代表必须在 A3 顺手扩大 OpenAPI 文档；优先保持 checked-in snapshot 稳定。
-
-## 仍然禁止
-
-A3 不得：
-
-```text
-修改 Engine gameplay
-修改 Controller cadence
-修改 Rule DSL / Validator
-重新实现 A1/A2 revision / lock / idempotency
-修改 web/**
-实现 Developer B B4
-引入 DB / Redis / Celery / WebSocket
-实现账号 / leaderboard
-无需求扩大 CORS / 部署范围
-```
+停止自行扩 schema，等待 Shared Review。
 
 ## 当前项目位置
 
@@ -119,10 +166,20 @@ A3 不得：
 A0 DynamicRuleController V0.2                         DONE
 A1 MatchApplicationService                            DONE
 A2 Repository / revision / lock / idempotency         DONE
-A3 FastAPI five-route vertical slice                   READY
-B4 Developer B real API integration                   WAITING FOR A3 MERGE
+A3 FastAPI five-route vertical slice                   REVIEW FIX ONLY — PR #59
+B4 Developer B real HTTP integration                  BLOCKED — Issue #60
 ```
+
+B4 只有在：
+
+```text
+PR #59 review-fix 完成
+→ Shared Review 复审
+→ PR #59 merge
+```
+
+之后才解除 Issue #60 的 BLOCKED。
 
 ---
 
-维护规则：如果 A3 再次需要暂停，必须先把本文件恢复为 `PAUSED_BY_OWNER` + `DO_NOT_START = true`，并同步 Issue #53。
+维护规则：PR #59 合并后，本文件必须再次更新，明确 Developer A 下一步是暂停还是进入新的已批准任务；不得长期保留 `REVIEW_FIX_ONLY`。
