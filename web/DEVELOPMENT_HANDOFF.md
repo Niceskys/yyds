@@ -2,13 +2,13 @@
 
 ## 当前基线 / 状态
 
-- B4 integration baseline: `main@cfd143098571513bcadc54e0f3eb382cde421e5c`
+- B4 merge baseline: `main@8769649cf587862b72f241fc64b531e5fdbbdbe6`
 - A3 merge: `b79b1da08a3ff5801b286b5f970f7e371fd85a08`（PR #59）
-- B4 branch: `frontend/real-api-v02`
-- B4 Issue: #60
-- B4 PR: #61 `feat(frontend): B4 integrate real V0.2 HTTP API`
-- B4 code HEAD before this handoff: `38b034a9f65c6a2e9da31607e4acc1ebfe067c9c`
-- current Developer B state: **B4 IMPLEMENTED — PR review**
+- B4 Issue: #60 — **DONE**
+- B4 PR: #61 `feat(frontend): B4 integrate real V0.2 HTTP API` — **MERGED**
+- B4 reviewed code HEAD: `3473bbbea6c0578e942197871ed2894e6fc39654`
+- B4 merge commit: `8769649cf587862b72f241fc64b531e5fdbbdbe6`
+- current Developer B state: **V0.2 FRONTEND DONE**
 - contract version: `mvp-v0.2`
 
 已完成：
@@ -21,8 +21,10 @@ frontend CI                      DONE — PR #44
 npm audit attribution/min patch  DONE — PR #54 / Issue #45
 checked-in OpenAPI snapshot       DONE — PR #57 / Issue #56
 generated TS + API seam          DONE — PR #58 / Issue #55
-B4 real HTTP integration         IMPLEMENTED — PR #61 review
+B4 real HTTP integration         DONE — PR #61 / Issue #60
 ```
+
+Developer B V0.2 主任务已无剩余实现 blocker；新的前端需求应建立新的 Issue，不要继续复用旧 B0–B4 调度语义。
 
 ## 公共契约权威链
 
@@ -46,7 +48,7 @@ React
 
 不要手写第二套 DTO。`contract:check` 仍是 generated TS drift gate。
 
-## B4 正式运行路径
+## 正式运行路径
 
 生产 App 已从 mock/scenario 驱动切为：
 
@@ -70,11 +72,11 @@ rule_rejected.json
 match_terminal.json
 ```
 
-这些 mock/fixture 资产仍保留用于 contract / ViewModel regression tests，不是 runtime state source。
+这些 mock / fixture 资产仍保留用于 contract / ViewModel regression tests，不是 runtime state source。
 
 ## 五个真实 HTTP 操作
 
-`web/src/contract/httpApiAdapter.ts` 实现 #55 冻结的 `MatchApiAdapter`：
+`web/src/contract/httpApiAdapter.ts` 实现冻结的 `MatchApiAdapter`：
 
 ```text
 createMatch(seed?)
@@ -95,20 +97,9 @@ getReplay(matchId)
   GET /api/v1/matches/{match_id}/replay
 ```
 
-transport 只做 HTTP 翻译和安全响应边界，不计算 gameplay。
-
-成功响应至少检查：
-
-```text
-JSON object
-schema_version = mvp-v0.2
-```
-
-这只是版本 sanity check，不是前端再维护一份 schema。
+transport 只负责 HTTP 翻译和安全响应边界，不计算 gameplay。成功响应至少要求是 JSON object 且 `schema_version = mvp-v0.2`；这是版本 sanity check，不是前端维护第二套 schema。
 
 ## 正式游玩流程
-
-当前 App authoritative flow：
 
 ```text
 开始游戏
@@ -127,14 +118,14 @@ schema_version = mvp-v0.2
 → TERMINAL
 ```
 
-前端不自行执行/推导：
+前端不得自行执行或推导：
 
 ```text
 Engine legality
 命中率
 rule validation
 有效属性
-ebattle escalation
+battle escalation
 terminal result
 revision + 1
 ```
@@ -142,8 +133,6 @@ revision + 1
 ## Revision / Idempotency-Key
 
 权威 revision 永远取当前服务端 DTO。
-
-规则：
 
 ```text
 新的用户 mutation 意图
@@ -162,35 +151,32 @@ HTTP 200 正常业务结果（含 MODEL_UNAVAILABLE）
 → 不重放旧 mutation
 → 清除旧 key
 → GET 最新 MatchSnapshot
+→ 清空旧 lastRound / rule feedback presentation state
 → UI 重新同步 authoritative state
 ```
 
 mutation pending 时规则提交和 advance 同时禁用，避免同一 revision 上并发生成多个不同 key。
 
-## Provider failure 的最终前端语义
+## Provider failure 的前端语义
 
 ### Strategy provider/model failure
-
-A3 authoritative：
 
 ```text
 HTTP 200 AdvanceResult
 round 正常提交
-PublicStrategyDecision.status = FALLBACK_MODEL_ERROR 或其他 public fallback status
+PublicStrategyDecision.status = public fallback status
 degraded = true
 ```
 
-B4：
+前端：
 
 - 不显示 HTTP error；
 - round / actions / events 正常展示；
-- RulePanel 显示非阻断提示“已使用降级策略继续完成对局”；
-- TeamPanel 在 `degraded=true` 时显示中文 public `statusLabel`，例如“模型不可用，已回退”；
+- 显示非阻断中文降级提示；
+- TeamPanel 可显示中文 public `statusLabel`；
 - 不显示 raw enum / provider exception。
 
 ### Rule provider/model failure
-
-A3 authoritative：
 
 ```text
 HTTP 200 RuleSubmissionResult
@@ -201,15 +187,9 @@ rule_change_count 不增加
 can_submit_rule = true
 ```
 
-B4：
+前端把它当正常业务反馈；规则输入保持可提交；下一次重新提交生成新 Idempotency-Key。
 
-- 作为正常业务反馈展示；
-- 显示“规则模型暂时不可用”；
-- 规则输入保持可提交；
-- 不当作 503；
-- 下一次重新提交生成新 Idempotency-Key，避免 A2 replay 旧 MODEL_UNAVAILABLE 结果。
-
-### 真正 RecoverableMatchFailure
+### RecoverableMatchFailure
 
 ```text
 HTTP 503
@@ -217,12 +197,7 @@ INTERNAL_ERROR
 retryable = true
 ```
 
-B4：
-
-- 显示本地固定安全中文：“本回合未安全完成，请稍后重试。”；
-- 不用 response 推测 mutation 是否完成；
-- 保留原 authoritative snapshot；
-- 同一次用户动作 retry 复用同 key。
+前端保留原 authoritative snapshot；显示固定安全中文；同一次用户动作 retry 复用同 key。
 
 ## ErrorEnvelope / privacy
 
@@ -243,9 +218,7 @@ NETWORK_ERROR
 INVALID_RESPONSE
 ```
 
-server `error.message` 不直接用于玩家展示；未知/非规范 response 也只显示固定安全文案。
-
-普通 UI 继续不得出现：
+server `error.message` 不直接作为玩家文案。普通 UI 不得出现：
 
 ```text
 private_memory
@@ -266,12 +239,12 @@ hard_liveness_active
 ```text
 GET /api/v1/matches/{match_id}/replay
 → ReplaySnapshot
-→ existing Replay Adapter
+→ Replay Adapter
 → Replay ViewModel
 → Replay UI
 ```
 
-不从当前 React state 反推 replay，不重新模拟 Engine/events，不调用模型。
+不从当前 React state 反推 Replay，不重新模拟 Engine / events，不调用模型。
 
 ## 本地开发连接
 
@@ -289,57 +262,18 @@ Frontend dev server 默认：
 → http://127.0.0.1:8000
 ```
 
-可通过：
+配置：
 
 ```text
-VITE_BACKEND_PROXY_TARGET
+VITE_BACKEND_PROXY_TARGET  # dev proxy target
+VITE_API_BASE_URL          # browser/runtime API base
 ```
 
-覆盖 dev proxy target。
+`VITE_API_BASE_URL` 未配置时使用 same-origin。Production code 不硬编码 `127.0.0.1:8000`，B4 没有新增 `CORS *`。
 
-browser/runtime API base：
+## 最终 B4 验证
 
-```text
-VITE_API_BASE_URL
-```
-
-未配置时使用 same-origin。Production code 不硬编码 `127.0.0.1:8000`。
-
-没有为 B4 擅自新增 `CORS *`。
-
-## B4 测试 / CI
-
-新增/更新 frontend regression：
-
-```text
-App real flow
-- create only：不自动跑 Round 1
-- first advance → Round 1 / PLAYER_DECISION
-- accepted rule 不 auto-advance
-- 503 保留 snapshot + same-key retry
-- 409 resync，不 auto replay old mutation
-- degraded strategy 是 200 正常 round
-- MODEL_UNAVAILABLE 是 200 business result
-- duplicate mutation loading guard
-- Replay 真实调用 getReplay
-
-HttpMatchApiAdapter
-- 五路由 URL/method/body/header
-- snake_case request body
-- Idempotency-Key
-- ErrorEnvelope safe parsing
-- malformed 5xx 不泄露 raw body
-- network unknown result retryable
-- malformed successful payload rejected
-
-Component regressions
-- fixture 只作为 UI/ViewModel test input
-- terminal mutation disabled
-- unknown event fallback
-- privacy whitelist
-```
-
-PR #61 code HEAD `38b034a9...` 正式 hosted CI：
+最终 reviewed HEAD `3473bbbea6c0578e942197871ed2894e6fc39654` 在 merge 前反复通过 hosted CI：
 
 ```text
 npm ci                  PASS
@@ -350,25 +284,11 @@ npm run build           PASS — Vite 5.4.21 / 48 modules
 Python tests            PASS
 ```
 
-production bundle at that HEAD：
+PR #61 最终 diff 仅 `web/**`；没有修改 backend、`api_contract.py`、OpenAPI snapshot、generated TS、Engine、CORS 或 canonical fixtures。没有 `CONTRACT CHANGE REQUIRED`。
 
-```text
-JS  173.64 kB / gzip 56.58 kB
-CSS   8.90 kB / gzip  2.52 kB
-```
+当前 npm audit 仍为 Issue #45 已记录并接受的 dev-tooling 风险状态；不要使用 `npm audit fix --force` 做无关大版本升级。
 
-当前 npm audit 仍为 Issue #45 已记录并接受的 dev-tooling 状态：
-
-```text
-5 package nodes
-3 moderate
-1 high
-1 critical
-```
-
-B4 未修改依赖，也没有运行 `npm audit fix --force`。
-
-## Mock 收口状态
+## Mock / regression 资产
 
 正式 runtime 已脱离 mock/scenario，但以下测试资产暂时保留：
 
@@ -378,44 +298,30 @@ web/src/mock/**
 MockScenarioBar component
 ```
 
-原因：它们仍服务 fixture / presentation regression。由于 production App 不 import，它们不会驱动正式游玩，也会被正常 tree-shaking 排除。
-
-后续若做代码清理，可以单独删除无调用的 dev-only MockScenarioBar/scenario UI；不要为了“清理”删除 canonical shared fixtures。
+它们仅服务 fixture / presentation regression，不驱动正式 App。后续若清理无调用的 dev-only mock UI，应单独开 Issue；不要删除 canonical shared fixtures。
 
 ## Developer A 当前状态
 
-根目录 `DEVELOPER_A_GATE.md`：
+根目录 `DEVELOPER_A_GATE.md` 仍是新的后端工作执行门。A0/A1/A2/A3 已完成；不要仅凭旧 Issue / chat / handoff 文案重启旧 Developer A 任务。任何新后端工作必须先读取当前 gate 并获得明确的新任务授权。
 
-```text
-DEVELOPER_A_GATE = PAUSED_BY_OWNER
-LAST_COMPLETED_TASK = A3 FastAPI V0.2 five-route vertical slice
-DO_NOT_START = true
-```
+## 后续工作规则
 
-A0/A1/A2/A3 全部 DONE。Developer A 不应开始旧 Day 4/Day 5 或任何新后端任务，直到项目负责人批准新的 Issue。
+B0–B4 V0.2 前端主线已完成。后续若继续开发：
 
-## Remaining / merge gate
-
-PR #61 在 merge 前只剩：
-
-1. 本 handoff commit 的 hosted CI 继续全绿；
-2. Shared Review 确认最终 diff 仅 frontend scope；
-3. PR 标记 Ready；
-4. merge #61；
-5. Issue #60 完成；
-6. 若无其他 B blocker，Issue #38 可作为 Developer B V0.2 主任务关闭。
-
-没有 `CONTRACT CHANGE REQUIRED`。
+1. 先读最新 `main`、`DEVELOPER_A_GATE.md` 与本 handoff；
+2. 为新的产品目标建立新的 Issue；
+3. 若修改 public contract，先声明 `CONTRACT CHANGE REQUIRED`，不要在前端私自补字段；
+4. 保持 `contract:check` / typecheck / tests / production build 全绿；
+5. 不把代码清理、安全依赖升级和新产品功能混进同一个 PR。
 
 ## 下一位 Developer B 必须先读
 
 1. `DEVELOPER_A_GATE.md`
-2. Issue #60 / PR #61
-3. PR #59 / A3 handoff
-4. `docs/GAMEPLAY_FLOW_V0.2.md`
-5. `docs/MVP_API_CONTRACT_V0.2.md`
-6. `contracts/README.md`
-7. `contracts/openapi/mvp-v0.2.json`
-8. `web/DEVELOPMENT_HANDOFF.md`
-9. `web/NPM_AUDIT_2026-09-09.md`
-10. 最近 5–10 个 main commits
+2. `web/DEVELOPMENT_HANDOFF.md`
+3. `docs/GAMEPLAY_FLOW_V0.2.md`
+4. `docs/MVP_API_CONTRACT_V0.2.md`
+5. `contracts/README.md`
+6. `contracts/openapi/mvp-v0.2.json`
+7. `web/NPM_AUDIT_2026-09-09.md`
+8. Issue #38 / #60 与 PR #61 的历史上下文
+9. 最近 5–10 个 main commits
