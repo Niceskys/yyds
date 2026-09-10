@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { Board } from './Board';
 import { ResultBanner } from './ResultBanner';
 import { RoundSummary } from './RoundSummary';
@@ -17,14 +16,16 @@ export interface GameScreenProps {
   lastRound: RoundViewModel | null;
   feedback: RuleFeedbackViewModel | null;
   error: GameErrorViewModel | null;
-  mockNotice: string | null;
+  notice: string | null;
   ruleText: string;
   onRuleTextChange: (value: string) => void;
   onSubmitRule: () => void;
   onAdvance: () => void;
   onRestart: () => void;
   onOpenReplay: (() => void) | null;
-  mockBar: ReactNode;
+  submittingRule?: boolean;
+  advancing?: boolean;
+  replayLoading?: boolean;
 }
 
 export function GameScreen({
@@ -32,19 +33,24 @@ export function GameScreen({
   lastRound,
   feedback,
   error,
-  mockNotice,
+  notice,
   ruleText,
   onRuleTextChange,
   onSubmitRule,
   onAdvance,
   onRestart,
   onOpenReplay,
-  mockBar,
+  submittingRule = false,
+  advancing = false,
+  replayLoading = false,
 }: GameScreenProps) {
   return (
     <main className="game">
-      {mockBar}
-      <TopStatusBar match={match} onOpenReplay={onOpenReplay} />
+      <TopStatusBar
+        match={match}
+        onOpenReplay={onOpenReplay}
+        replayLoading={replayLoading}
+      />
       <div className="game__board-row">
         <TeamPanel team={match.teams.RED} action={lastRound?.actions.RED ?? null} />
         <Board board={match.board} />
@@ -60,7 +66,9 @@ export function GameScreen({
         onAdvance={onAdvance}
         feedback={feedback}
         error={error}
-        mockNotice={mockNotice}
+        notice={notice}
+        submittingRule={submittingRule}
+        advancing={advancing}
       />
     </main>
   );

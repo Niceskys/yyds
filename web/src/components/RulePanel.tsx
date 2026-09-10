@@ -12,15 +12,16 @@ interface RulePanelProps {
   onAdvance: () => void;
   feedback: RuleFeedbackViewModel | null;
   error: GameErrorViewModel | null;
-  mockNotice: string | null;
+  notice: string | null;
+  submittingRule?: boolean;
+  advancing?: boolean;
 }
 
 /**
  * 规则输入 / 提交 / 继续下一回合。
  *
- * 按钮状态只来自 PlayerDecisionSnapshot：
- * can_submit_rule / rule_changed_this_intermission / can_advance。
- * 前端不根据 completed_rounds / lifecycle / rule_change_count 自行推理。
+ * 业务可用性只来自 PlayerDecisionSnapshot；loading 只用于阻止同一 authoritative
+ * revision 上发生并发 mutation，前端不推导游戏规则或自行推进 revision。
  */
 export function RulePanel({
   decision,
@@ -30,11 +31,16 @@ export function RulePanel({
   onAdvance,
   feedback,
   error,
-  mockNotice,
+  notice,
+  submittingRule = false,
+  advancing = false,
 }: RulePanelProps) {
   const beforeFirstRound = decision.afterRound === null;
-  const inputDisabled = !decision.canSubmitRule;
-  const submitDisabled = !decision.canSubmitRule || ruleText.trim().length === 0;
+  const mutationPending = submittingRule || advancing;
+  const inputDisabled = !decision.canSubmitRule || mutationPending;
+  const submitDisabled =
+    !decision.canSubmitRule || ruleText.trim().length === 0 || mutationPending;
+  const advanceDisabled = !decision.canAdvance || mutationPending;
 
   let inputHint: string;
   if (beforeFirstRound) {
@@ -43,6 +49,8 @@ export function RulePanel({
     inputHint = '本回合间规则已生效，规则输入已锁定。你可以点击“继续下一回合”。';
   } else if (!decision.canSubmitRule) {
     inputHint = '当前阶段不能提交规则。';
+  } else if (mutationPending) {
+    inputHint = '正在等待游戏服务确认本次操作，请勿重复提交。';
   } else {
     inputHint = '你可以提交一条同时约束红蓝双方的公共规则，或直接继续下一回合。';
   }
@@ -74,22 +82,22 @@ export function RulePanel({
           disabled={submitDisabled}
           onClick={onSubmitRule}
         >
-          提交规则
+          {submittingRule ? '正在提交…' : '提交规则'}
         </button>
         <button
           type="button"
           className="btn btn--secondary"
           data-testid="advance-round"
-          disabled={!decision.canAdvance}
+          disabled={advanceDisabled}
           onClick={onAdvance}
         >
-          继续下一回合
+          {advancing ? '正在结算…' : '继续下一回合'}
         </button>
       </div>
 
-      {mockNotice ? (
-        <p className="rule-panel__notice" data-testid="mock-notice">
-          {mockNotice}
+      {notice ? (
+        <p className="rule-panel__notice" data-testid="game-notice">
+          {notice}
         </p>
       ) : null}
 
@@ -127,7 +135,7 @@ export function RulePanel({
           <p className="feedback__headline">操作未完成</p>
           <p className="feedback__message">{error.message}</p>
           {error.retryable ? (
-            <p className="feedback__suggest">这是可恢复错误，可以稍后重试。</p>
+            <p className="feedback__suggest">这是可恢复错误，可以使用同一次操作重试。</p>
           ) : null}
         </div>
       ) : null}

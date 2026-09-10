@@ -4,6 +4,7 @@ import type { MatchViewModel } from '../contract/viewModel';
 interface TopStatusBarProps {
   match: MatchViewModel;
   onOpenReplay: (() => void) | null;
+  replayLoading?: boolean;
 }
 
 /**
@@ -11,7 +12,11 @@ interface TopStatusBarProps {
  * 已完成回合、规则制定次数、当前公共规则、战局升温全部直接读取后端字段，
  * 前端不做任何推断。
  */
-export function TopStatusBar({ match, onOpenReplay }: TopStatusBarProps) {
+export function TopStatusBar({
+  match,
+  onOpenReplay,
+  replayLoading = false,
+}: TopStatusBarProps) {
   const activeRuleText = match.activeRule
     ? match.activeRule.playerText
     : '暂无（本局尚未制定规则）';
@@ -50,8 +55,13 @@ export function TopStatusBar({ match, onOpenReplay }: TopStatusBarProps) {
       </div>
       <EscalationPanel escalation={match.escalation} />
       {onOpenReplay ? (
-        <button type="button" className="btn btn--ghost" onClick={onOpenReplay}>
-          查看本局回放
+        <button
+          type="button"
+          className="btn btn--ghost"
+          onClick={onOpenReplay}
+          disabled={replayLoading}
+        >
+          {replayLoading ? '正在读取回放…' : '查看本局回放'}
         </button>
       ) : null}
       {match.debugRaw ? <p className="debug-raw">调试：{match.debugRaw}</p> : null}

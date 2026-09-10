@@ -1,82 +1,248 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { GameScreen } from './components/GameScreen';
-import { MockScenarioBar } from './components/MockScenarioBar';
 import { ReplayView } from './components/ReplayView';
 import { StartScreen } from './components/StartScreen';
-import { loadReplay } from './contract/fixtures';
+import type { MatchApiAdapter } from './contract/apiAdapter';
+import {
+  HttpMatchApiAdapter,
+  isRevisionConflict,
+  shouldReuseIdempotencyKey,
+  toSafeGameError,
+} from './contract/httpApiAdapter';
+import {
+  buildMatchViewModel,
+  buildRoundViewModel,
+  buildRuleFeedbackViewModel,
+} from './contract/mockAdapter';
 import { buildReplayViewModel } from './contract/replayAdapter';
-import { buildScenarioState } from './mock/scenarios';
-import type { ScenarioId } from './mock/scenarios';
+import type { MatchSnapshot } from './contract/types';
+import type {
+  GameErrorViewModel,
+  ReplayViewModel,
+  RoundViewModel,
+  RuleFeedbackViewModel,
+} from './contract/viewModel';
 
 type Screen = 'start' | 'game' | 'replay';
-type SubmissionMode = 'accepted' | 'rejected';
+type MutationKind = 'rule' | 'advance';
+
+interface RetryMutation {
+  kind: MutationKind;
+  fingerprint: string;
+  key: string;
+}
+
+export interface AppProps {
+  api?: MatchApiAdapter;
+  idempotencyKeyFactory?: () => string;
+}
 
 /** 仅开发模式附加内部原始值；生产构建不显示。 */
 const DEBUG = import.meta.env.DEV;
 
-export function App() {
-  const [screen, setScreen] = useState<Screen>('start');
-  const [scenario, setScenario] = useState<ScenarioId>('player_decision');
-  const [submissionMode, setSubmissionMode] = useState<SubmissionMode>('accepted');
-  const [ruleText, setRuleText] = useState('');
-  const [mockNotice, setMockNotice] = useState<string | null>(null);
+const defaultApi = new HttpMatchApiAdapter({
+  baseUrl: import.meta.env.VITE_API_BASE_URL ?? '',
+});
 
-  const state = useMemo(() => buildScenarioState(scenario, DEBUG), [scenario]);
-  const replay = useMemo(
-    () => state.replay ?? buildReplayViewModel(loadReplay(), DEBUG),
-    [state.replay],
+function createDefaultIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function degradedRoundNotice(round: {
+  strategies: { RED: { degraded: boolean }; BLUE: { degraded: boolean } };
+}): string | null {
+  if (round.strategies.RED.degraded || round.strategies.BLUE.degraded) {
+    return '本回合有一方模型不可用，已使用降级策略继续完成对局。';
+  }
+  return null;
+}
+
+export function App({
+  api = defaultApi,
+  idempotencyKeyFactory = createDefaultIdempotencyKey,
+}: AppProps = {}) {
+  const [screen, setScreen] = useState<Screen>('start');
+  const [snapshot, setSnapshot] = useState<MatchSnapshot | null>(null);
+  const [lastRound, setLastRound] = useState<RoundViewModel | null>(null);
+  const [feedback, setFeedback] = useState<RuleFeedbackViewModel | null>(null);
+  const [error, setError] = useState<GameErrorViewModel | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [replay, setReplay] = useState<ReplayViewModel | null>(null);
+  const [ruleText, setRuleText] = useState('');
+  const [startLoading, setStartLoading] = useState(false);
+  const [mutationPending, setMutationPending] = useState<MutationKind | null>(null);
+  const [replayLoading, setReplayLoading] = useState(false);
+  const retryMutationRef = useRef<RetryMutation | null>(null);
+
+  const match = useMemo(
+    () => (snapshot ? buildMatchViewModel(snapshot, { debug: DEBUG }) : null),
+    [snapshot],
   );
 
-  const handleStart = () => {
-    // 产品流程：创建对局 → 第 1 回合自动执行 → 进入玩家决策阶段。
-    // Mock 阶段使用 advance_round fixture，同时保留第 1 回合公开策略、实际行动与事件。
-    setScenario('advance_round');
-    setRuleText('');
-    setMockNotice(null);
-    setScreen('game');
+  const acquireMutationKey = (kind: MutationKind, fingerprint: string): string => {
+    const pending = retryMutationRef.current;
+    if (pending && pending.kind === kind && pending.fingerprint === fingerprint) {
+      return pending.key;
+    }
+    const key = idempotencyKeyFactory();
+    retryMutationRef.current = { kind, fingerprint, key };
+    return key;
   };
 
-  const handleSelectScenario = (id: ScenarioId) => {
-    setScenario(id);
-    setRuleText('');
-    setMockNotice(null);
-    setScreen('game');
+  const clearRetryMutation = () => {
+    retryMutationRef.current = null;
   };
 
-  const handleSubmitRule = () => {
-    if (!state.match.decision.canSubmitRule) return;
-    setScenario(submissionMode === 'accepted' ? 'rule_accepted' : 'rule_rejected');
-    setMockNotice(
-      'Mock 模式：已用对应 fixture 模拟规则提交结果，B4 接入真实 API 后改为调用规则接口。',
-    );
+  const handleStart = async () => {
+    if (startLoading) return;
+    setStartLoading(true);
+    setError(null);
+    try {
+      const created = await api.createMatch();
+      setSnapshot(created);
+      setLastRound(null);
+      setFeedback(null);
+      setNotice(null);
+      setReplay(null);
+      setRuleText('');
+      clearRetryMutation();
+      setScreen('game');
+    } catch (caught) {
+      setError(toSafeGameError(caught));
+    } finally {
+      setStartLoading(false);
+    }
   };
 
-  const handleAdvance = () => {
-    if (!state.match.decision.canAdvance) return;
-    setScenario('advance_round');
-    setMockNotice(
-      'Mock 模式：已模拟推进一个完整回合，B4 接入真实 API 后改为调用推进接口。',
-    );
+  const resyncAfterRevisionConflict = async (matchId: string) => {
+    try {
+      const latest = await api.getMatch(matchId);
+      setSnapshot(latest);
+      // MatchSnapshot cannot reconstruct the authoritative execution detail or
+      // previous submission result. Clear stale presentation state instead of
+      // pairing old round/feedback data with the newly resynced snapshot.
+      setLastRound(null);
+      setFeedback(null);
+      setReplay(null);
+    } catch {
+      // Preserve the original authoritative snapshot and original conflict message.
+      // A failed resync must never expose a second raw transport error or guess state.
+    }
+  };
+
+  const handleMutationFailure = async (caught: unknown, matchId: string) => {
+    setError(toSafeGameError(caught));
+    setNotice(null);
+    if (isRevisionConflict(caught)) {
+      clearRetryMutation();
+      await resyncAfterRevisionConflict(matchId);
+      return;
+    }
+    if (!shouldReuseIdempotencyKey(caught)) {
+      clearRetryMutation();
+    }
+  };
+
+  const handleSubmitRule = async () => {
+    if (!snapshot || mutationPending || !snapshot.player_decision.can_submit_rule) return;
+    const playerText = ruleText.trim();
+    if (!playerText) return;
+
+    const fingerprint = `rule:${snapshot.match_id}:${snapshot.revision}:${playerText}`;
+    const idempotencyKey = acquireMutationKey('rule', fingerprint);
+    setMutationPending('rule');
+    setError(null);
+    setNotice(null);
+
+    try {
+      const result = await api.submitRule({
+        matchId: snapshot.match_id,
+        expectedRevision: snapshot.revision,
+        idempotencyKey,
+        playerText,
+      });
+      clearRetryMutation();
+      setSnapshot(result.match);
+      setFeedback(buildRuleFeedbackViewModel(result));
+      setReplay(null);
+      if (result.public_code === 'MODEL_UNAVAILABLE') {
+        setNotice('规则模型暂时不可用，本次没有修改公共规则，你可以稍后重新提交。');
+      }
+    } catch (caught) {
+      await handleMutationFailure(caught, snapshot.match_id);
+    } finally {
+      setMutationPending(null);
+    }
+  };
+
+  const handleAdvance = async () => {
+    if (!snapshot || mutationPending || !snapshot.player_decision.can_advance) return;
+
+    const fingerprint = `advance:${snapshot.match_id}:${snapshot.revision}`;
+    const idempotencyKey = acquireMutationKey('advance', fingerprint);
+    setMutationPending('advance');
+    setError(null);
+    setFeedback(null);
+    setNotice(null);
+
+    try {
+      const result = await api.advanceMatch({
+        matchId: snapshot.match_id,
+        expectedRevision: snapshot.revision,
+        idempotencyKey,
+      });
+      clearRetryMutation();
+      setSnapshot(result.match);
+      setLastRound(buildRoundViewModel(result.round, DEBUG));
+      setReplay(null);
+      setNotice(degradedRoundNotice(result.round));
+    } catch (caught) {
+      await handleMutationFailure(caught, snapshot.match_id);
+    } finally {
+      setMutationPending(null);
+    }
+  };
+
+  const handleOpenReplay = async () => {
+    if (!snapshot || replayLoading) return;
+    setReplayLoading(true);
+    setError(null);
+    try {
+      const result = await api.getReplay(snapshot.match_id);
+      setReplay(buildReplayViewModel(result, DEBUG));
+      setScreen('replay');
+    } catch (caught) {
+      setError(toSafeGameError(caught));
+    } finally {
+      setReplayLoading(false);
+    }
   };
 
   const handleRestart = () => {
-    setScenario('player_decision');
+    setSnapshot(null);
+    setLastRound(null);
+    setFeedback(null);
+    setError(null);
+    setNotice(null);
+    setReplay(null);
     setRuleText('');
-    setMockNotice(null);
+    setMutationPending(null);
+    clearRetryMutation();
     setScreen('start');
   };
-
-  const openReplay = state.match.resultLabel ? () => setScreen('replay') : null;
 
   if (screen === 'start') {
     return (
       <div className="app">
-        <StartScreen onStart={handleStart} />
+        <StartScreen onStart={() => void handleStart()} loading={startLoading} error={error} />
       </div>
     );
   }
 
-  if (screen === 'replay') {
+  if (screen === 'replay' && replay) {
     return (
       <div className="app">
         <ReplayView replay={replay} onBack={() => setScreen('game')} />
@@ -84,28 +250,31 @@ export function App() {
     );
   }
 
+  if (!match) {
+    return (
+      <div className="app">
+        <StartScreen onStart={() => void handleStart()} loading={startLoading} error={error} />
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <GameScreen
-        match={state.match}
-        lastRound={state.lastRound}
-        feedback={state.feedback}
-        error={state.error}
-        mockNotice={mockNotice}
+        match={match}
+        lastRound={lastRound}
+        feedback={feedback}
+        error={error}
+        notice={notice}
         ruleText={ruleText}
         onRuleTextChange={setRuleText}
-        onSubmitRule={handleSubmitRule}
-        onAdvance={handleAdvance}
+        onSubmitRule={() => void handleSubmitRule()}
+        onAdvance={() => void handleAdvance()}
         onRestart={handleRestart}
-        onOpenReplay={openReplay}
-        mockBar={
-          <MockScenarioBar
-            current={scenario}
-            onSelect={handleSelectScenario}
-            submissionMode={submissionMode}
-            onSubmissionModeChange={setSubmissionMode}
-          />
-        }
+        onOpenReplay={() => void handleOpenReplay()}
+        submittingRule={mutationPending === 'rule'}
+        advancing={mutationPending === 'advance'}
+        replayLoading={replayLoading}
       />
     </div>
   );
