@@ -53,7 +53,7 @@ Browser React
 # 2. 下一阶段唯一主顺序
 
 ```text
-M1 — Integrated Playable Acceptance
+M1 — Integrated Playable Acceptance（Issue #64 / IN PROGRESS）
 ↓ GATE 1
 B5A — Core Causal-feedback Motion（Issue #63）
 ↓ UI PRESENTATION GATE
@@ -73,6 +73,21 @@ B5A 只补足玩家理解回合、公共规则与 Replay 所必需的因果反�
 # 3. M1 — Integrated Playable Acceptance
 
 目标：**证明当前仓库真的已经是一条可由真人完成的纵向产品闭环，而不只是各层分别通过单元测试。**
+
+跟踪 Issue：[#64](https://github.com/Niceskys/yyds/issues/64)  
+首轮记录：[`docs/experiments/M1_INTEGRATED_PLAYABLE_ACCEPTANCE_2026-09-10.md`](experiments/M1_INTEGRATED_PLAYABLE_ACCEPTANCE_2026-09-10.md)
+
+当前证据状态：
+
+```text
+M1_STATUS = IN_PROGRESS
+TECHNICAL_HTTP_SLICE = PASS
+REAL_BROWSER_VISIBLE_FLOW = BLOCKED_BY_EXECUTION_ENVIRONMENT
+LIVE_PROVIDER_FLOW = NOT_RUN_NO_CREDENTIAL
+GATE_1 = NOT_PASSED
+```
+
+首轮已通过全量测试、Vite proxy → FastAPI 的真实 HTTP 整局、revision/idempotency、规则接受/拒绝、终局、Replay、strategy fallback 与 MODEL_UNAVAILABLE 语义。但确定性 Provider 不等于 live Provider，HTTP/jsdom 也不等于可见浏览器证据；两项缺口补齐前不得关闭 M1。
 
 ## 必须验证的真实流程
 
