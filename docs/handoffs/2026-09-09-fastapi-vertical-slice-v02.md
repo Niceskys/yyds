@@ -236,8 +236,13 @@ OpenAPI snapshot parity                                                      ide
 f148ae4 feat(backend): wire V0.2 FastAPI routes to match repository
 f07ee90 feat(backend): add runtime MiMo wiring and harden provider transport
 7446f1c test(backend): cover the real HTTP vertical slice and idempotent retries
-<docs>  docs(backend): record A3 FastAPI handoff and status
+4a00dfe docs(backend): record A3 FastAPI vertical-slice handoff
+1bba921 docs(backend): sync A3 status in active start-here and task board
+bfa091b docs(backend): sync V0.2 API contract section 14 with A2 merge and A3 status
 ```
+
+本文件提交列表修正前的 HEAD：`bfa091b69945f0a3f586970dbca3da8c2bf6bba2`。
+A3 未 amend A2 历史；`main` 未被修改。
 
 ## 14. 留给 B4 / 未完成
 
