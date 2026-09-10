@@ -15,14 +15,13 @@ function renderScenario(id: ScenarioId, ruleText = '') {
       lastRound={state.lastRound}
       feedback={state.feedback}
       error={state.error}
-      mockNotice={null}
+      notice={null}
       ruleText={ruleText}
       onRuleTextChange={onRuleTextChange}
       onSubmitRule={onSubmitRule}
       onAdvance={onAdvance}
       onRestart={vi.fn()}
       onOpenReplay={null}
-      mockBar={null}
     />,
   );
   return { onRuleTextChange, onSubmitRule, onAdvance };
@@ -86,6 +85,30 @@ describe('游玩主界面', () => {
     expect(screen.getByTestId('round-summary')).toHaveTextContent('第 1 回合结果');
     expect(screen.getByTestId('event-list')).toHaveTextContent('造成伤害');
     expect(screen.getByTestId('action-RED')).toHaveTextContent('使用弓箭攻击');
+  });
+
+  it('mutation 进行中阻止重复提交和并发推进', () => {
+    const state = buildScenarioState('player_decision', false);
+    render(
+      <GameScreen
+        match={state.match}
+        lastRound={state.lastRound}
+        feedback={state.feedback}
+        error={state.error}
+        notice={null}
+        ruleText="双方移动距离增加 1 格"
+        onRuleTextChange={vi.fn()}
+        onSubmitRule={vi.fn()}
+        onAdvance={vi.fn()}
+        onRestart={vi.fn()}
+        onOpenReplay={null}
+        submittingRule
+      />,
+    );
+    expect(screen.getByTestId('rule-input')).toBeDisabled();
+    expect(screen.getByTestId('submit-rule')).toBeDisabled();
+    expect(screen.getByTestId('advance-round')).toBeDisabled();
+    expect(screen.getByTestId('submit-rule')).toHaveTextContent('正在提交');
   });
 
   it('普通 UI 不出现内部实现字段与英文枚举', () => {
