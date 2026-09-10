@@ -126,15 +126,15 @@ export class HttpMatchApiAdapter implements MatchApiAdapter {
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const headers = new Headers(init.headers);
+    headers.set('Accept', 'application/json');
+    if (init.body) headers.set('Content-Type', 'application/json');
+
     let response: Response;
     try {
       response = await this.fetchImpl(`${this.baseUrl}${path}`, {
         ...init,
-        headers: {
-          Accept: 'application/json',
-          ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-          ...init.headers,
-        },
+        headers,
       });
     } catch {
       throw new MatchApiRequestError({
@@ -149,8 +149,8 @@ export class HttpMatchApiAdapter implements MatchApiAdapter {
       if (isErrorEnvelope(payload)) {
         throw new MatchApiRequestError({
           code: payload.error.code,
-          // Keep the server message inside the transport error for diagnostics only.
-          // The React layer maps known codes to local safe Chinese copy before display.
+          // Transport keeps this value for diagnostics only. React maps the code
+          // to local safe Chinese copy before anything is shown to the player.
           message: payload.error.message,
           retryable: payload.error.retryable,
           status: response.status,
