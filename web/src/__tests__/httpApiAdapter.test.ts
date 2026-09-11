@@ -29,6 +29,19 @@ function jsonResponse(payload: unknown, status = 200): Response {
 }
 
 describe('HttpMatchApiAdapter', () => {
+  it('调用 fetch 时不会把 adapter 实例绑定为 this', async () => {
+    let receiver: unknown = Symbol('not-called');
+    const fetchImpl = (async function (this: unknown) {
+      receiver = this;
+      return jsonResponse(loadMatchSnapshot('match_initial'), 201);
+    }) as typeof fetch;
+    const api = new HttpMatchApiAdapter({ fetchImpl });
+
+    await api.createMatch();
+
+    expect(receiver).toBeUndefined();
+  });
+
   it('把五个 frozen operation 映射到正确 URL / method / body / Idempotency-Key', async () => {
     const payloads: unknown[] = [
       loadMatchSnapshot('match_initial'),
