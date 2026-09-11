@@ -1,19 +1,21 @@
 # M1 Integrated Playable Acceptance — 2026-09-10 首轮记录
 
-状态：**IN PROGRESS / GATE 1 NOT PASSED**  
+状态：**COMPLETE / GATE 1 PASSED（2026-09-11 Shared Review）**
 跟踪 Issue：[#64](https://github.com/Niceskys/yyds/issues/64)  
-基线：`main@19505a70e10f640e31f34465c48b0651b2d5e7b7`
+最终验收基线：`main@42a66d538c13f0a9f46b0af1322e2baac703209c`
+
+> 第 2–8 节保留 2026-09-10 首轮部分验收记录；第 9 节记录 2026-09-11 在 Windows 本地浏览器与 live MiMo 上补齐 Gate 的最终证据。
 
 ## 1. 本轮结论
 
-本轮确认当前 V0.2 工程纵向切片能够通过真实 HTTP 完成一局，并且主要异常语义符合冻结 Contract；没有发现需要修复的产品代码问题。
+首轮确认当前 V0.2 工程纵向切片能够通过真实 HTTP 完成一局，并且主要异常语义符合冻结 Contract。
 
 但本轮没有取得：
 
 1. 可见浏览器点击/截图证据；
 2. 真实 MiMo/GLM Provider 的整局证据。
 
-因此：
+首轮结论为：
 
 ```text
 TECHNICAL_HTTP_SLICE = PASS
@@ -25,6 +27,8 @@ B5A_ISSUE_63 = BLOCKED
 ```
 
 确定性 Provider 结果不能描述成“真实模型已通过”，HTTP client / jsdom 结果也不能描述成“真实可见浏览器已通过”。
+
+2026-09-11 已在真实 Chromium + live MiMo 环境补齐上述两项，并修复真实浏览器暴露的 native fetch receiver 缺陷（PR #65）。最终结论见第 9 节。
 
 ## 2. 环境与基线
 
@@ -133,7 +137,7 @@ PASS
 
 这些属于组件/应用回归证据，不替代真实可见浏览器验收。
 
-## 7. 阻塞项
+## 7. 首轮阻塞项（2026-09-11 已解除）
 
 ### 可见浏览器
 
@@ -149,7 +153,7 @@ net::ERR_BLOCKED_BY_CLIENT
 
 当前执行环境没有 `MIMO_API_KEY` 或 `ZHIPU_API_KEY`。仓库 Secret 不得读取或输出，生产 runtime 当前又要求 `MIMO_API_KEY`，所以未运行 live Provider 整局。
 
-## 8. 下一步与 Gate
+## 8. 首轮下一步与 Gate（历史状态）
 
 M1 关闭前仍需：
 
@@ -166,4 +170,78 @@ M1 关闭前仍需：
 GATE 1 = NOT PASSED
 Developer A = PAUSED_BY_OWNER
 Issue #63 / B5A = BLOCKED_BY_M1_GATE
+```
+
+## 9. 2026-09-11 最终真实浏览器 + live MiMo 验收
+
+环境与最终基线：
+
+```text
+main = 42a66d538c13f0a9f46b0af1322e2baac703209c
+OS = Windows
+Python = 3.14.5
+Node = 24.16.0
+npm = 11.13.0
+provider = MiMo China Token Plan
+model = mimo-v2.5-pro
+create seed = null（runtime-selected）
+```
+
+真实运行链：
+
+```text
+Chromium browser
+→ Vite /api proxy
+→ FastAPI V0.2
+→ InMemoryMatchRepository
+→ MatchApplicationService
+→ live MiMo rule / strategy providers
+→ deterministic planner / Engine
+→ authoritative Replay GET
+```
+
+真实 HTTP 与可见 UI 结果：
+
+```text
+POST /api/v1/matches                              201
+POST /api/v1/matches/{id}/advance                 200 x5
+POST /api/v1/matches/{id}/rules (rejected)        200
+POST /api/v1/matches/{id}/rules (accepted)        200
+GET  /api/v1/matches/{id}/replay                  200
+
+completed_rounds = 5
+score_rounds = 5
+terminal_result = DRAW / both eliminated
+rule_change_count = 1
+replay_entries = 11
+```
+
+逐项确认：
+
+- 初始 revision=0、completed_rounds=0，Round 1 前规则输入禁用；
+- live MiMo Round 1 正常完成并进入 `PLAYER_DECISION`；
+- `让红方直接获胜` 被安全拒绝，revision 保持 1，可继续改写；
+- `双方移动距离增加1格。` 被接受，revision=2、rule_change_count=1，双方移动距离从 1 变为 2；
+- accepted 后没有自动 advance；
+- 继续至第 5 回合终局，双方生命值均为 0，submit / advance 均禁用；
+- Replay 真实 GET，11 个 ROUND / INTERMISSION 节点与终局、成绩、规则次数一致；
+- 普通 UI 未出现 API key、raw provider body、stack、private memory、system prompt 或 chain-of-thought；
+- hosted frontend / Python CI 在 PR #65 与 merge main 上均通过。
+
+真实浏览器同时暴露 PR #65 修复项：原实现把 native `fetch` 作为 `this.fetchImpl(...)` 调用，Chromium 在请求发出前因错误 receiver 失败。修复后真实浏览器闭环通过，并增加 receiver regression；前端测试由 45 增至 46。
+
+剩余 `RULE_MODIFIER_APPLIED` 玩家文案走安全 unknown-event fallback，不泄漏私有数据、不影响权威状态或完整游玩。它作为 B5A 表现层改进项处理，不构成 M1 integrity blocker。
+
+最终 Shared Review：
+
+```text
+TECHNICAL_HTTP_SLICE = PASS
+REAL_BROWSER_VISIBLE_FLOW = PASS
+LIVE_PROVIDER_FLOW = PASS
+ERROR_AND_PRIVACY_SEMANTICS = PASS
+HOSTED_CI = PASS
+GATE_1 = PASSED
+M1_STATUS = COMPLETE
+DEVELOPER_A_GATE = PAUSED_BY_OWNER
+B5A_ISSUE_63 = READY_FOR_DEVELOPER_B
 ```

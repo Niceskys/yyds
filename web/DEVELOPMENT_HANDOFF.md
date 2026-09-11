@@ -9,6 +9,8 @@
 - B4 reviewed code HEAD: `3473bbbea6c0578e942197871ed2894e6fc39654`
 - B4 merge commit: `8769649cf587862b72f241fc64b531e5fdbbdbe6`
 - current Developer B state: **V0.2 FRONTEND DONE**
+- M1 browser/live-provider acceptance: **PASSED** — Issue #64 / PR #65
+- current Developer B task: **B5A READY** — Issue #63
 - contract version: `mvp-v0.2`
 
 已完成：
@@ -24,7 +26,7 @@ generated TS + API seam          DONE — PR #58 / Issue #55
 B4 real HTTP integration         DONE — PR #61 / Issue #60
 ```
 
-Developer B V0.2 主任务已无剩余实现 blocker；新的前端需求应建立新的 Issue，不要继续复用旧 B0–B4 调度语义。
+Developer B V0.2 主任务已完成；M1 GATE 1 已通过，当前从最新 main 执行独立的 Issue #63 / B5A，不复用旧 B0–B4 调度语义。
 
 ## 公共契约权威链
 
@@ -306,10 +308,10 @@ MockScenarioBar component
 
 ## 后续工作规则
 
-B0–B4 V0.2 前端主线已完成。后续若继续开发：
+B0–B4 V0.2 前端主线与 M1 Gate 已完成。当前执行 B5A 时：
 
 1. 先读最新 `main`、`DEVELOPER_A_GATE.md` 与本 handoff；
-2. 为新的产品目标建立新的 Issue；
+2. 只在 Issue #63 范围内实现核心因果反馈动画；
 3. 若修改 public contract，先声明 `CONTRACT CHANGE REQUIRED`，不要在前端私自补字段；
 4. 保持 `contract:check` / typecheck / tests / production build 全绿；
 5. 不把代码清理、安全依赖升级和新产品功能混进同一个 PR。
@@ -323,5 +325,5 @@ B0–B4 V0.2 前端主线已完成。后续若继续开发：
 5. `contracts/README.md`
 6. `contracts/openapi/mvp-v0.2.json`
 7. `web/NPM_AUDIT_2026-09-09.md`
-8. Issue #38 / #60 与 PR #61 的历史上下文
+8. Issue #63 / #64 与 PR #65 的放行和验收上下文
 9. 最近 5–10 个 main commits
