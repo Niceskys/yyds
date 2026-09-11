@@ -26,13 +26,16 @@ generated TS + API seam          DONE — PR #58 / Issue #55
 B4 real HTTP integration         DONE — PR #61 / Issue #60
 B5A.1 round causal transition    DONE — current increment / Issue #63
 B5A.2 rule causal feedback       DONE — current increment / Issue #63
+B5A.3 escalation change feedback  DONE — current increment / Issue #63
 ```
 
 Developer B V0.2 主任务已完成；M1 GATE 1 已通过，当前从最新 main 执行独立的 Issue #63 / B5A，不复用旧 B0–B4 调度语义。
 
 B5A.1 已增加约 1 秒的回合因果过渡：只比较 advance 前后两份公开 authoritative snapshot，展示红蓝公开行动、坐标与生命变化；演出期间继续锁住 mutation，`prefers-reduced-motion` 下直接落到权威结果。
 
-B5A.2 已把 accepted / rejected / MODEL_UNAVAILABLE 分为成功、拒绝、暂时不可用三种克制反馈；accepted 使用提交前后 authoritative snapshot 精确列出公开属性变化，且明确不会自动推进。`RULE_MODIFIER_APPLIED` 现使用公开 modifier payload 生成安全中文文案。战局升温与 Replay 过渡仍属于后续 B5A 增量。
+B5A.2 已把 accepted / rejected / MODEL_UNAVAILABLE 分为成功、拒绝、暂时不可用三种克制反馈；accepted 使用提交前后 authoritative snapshot 精确列出公开属性变化，且明确不会自动推进。`RULE_MODIFIER_APPLIED` 现使用公开 modifier payload 生成安全中文文案。
+
+B5A.3 已把战局升温变化接入回合因果过渡：只比较 advance 前后公开 authoritative escalation 的等级与连续无伤害回合，等级或进度变化时显示短暂的橙色边缘脉冲和可读变化行，并在 reduced-motion 下关闭脉冲。修正了 escalation 组件 class 与既有样式选择器不一致的问题；不新增或修改 public contract。Replay 过渡仍属于后续 B5A 增量。
 
 ## 公共契约权威链
 
