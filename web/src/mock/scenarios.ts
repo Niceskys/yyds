@@ -132,7 +132,10 @@ export function buildScenarioState(id: ScenarioId, debug: boolean): GameViewStat
       return {
         ...empty,
         match: buildMatchViewModel(submission.match, { debug }),
-        feedback: buildRuleFeedbackViewModel(submission),
+        feedback: buildRuleFeedbackViewModel(
+          submission,
+          loadMatchSnapshot('match_player_decision'),
+        ),
       };
     }
     case 'rule_rejected': {

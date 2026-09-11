@@ -172,11 +172,8 @@ export function App({
       });
       clearRetryMutation();
       setSnapshot(result.match);
-      setFeedback(buildRuleFeedbackViewModel(result));
+      setFeedback(buildRuleFeedbackViewModel(result, snapshot));
       setReplay(null);
-      if (result.public_code === 'MODEL_UNAVAILABLE') {
-        setNotice('规则模型暂时不可用，本次没有修改公共规则，你可以稍后重新提交。');
-      }
     } catch (caught) {
       await handleMutationFailure(caught, snapshot.match_id);
     } finally {

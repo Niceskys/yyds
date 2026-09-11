@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadMatchSnapshot, loadReplay, loadRuleSubmission } from '../contract/fixtures';
 import { buildReplayViewModel } from '../contract/replayAdapter';
+import { presentEvent } from '../contract/eventLabels';
 import {
   buildActionViewModel,
   buildBoardViewModel,
@@ -83,6 +84,38 @@ describe('fixture → ViewModel adapter', () => {
     expect(feedback.accepted).toBe(false);
     expect(feedback.codeLabel).toBe('无法生成可用规则');
     expect(feedback.suggestedRephrase).toBe('双方的移动距离增加1格');
+  });
+
+  it('accepted feedback 只展示 authoritative 公开属性前后变化', () => {
+    const submission = loadRuleSubmission('rule_accepted');
+    const feedback = buildRuleFeedbackViewModel(
+      submission,
+      loadMatchSnapshot('match_player_decision'),
+    );
+    expect(feedback.statChangeSummary).toEqual([
+      '红方：移动距离 1 格 → 2 格',
+      '蓝方：移动距离 1 格 → 2 格',
+    ]);
+  });
+
+  it('RULE_MODIFIER_APPLIED 使用公开 modifier 生成安全中文文案', () => {
+    const event = presentEvent(
+      {
+        event_version: 'event-v0.1',
+        kind: 'RULE_MODIFIER_APPLIED',
+        actor: 'RED',
+        details: {
+          move_range_add: 1,
+          bow_hit_multiplier: 1.5,
+          cooldown_weapons: ['BOW'],
+        },
+      },
+      0,
+      false,
+    );
+    expect(event.label).toBe('公共规则生效');
+    expect(event.detail).toBe('红方：移动距离 +1，弓箭命中倍率 ×1.5，冷却武器：弓箭');
+    expect(event.isUnknown).toBe(false);
   });
 
   it('终局禁止提交与推进，并给出玩家成绩', () => {

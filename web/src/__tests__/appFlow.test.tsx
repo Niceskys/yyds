@@ -271,6 +271,14 @@ describe('真实 API 游玩流程', () => {
     fireEvent.click(screen.getByTestId('submit-rule'));
 
     await waitFor(() => expect(screen.getByTestId('rule-feedback')).toHaveTextContent('规则模型暂时不可用'));
+    expect(screen.getByTestId('rule-feedback')).toHaveAttribute(
+      'data-feedback-tone',
+      'unavailable',
+    );
+    expect(screen.getByTestId('rule-feedback-guidance')).toHaveTextContent(
+      '本次没有修改公共规则',
+    );
+    expect(screen.queryByTestId('game-notice')).toBeNull();
     expect(screen.getByTestId('rule-change-count')).toHaveTextContent('0');
     expect(screen.getByTestId('rule-input')).not.toBeDisabled();
     expect(calls.submitRule).toHaveLength(1);
