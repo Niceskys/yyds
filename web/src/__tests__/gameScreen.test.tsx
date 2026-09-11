@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { GameScreen } from '../components/GameScreen';
 import { buildScenarioState } from '../mock/scenarios';
+import type { RoundTransitionViewModel } from '../contract/viewModel';
 import type { ScenarioId } from '../mock/scenarios';
 
 function renderScenario(id: ScenarioId, ruleText = '') {
@@ -89,6 +90,60 @@ describe('游玩主界面', () => {
     expect(screen.getByTestId('round-summary')).toHaveTextContent('第 1 回合结果');
     expect(screen.getByTestId('event-list')).toHaveTextContent('造成伤害');
     expect(screen.getByTestId('action-RED')).toHaveTextContent('使用弓箭攻击');
+  });
+
+  it('只根据前后 authoritative escalation 展示升温等级变化', () => {
+    const state = buildScenarioState('advance_round', false);
+    if (!state.lastRound) throw new Error('advance fixture should include a round');
+    const before = {
+      ...state.match,
+      escalation: {
+        ...state.match.escalation,
+        level: 0,
+        levelLabel: '0级',
+        noDamageStreak: 2,
+        roundsUntilNextLevel: 1,
+      },
+    };
+    const after = {
+      ...state.match,
+      escalation: {
+        ...state.match.escalation,
+        level: 1,
+        levelLabel: '1级',
+        noDamageStreak: 3,
+        roundsUntilNextLevel: 3,
+      },
+    };
+    const roundTransition: RoundTransitionViewModel = {
+      before,
+      after,
+      round: state.lastRound,
+    };
+
+    render(
+      <GameScreen
+        match={after}
+        lastRound={state.lastRound}
+        roundTransition={roundTransition}
+        feedback={null}
+        error={null}
+        notice={null}
+        ruleText=""
+        onRuleTextChange={vi.fn()}
+        onSubmitRule={vi.fn()}
+        onAdvance={vi.fn()}
+        onRestart={vi.fn()}
+        onOpenReplay={null}
+        advancing
+      />,
+    );
+
+    expect(screen.getByTestId('escalation')).toHaveAttribute('data-changed', 'true');
+    expect(screen.getByTestId('escalation-change')).toHaveTextContent(
+      '等级 0级 → 1级；连续无伤害 2 → 3 回合',
+    );
+    expect(screen.getByTestId('escalation-change')).toHaveAttribute('role', 'status');
   });
 
   it('mutation 进行中阻止重复提交和并发推进', () => {

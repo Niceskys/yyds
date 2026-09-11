@@ -1,10 +1,11 @@
 import { EscalationPanel } from './EscalationPanel';
-import type { MatchViewModel } from '../contract/viewModel';
+import type { EscalationViewModel, MatchViewModel } from '../contract/viewModel';
 
 interface TopStatusBarProps {
   match: MatchViewModel;
   onOpenReplay: (() => void) | null;
   replayLoading?: boolean;
+  previousEscalation?: EscalationViewModel | null;
 }
 
 /**
@@ -16,6 +17,7 @@ export function TopStatusBar({
   match,
   onOpenReplay,
   replayLoading = false,
+  previousEscalation = null,
 }: TopStatusBarProps) {
   const activeRuleText = match.activeRule
     ? match.activeRule.playerText
@@ -53,7 +55,7 @@ export function TopStatusBar({
           <span className="metric__value">{activeRuleText}</span>
         </div>
       </div>
-      <EscalationPanel escalation={match.escalation} />
+      <EscalationPanel escalation={match.escalation} previous={previousEscalation} />
       {onOpenReplay ? (
         <button
           type="button"

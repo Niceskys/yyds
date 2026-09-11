@@ -120,7 +120,7 @@ button:disabled {
 .result-banner,
 .replay__entry,
 .team-panel,
-.escalation-panel,
+.escalation,
 .mock-scenario-bar {
   border: 1px solid #263244;
   border-radius: 14px;
@@ -185,10 +185,69 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
-.escalation-panel {
+.escalation {
   margin-top: 0.75rem;
   padding: 0.75rem;
+  overflow: hidden;
   background: rgba(127, 29, 29, 0.14);
+}
+
+.escalation__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.escalation__title {
+  font-weight: 800;
+}
+
+.escalation__level {
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  color: #fecaca;
+  background: rgba(185, 28, 28, 0.32);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.escalation__streak,
+.escalation__hint {
+  color: #cbd5e1;
+  line-height: 1.55;
+}
+
+.escalation__hint {
+  display: block;
+  margin-top: 0.4rem;
+}
+
+.escalation--changed {
+  border-color: #f97316;
+  animation: escalation-edge-pulse 900ms ease-out both;
+}
+
+.escalation--level-changed .escalation__level {
+  color: #fff7ed;
+  background: #c2410c;
+}
+
+.escalation__change {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.7rem;
+  margin: 0.65rem 0 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(249, 115, 22, 0.38);
+  color: #fed7aa;
+  font-size: 0.84rem;
+}
+
+@keyframes escalation-edge-pulse {
+  0% { box-shadow: 0 0 0 rgba(249, 115, 22, 0); }
+  45% { box-shadow: 0 0 24px rgba(249, 115, 22, 0.3); }
+  100% { box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); }
 }
 
 .game__board-row {
@@ -694,6 +753,10 @@ button:disabled {
   }
 
   .feedback {
+    animation: none;
+  }
+
+  .escalation--changed {
     animation: none;
   }
 }

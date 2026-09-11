@@ -328,6 +328,33 @@ describe('真实 API 游玩流程', () => {
     expect(advanceButton).not.toBeDisabled();
   });
 
+  it('advance 返回升温变化时只在回合演出期展示提示', async () => {
+    const base = loadAdvanceResult();
+    const escalated: AdvanceResult = {
+      ...base,
+      match: {
+        ...base.match,
+        battle_escalation: {
+          ...base.match.battle_escalation,
+          level: 1,
+          no_damage_streak: 3,
+          next_level_at_no_damage: 6,
+          rounds_until_next_level: 3,
+        },
+      },
+    };
+    const { adapter } = makeRecordingApi({ advance: async () => escalated });
+    await startGame(adapter, sequentialKeyFactory(), 60);
+
+    fireEvent.click(screen.getByTestId('advance-round'));
+
+    const change = await screen.findByTestId('escalation-change');
+    expect(change).toHaveTextContent('等级 0级 → 1级');
+    expect(screen.getByTestId('escalation')).toHaveAttribute('data-level', '1');
+    await waitFor(() => expect(screen.queryByTestId('escalation-change')).toBeNull());
+    expect(screen.getByTestId('escalation')).toHaveAttribute('data-changed', 'false');
+  });
+
   it('reduced-motion 下直接显示 authoritative snapshot，不等待演出', async () => {
     vi.stubGlobal(
       'matchMedia',

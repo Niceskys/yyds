@@ -55,6 +55,7 @@ export function GameScreen({
         match={match}
         onOpenReplay={onOpenReplay}
         replayLoading={replayLoading}
+        previousEscalation={roundTransition?.before.escalation ?? null}
       />
       <div className="game__board-row">
         <TeamPanel
