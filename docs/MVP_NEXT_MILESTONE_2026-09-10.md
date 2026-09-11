@@ -53,9 +53,9 @@ Browser React
 # 2. 下一阶段唯一主顺序
 
 ```text
-M1 — Integrated Playable Acceptance（Issue #64 / IN PROGRESS）
-↓ GATE 1
-B5A — Core Causal-feedback Motion（Issue #63）
+M1 — Integrated Playable Acceptance（Issue #64 / DONE）
+↓ GATE 1 PASSED
+B5A — Core Causal-feedback Motion（Issue #63 / CURRENT）
 ↓ UI PRESENTATION GATE
 M2 — Agent A/B/C Evidence
 ↓ GATE 2
@@ -64,7 +64,7 @@ M3 — Human Playtest
 B5B — 根据证据决定视觉润色，以及 Agent / 玩法 / UI 下一轮改动
 ```
 
-B5A 只补足玩家理解回合、公共规则与 Replay 所必需的因果反馈，不增加玩法，也不是装饰性大改版。M1 未通过前保持阻塞。
+B5A 只补足玩家理解回合、公共规则与 Replay 所必需的因果反馈，不增加玩法，也不是装饰性大改版。M1 已通过，B5A 已放行。
 
 这条主顺序跑通前，默认不增加新的玩法系统。
 
@@ -80,14 +80,14 @@ B5A 只补足玩家理解回合、公共规则与 Replay 所必需的因果反�
 当前证据状态：
 
 ```text
-M1_STATUS = IN_PROGRESS
+M1_STATUS = COMPLETE
 TECHNICAL_HTTP_SLICE = PASS
-REAL_BROWSER_VISIBLE_FLOW = BLOCKED_BY_EXECUTION_ENVIRONMENT
-LIVE_PROVIDER_FLOW = NOT_RUN_NO_CREDENTIAL
-GATE_1 = NOT_PASSED
+REAL_BROWSER_VISIBLE_FLOW = PASS
+LIVE_PROVIDER_FLOW = PASS
+GATE_1 = PASSED
 ```
 
-首轮已通过全量测试、Vite proxy → FastAPI 的真实 HTTP 整局、revision/idempotency、规则接受/拒绝、终局、Replay、strategy fallback 与 MODEL_UNAVAILABLE 语义。但确定性 Provider 不等于 live Provider，HTTP/jsdom 也不等于可见浏览器证据；两项缺口补齐前不得关闭 M1。
+最终验收在真实 Chromium 中通过 Vite proxy → FastAPI → Repository → live MiMo → Planner/Engine → Replay 完成整局，并覆盖 revision、规则接受/拒绝、终局与权威 Replay。期间发现的 native fetch 接收器绑定问题由 PR #65 修复；全量测试与 hosted CI 通过，M1 GATE 1 已关闭。
 
 ## 必须验证的真实流程
 
@@ -165,8 +165,8 @@ Agent richer plan
 
 ```text
 OWNER = Developer B
-STATUS = BLOCKED_BY_M1_GATE
-MAY_START = false
+STATUS = READY
+MAY_START = true
 DEVELOPER_A_ACTION = NONE
 CONTRACT_CHANGE = NOT_PLANNED
 ```
@@ -204,7 +204,7 @@ WebSocket
 Developer A 后端工作
 ```
 
-只有 M1 GATE 1 通过、并在 Issue #63 留下 `READY — 可以开始` 后，Developer B 才能从最新 main 开工。
+M1 GATE 1 已通过；Shared Review 在 Issue #63 留下 `READY — 可以开始` 后，Developer B 从最新 main 开工。
 
 ---
 
@@ -359,22 +359,21 @@ M2 若需要实现实验 harness / deterministic A / richer C，必须先创建�
 
 B0–B4 已完成。新的前端工作必须建立新 Issue。
 
-M1 可以由 Shared / Developer B 执行 integration smoke 与必要的前端 integration bug 修复，但不能借 M1 扩大玩法范围。
+M1 已由 Shared Review 完成真实浏览器与 live Provider 验收，integration bug 已由 PR #65 修复。
 
-B5A 已建立 Issue #63，但状态为 `BLOCKED_BY_M1_GATE`。M1 GATE 1 通过并由 Shared Review 在 Issue 明确留下 READY 前，Developer B 不得开始复杂动效实现。
+B5A 已建立 Issue #63，状态为 `READY`。Developer B 可从最新 main 开始表现层实现；Developer A 继续暂停。
 
 ---
 
 # 9. 当前第一任务
 
-**现在先做 M1 Integrated Playable Acceptance。**
+**现在做 B5A Core Causal-feedback Motion。**
 
-在 M1 通过以前：
+在 B5A 通过 UI PRESENTATION GATE 以前：
 
 - 不解锁 Developer A 做新 Agent feature；
 - 不实现 C richer plan；
-- 不启动 Issue #63 / B5A；
 - 不做 UI 大改版；
 - 不提前做真人玩法扩展。
 
-M1 完成后，Shared Review 先复核 Issue #63 的 contract 缺口并决定是否放行 B5A；B5A 的 UI PRESENTATION GATE 通过后再进入 M2。
+M1 已完成，Issue #63 不需要 contract 修改并已放行。B5A 的 UI PRESENTATION GATE 通过后再进入 M2。

@@ -66,16 +66,15 @@ Developer B V0.2 umbrella Issue #38 已按 completed 关闭。
 # 3. 当前唯一第一任务
 
 ```text
-M1 — Integrated Playable Acceptance
-Issue #64
-STATUS = IN_PROGRESS
-TECHNICAL_HTTP_SLICE = PASS
-REAL_BROWSER_VISIBLE_FLOW = BLOCKED_BY_EXECUTION_ENVIRONMENT
-LIVE_PROVIDER_FLOW = NOT_RUN_NO_CREDENTIAL
-GATE_1 = NOT_PASSED
+B5A — Core Causal-feedback Motion
+Issue #63
+STATUS = READY_FOR_DEVELOPER_B
+M1_ISSUE_64 = COMPLETE
+M1_GATE_1 = PASSED
+DEVELOPER_A_ACTION = NONE
 ```
 
-首轮证据：`docs/experiments/M1_INTEGRATED_PLAYABLE_ACCEPTANCE_2026-09-10.md`。确定性 Provider 的真实 HTTP 通过不等于 live Provider 通过，HTTP/jsdom 也不等于可见浏览器通过。
+M1 最终证据：`docs/experiments/M1_INTEGRATED_PLAYABLE_ACCEPTANCE_2026-09-10.md`。真实 Chromium + live MiMo 纵向闭环已通过；接收器绑定 bug 由 PR #65 修复，GATE 1 已关闭。
 
 详见：
 
@@ -83,7 +82,7 @@ GATE_1 = NOT_PASSED
 docs/MVP_NEXT_MILESTONE_2026-09-10.md
 ```
 
-目标不是加功能，而是证明当前仓库可以真实完成：
+M1 已证明当前仓库可以真实完成：
 
 ```text
 backend 启动
@@ -100,7 +99,7 @@ backend 启动
 → Replay
 ```
 
-M1 通过前，默认不要做：
+B5A 期间仍默认不要做：
 
 ```text
 新 DSL
@@ -112,10 +111,9 @@ richer-plan Agent
 WebSocket
 账号 / 排行
 UI 大改版
-B5A 动画实现
 ```
 
-核心因果反馈动画已建立 Developer B Issue #63，但当前为 `BLOCKED_BY_M1_GATE`，不是 M1 的并行实现任务。
+核心因果反馈动画已由 Shared Review 放行为 Developer B Issue #63。它只改善权威状态变化的可读性，不改变玩法或公共契约。
 
 ---
 
@@ -156,24 +154,25 @@ FastAPI V0.2
 
 Developer B 新工作必须建立新的 Issue。
 
-当前可以参与：
+当前任务：
 
-- M1 integration smoke；
-- 修复 M1 发现的真实 integration bug；
-- 记录可复现 smoke 证据。
+- 实现 Issue #63 / B5A 核心因果反馈动画；
+- 保持动画后的 UI 与 authoritative snapshot 完全一致；
+- 保持 contract check、typecheck、tests 与 production build 全绿。
 
-不得借 M1 顺手加入新玩法。
+不得借 B5A 顺手加入新玩法或修改公共契约。
 
-M1 通过后的下一项表现层任务已经预登记：
+B5A 已正式放行：
 
 ```text
 B5A core causal-feedback motion
 Issue #63
-STATUS = BLOCKED_BY_M1_GATE
+STATUS = READY
+MAY_START = true
 DEVELOPER_A_ACTION = NONE
 ```
 
-只有 M1 GATE 1 通过、Shared Review 在 Issue #63 留下 `READY — 可以开始` 后，Developer B 才能从最新 main 开工。该任务不得修改 Engine、Planner、Rule DSL、revision/idempotency 或 public contract。
+Developer B 从最新 main 开工。该任务不得修改 Engine、Planner、Rule DSL、revision/idempotency 或 public contract。
 
 最新前端 handoff：
 
@@ -371,9 +370,9 @@ connectivity evidence
 # 12. 下一阶段顺序
 
 ```text
-M1 Integrated Playable Acceptance   [CURRENT / Issue #64 / GATE NOT PASSED]
-↓ GATE 1
-B5A Core Causal-feedback Motion      [BLOCKED — Issue #63]
+M1 Integrated Playable Acceptance   [DONE / Issue #64 / GATE PASSED]
+↓ GATE 1 PASSED
+B5A Core Causal-feedback Motion      [CURRENT — Issue #63 / READY]
 ↓ UI PRESENTATION GATE
 M2 Agent A/B/C Evidence              [NEXT]
 ↓ GATE 2
@@ -412,7 +411,7 @@ MCTS
 3D
 ```
 
-任何新功能如果不直接解决当前 M1/M2/M3 风险，默认先不做。
+任何新功能如果不直接解决当前 B5A/M2/M3 风险，默认先不做。
 
 ---
 
