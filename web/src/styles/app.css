@@ -116,6 +116,7 @@ button:disabled {
 .top-status,
 .rule-panel,
 .round-summary,
+.round-transition,
 .result-banner,
 .replay__entry,
 .team-panel,
@@ -343,6 +344,137 @@ button:disabled {
   padding: 1rem;
 }
 
+.round-transition {
+  margin-top: 1rem;
+  padding: 1rem;
+  overflow: hidden;
+  border-color: #475569;
+  background:
+    linear-gradient(110deg, rgba(185, 28, 28, 0.13), transparent 44%),
+    linear-gradient(250deg, rgba(29, 78, 216, 0.13), transparent 44%),
+    rgba(15, 23, 42, 0.96);
+  animation: round-transition-enter 180ms ease-out both;
+}
+
+.round-transition__header,
+.round-transition__teams {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.round-transition__header {
+  align-items: center;
+}
+
+.round-transition__header h2,
+.round-transition__team h3,
+.round-transition__team p,
+.round-transition__footnote {
+  margin: 0;
+}
+
+.round-transition__eyebrow {
+  color: #93c5fd;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.round-transition__stages {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: stage;
+}
+
+.round-transition__stages li {
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  animation: round-stage-highlight 900ms ease-in-out both;
+}
+
+.round-transition__stages li + li::before {
+  content: '→';
+  margin-right: 0.5rem;
+  color: #64748b;
+}
+
+.round-transition__stages li:nth-child(2) {
+  animation-delay: 180ms;
+}
+
+.round-transition__stages li:nth-child(3) {
+  animation-delay: 360ms;
+}
+
+.round-transition__teams {
+  margin-top: 0.9rem;
+}
+
+.round-transition__team {
+  padding: 0.8rem;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: rgba(17, 24, 39, 0.82);
+  animation: round-team-reveal 420ms 120ms ease-out both;
+}
+
+.round-transition__team--red {
+  border-left: 3px solid #dc2626;
+}
+
+.round-transition__team--blue {
+  border-left: 3px solid #2563eb;
+  animation-delay: 240ms;
+}
+
+.round-transition__team p {
+  margin-top: 0.35rem;
+  color: #cbd5e1;
+}
+
+.round-transition__action,
+.round-transition__hp-change {
+  color: #f8fafc !important;
+  font-weight: 800;
+}
+
+.round-transition__footnote {
+  margin-top: 0.75rem;
+  color: #94a3b8;
+  font-size: 0.78rem;
+}
+
+.board--settling .unit,
+.team-panel--settling .team-panel__hp {
+  animation: authoritative-state-pulse 640ms ease-out both;
+}
+
+@keyframes round-transition-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes round-team-reveal {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes round-stage-highlight {
+  0%, 100% { color: #cbd5e1; }
+  45% { color: #fff; text-shadow: 0 0 12px rgba(147, 197, 253, 0.65); }
+}
+
+@keyframes authoritative-state-pulse {
+  0% { transform: scale(0.94); opacity: 0.68; }
+  65% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 .rule-panel__label {
   display: block;
   margin: 0.85rem 0 0.4rem;
@@ -474,6 +606,8 @@ button:disabled {
   }
 
   .game__board-row,
+  .round-transition__header,
+  .round-transition__teams,
   .top-status__metrics {
     grid-template-columns: 1fr;
   }
@@ -499,5 +633,15 @@ button:disabled {
 
   .unit__hp {
     font-size: 0.64rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .round-transition,
+  .round-transition__stages li,
+  .round-transition__team,
+  .board--settling .unit,
+  .team-panel--settling .team-panel__hp {
+    animation: none;
   }
 }

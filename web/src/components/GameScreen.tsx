@@ -1,5 +1,6 @@
 import { Board } from './Board';
 import { ResultBanner } from './ResultBanner';
+import { RoundTransition } from './RoundTransition';
 import { RoundSummary } from './RoundSummary';
 import { RulePanel } from './RulePanel';
 import { TeamPanel } from './TeamPanel';
@@ -9,11 +10,13 @@ import type {
   MatchViewModel,
   RoundViewModel,
   RuleFeedbackViewModel,
+  RoundTransitionViewModel,
 } from '../contract/viewModel';
 
 export interface GameScreenProps {
   match: MatchViewModel;
   lastRound: RoundViewModel | null;
+  roundTransition?: RoundTransitionViewModel | null;
   feedback: RuleFeedbackViewModel | null;
   error: GameErrorViewModel | null;
   notice: string | null;
@@ -31,6 +34,7 @@ export interface GameScreenProps {
 export function GameScreen({
   match,
   lastRound,
+  roundTransition = null,
   feedback,
   error,
   notice,
@@ -44,6 +48,7 @@ export function GameScreen({
   advancing = false,
   replayLoading = false,
 }: GameScreenProps) {
+  const settlingRound = roundTransition !== null;
   return (
     <main className="game">
       <TopStatusBar
@@ -52,10 +57,19 @@ export function GameScreen({
         replayLoading={replayLoading}
       />
       <div className="game__board-row">
-        <TeamPanel team={match.teams.RED} action={lastRound?.actions.RED ?? null} />
-        <Board board={match.board} />
-        <TeamPanel team={match.teams.BLUE} action={lastRound?.actions.BLUE ?? null} />
+        <TeamPanel
+          team={match.teams.RED}
+          action={lastRound?.actions.RED ?? null}
+          settling={settlingRound}
+        />
+        <Board board={match.board} settling={settlingRound} />
+        <TeamPanel
+          team={match.teams.BLUE}
+          action={lastRound?.actions.BLUE ?? null}
+          settling={settlingRound}
+        />
       </div>
+      {roundTransition ? <RoundTransition transition={roundTransition} /> : null}
       <RoundSummary round={lastRound} />
       <ResultBanner match={match} onRestart={onRestart} onOpenReplay={onOpenReplay} />
       <RulePanel

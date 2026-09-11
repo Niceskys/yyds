@@ -2,6 +2,7 @@ import type { BoardViewModel } from '../contract/viewModel';
 
 interface BoardProps {
   board: BoardViewModel;
+  settling?: boolean;
 }
 
 /**
@@ -10,9 +11,9 @@ interface BoardProps {
  * 公共坐标 1-based、row 1 在顶部、col 1 在左侧；
  * 0-based 数组索引只存在于 adapter 与这里的渲染边界。
  */
-export function Board({ board }: BoardProps) {
+export function Board({ board, settling = false }: BoardProps) {
   return (
-    <section className="board" aria-label="棋盘">
+    <section className={settling ? 'board board--settling' : 'board'} aria-label="棋盘">
       <div
         className="board__grid"
         data-testid="board-grid"

@@ -115,6 +115,13 @@ export interface MatchViewModel {
   debugRaw: string | null;
 }
 
+/** 仅用于把两份 authoritative snapshot 的公开差异呈现成一次回合过渡。 */
+export interface RoundTransitionViewModel {
+  before: MatchViewModel;
+  after: MatchViewModel;
+  round: RoundViewModel;
+}
+
 export interface RuleFeedbackViewModel {
   accepted: boolean;
   code: RuleSubmissionCode | string;

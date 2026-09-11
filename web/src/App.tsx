@@ -19,6 +19,7 @@ import type { MatchSnapshot } from './contract/types';
 import type {
   GameErrorViewModel,
   ReplayViewModel,
+  RoundTransitionViewModel,
   RoundViewModel,
   RuleFeedbackViewModel,
 } from './contract/viewModel';
@@ -35,6 +36,7 @@ interface RetryMutation {
 export interface AppProps {
   api?: MatchApiAdapter;
   idempotencyKeyFactory?: () => string;
+  roundTransitionDurationMs?: number;
 }
 
 /** 仅开发模式附加内部原始值；生产构建不显示。 */
@@ -63,10 +65,12 @@ function degradedRoundNotice(round: {
 export function App({
   api = defaultApi,
   idempotencyKeyFactory = createDefaultIdempotencyKey,
+  roundTransitionDurationMs = 1000,
 }: AppProps = {}) {
   const [screen, setScreen] = useState<Screen>('start');
   const [snapshot, setSnapshot] = useState<MatchSnapshot | null>(null);
   const [lastRound, setLastRound] = useState<RoundViewModel | null>(null);
+  const [roundTransition, setRoundTransition] = useState<RoundTransitionViewModel | null>(null);
   const [feedback, setFeedback] = useState<RuleFeedbackViewModel | null>(null);
   const [error, setError] = useState<GameErrorViewModel | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -104,6 +108,7 @@ export function App({
       const created = await api.createMatch();
       setSnapshot(created);
       setLastRound(null);
+      setRoundTransition(null);
       setFeedback(null);
       setNotice(null);
       setReplay(null);
@@ -125,6 +130,7 @@ export function App({
       // previous submission result. Clear stale presentation state instead of
       // pairing old round/feedback data with the newly resynced snapshot.
       setLastRound(null);
+      setRoundTransition(null);
       setFeedback(null);
       setReplay(null);
     } catch {
@@ -179,7 +185,13 @@ export function App({
   };
 
   const handleAdvance = async () => {
-    if (!snapshot || mutationPending || !snapshot.player_decision.can_advance) return;
+    if (
+      !snapshot ||
+      mutationPending ||
+      roundTransition ||
+      !snapshot.player_decision.can_advance
+    )
+      return;
 
     const fingerprint = `advance:${snapshot.match_id}:${snapshot.revision}`;
     const idempotencyKey = acquireMutationKey('advance', fingerprint);
@@ -195,10 +207,26 @@ export function App({
         idempotencyKey,
       });
       clearRetryMutation();
+      const round = buildRoundViewModel(result.round, DEBUG);
+      const reducedMotion =
+        typeof window !== 'undefined' &&
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       setSnapshot(result.match);
-      setLastRound(buildRoundViewModel(result.round, DEBUG));
+      setLastRound(round);
       setReplay(null);
       setNotice(degradedRoundNotice(result.round));
+      if (!reducedMotion && roundTransitionDurationMs > 0) {
+        setRoundTransition({
+          before: buildMatchViewModel(snapshot, { debug: DEBUG }),
+          after: buildMatchViewModel(result.match, { debug: DEBUG }),
+          round,
+        });
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, roundTransitionDurationMs);
+        });
+        setRoundTransition(null);
+      }
     } catch (caught) {
       await handleMutationFailure(caught, snapshot.match_id);
     } finally {
@@ -224,6 +252,7 @@ export function App({
   const handleRestart = () => {
     setSnapshot(null);
     setLastRound(null);
+    setRoundTransition(null);
     setFeedback(null);
     setError(null);
     setNotice(null);
@@ -263,6 +292,7 @@ export function App({
       <GameScreen
         match={match}
         lastRound={lastRound}
+        roundTransition={roundTransition}
         feedback={feedback}
         error={error}
         notice={notice}
