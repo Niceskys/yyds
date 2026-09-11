@@ -5,7 +5,7 @@
  * 已知映射 + 安全 fallback，而不是封闭 enum。
  * 未知事件不得让页面崩溃，也不得暴露 provider 原始错误。
  */
-import { labelTeam, labelWeapon } from './labels';
+import { formatSigned, labelTeam, labelWeapon } from './labels';
 import type { EventViewModel } from './viewModel';
 import type { RoundEventPublicView, TeamId } from './types';
 
@@ -38,6 +38,36 @@ const KNOWN_PRESENTERS: Record<
   string,
   (event: RoundEventPublicView) => EventPresentation
 > = {
+  RULE_MODIFIER_APPLIED: (event) => {
+    const details = event.details ?? {};
+    const parts: string[] = [];
+    const additiveModifiers: Array<[string, string]> = [
+      ['move_range_add', '移动距离'],
+      ['knife_range_add', '刀攻击距离'],
+      ['bow_range_add', '弓箭射程'],
+      ['knife_damage_add', '刀伤害'],
+      ['bow_damage_add', '弓箭伤害'],
+    ];
+    additiveModifiers.forEach(([key, label]) => {
+      const value = asNumber(details[key]);
+      if (value !== null && value !== 0) parts.push(`${label} ${formatSigned(value)}`);
+    });
+    const multiplier = asNumber(details.bow_hit_multiplier);
+    if (multiplier !== null && multiplier !== 1) {
+      parts.push(`弓箭命中倍率 ×${multiplier}`);
+    }
+    if (Array.isArray(details.cooldown_weapons) && details.cooldown_weapons.length > 0) {
+      const weapons = details.cooldown_weapons
+        .map(asString)
+        .filter((weapon): weapon is string => weapon !== null)
+        .map(labelWeapon);
+      if (weapons.length > 0) parts.push(`冷却武器：${weapons.join('、')}`);
+    }
+    return {
+      label: '公共规则生效',
+      detail: `${teamName(event.actor)}：${parts.length > 0 ? parts.join('，') : '规则条件已触发'}`,
+    };
+  },
   ATTACK_RESOLVED: (event) => {
     const details = event.details ?? {};
     const weapon = labelWeapon(asString(details.weapon));

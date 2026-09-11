@@ -324,15 +324,34 @@ export function buildAdvanceViewModel(
 /** 规则提交结果 → 反馈 ViewModel。 */
 export function buildRuleFeedbackViewModel(
   result: RuleSubmissionResult,
+  previousMatch?: MatchSnapshot,
 ): RuleFeedbackViewModel {
   const statChangeSummary: string[] = [];
   if (result.accepted) {
     (['RED', 'BLUE'] as TeamId[]).forEach((team) => {
-      const stats = result.match.effective_stats[team];
-      statChangeSummary.push(
-        `${labelTeam(team)}：移动距离 ${stats.move_range} 格，弓箭射程 ${stats.bow_range} 格，弓箭最低命中率 ${formatPercent(stats.bow_hit_floor)}`,
+      const afterStats = buildStatsViewModel(result.match.effective_stats[team]);
+      if (!previousMatch) {
+        const stats = result.match.effective_stats[team];
+        statChangeSummary.push(
+          `${labelTeam(team)}：移动距离 ${stats.move_range} 格，弓箭射程 ${stats.bow_range} 格，弓箭最低命中率 ${formatPercent(stats.bow_hit_floor)}`,
+        );
+        return;
+      }
+      const beforeByKey = new Map(
+        buildStatsViewModel(previousMatch.effective_stats[team]).map((stat) => [stat.key, stat]),
       );
+      afterStats.forEach((after) => {
+        const before = beforeByKey.get(after.key);
+        if (before && before.value !== after.value) {
+          statChangeSummary.push(
+            `${labelTeam(team)}：${after.label} ${before.value} → ${after.value}`,
+          );
+        }
+      });
     });
+    if (previousMatch && statChangeSummary.length === 0) {
+      statChangeSummary.push('本次公开属性未立即变化；后续回合仍以服务端权威状态为准。');
+    }
   }
   return {
     accepted: result.accepted,

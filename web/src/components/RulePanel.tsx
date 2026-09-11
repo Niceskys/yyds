@@ -41,6 +41,18 @@ export function RulePanel({
   const submitDisabled =
     !decision.canSubmitRule || ruleText.trim().length === 0 || mutationPending;
   const advanceDisabled = !decision.canAdvance || mutationPending;
+  const feedbackTone = feedback?.accepted
+    ? 'accepted'
+    : feedback?.code === 'MODEL_UNAVAILABLE'
+      ? 'unavailable'
+      : 'rejected';
+  const feedbackMarker =
+    feedbackTone === 'accepted' ? '✓' : feedbackTone === 'unavailable' ? '…' : '×';
+  const feedbackGuidance = feedback?.accepted
+    ? '规则已锁定；查看属性变化后，仍需点击“继续下一回合”。'
+    : feedback?.code === 'MODEL_UNAVAILABLE'
+      ? '本次没有修改公共规则；你可以保留原文稍后重试。'
+      : '本次没有修改公共规则；请根据提示改写后重试。';
 
   let inputHint: string;
   if (beforeFirstRound) {
@@ -103,14 +115,19 @@ export function RulePanel({
 
       {feedback ? (
         <div
-          className={
-            feedback.accepted
-              ? 'feedback feedback--accepted'
-              : 'feedback feedback--rejected'
-          }
+          className={`feedback feedback--${feedbackTone}`}
           data-testid="rule-feedback"
+          data-feedback-tone={feedbackTone}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
         >
-          <p className="feedback__headline">{feedback.codeLabel}</p>
+          <div className="feedback__status-row">
+            <span className="feedback__marker" aria-hidden="true">
+              {feedbackMarker}
+            </span>
+            <p className="feedback__headline">{feedback.codeLabel}</p>
+          </div>
           <p className="feedback__message">{feedback.message}</p>
           {feedback.acceptedRuleText ? (
             <p className="feedback__rule">已生效规则：{feedback.acceptedRuleText}</p>
@@ -121,12 +138,15 @@ export function RulePanel({
             </p>
           ) : null}
           {feedback.statChangeSummary.length > 0 ? (
-            <ul className="feedback__stats">
+            <ul className="feedback__stats" aria-label="公开属性变化">
               {feedback.statChangeSummary.map((line) => (
                 <li key={line}>{line}</li>
               ))}
             </ul>
           ) : null}
+          <p className="feedback__guidance" data-testid="rule-feedback-guidance">
+            {feedbackGuidance}
+          </p>
         </div>
       ) : null}
 

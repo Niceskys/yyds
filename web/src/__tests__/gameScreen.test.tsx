@@ -59,6 +59,9 @@ describe('游玩主界面', () => {
     expect(screen.getByTestId('submit-rule')).toBeDisabled();
     expect(screen.getByTestId('advance-round')).not.toBeDisabled();
     expect(screen.getByTestId('rule-feedback')).toHaveTextContent('规则已生效');
+    expect(screen.getByTestId('rule-feedback')).toHaveAttribute('data-feedback-tone', 'accepted');
+    expect(screen.getByTestId('rule-feedback')).toHaveTextContent('移动距离 1 格 → 2 格');
+    expect(screen.getByTestId('rule-feedback-guidance')).toHaveTextContent('仍需点击');
     expect(screen.getByTestId('rule-change-count')).toHaveTextContent('1');
     expect(screen.getByTestId('active-rule')).toHaveTextContent('双方移动距离增加1格');
   });
@@ -68,6 +71,7 @@ describe('游玩主界面', () => {
     expect(screen.getByTestId('rule-input')).not.toBeDisabled();
     expect(screen.getByTestId('rule-change-count')).toHaveTextContent('0');
     expect(screen.getByTestId('rule-feedback')).toHaveTextContent('无法生成可用规则');
+    expect(screen.getByTestId('rule-feedback')).toHaveAttribute('data-feedback-tone', 'rejected');
     expect(screen.getByTestId('rule-feedback')).toHaveTextContent('可以试试这样说');
   });
 
