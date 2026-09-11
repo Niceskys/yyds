@@ -3,13 +3,14 @@ import type { ActionViewModel, TeamViewModel } from '../contract/viewModel';
 interface TeamPanelProps {
   team: TeamViewModel;
   action: ActionViewModel | null;
+  settling?: boolean;
 }
 
-export function TeamPanel({ team, action }: TeamPanelProps) {
+export function TeamPanel({ team, action, settling = false }: TeamPanelProps) {
   const strategy = team.strategy;
   return (
     <section
-      className={`team-panel team-panel--${team.team.toLowerCase()}`}
+      className={`team-panel team-panel--${team.team.toLowerCase()}${settling ? ' team-panel--settling' : ''}`}
       aria-label={team.teamLabel}
     >
       <header className="team-panel__header">

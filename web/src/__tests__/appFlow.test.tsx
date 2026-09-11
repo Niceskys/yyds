@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { App } from '../App';
 import type {
   AdvanceMatchCommand,
@@ -82,8 +82,18 @@ function degradedStrategy(strategy: PublicStrategyDecision | null): PublicStrate
   };
 }
 
-async function startGame(api: MatchApiAdapter, keyFactory = sequentialKeyFactory()) {
-  render(<App api={api} idempotencyKeyFactory={keyFactory} />);
+async function startGame(
+  api: MatchApiAdapter,
+  keyFactory = sequentialKeyFactory(),
+  roundTransitionDurationMs = 0,
+) {
+  render(
+    <App
+      api={api}
+      idempotencyKeyFactory={keyFactory}
+      roundTransitionDurationMs={roundTransitionDurationMs}
+    />,
+  );
   fireEvent.click(screen.getByRole('button', { name: '开始游戏' }));
   await screen.findByTestId('board-grid');
 }
@@ -286,6 +296,47 @@ describe('真实 API 游玩流程', () => {
       await pending;
     });
     await waitFor(() => expect(screen.getByTestId('completed-rounds')).toHaveTextContent('1'));
+  });
+
+  it('回合演出展示公开因果变化，并在结束前阻止重复 mutation', async () => {
+    const { adapter, calls } = makeRecordingApi();
+    await startGame(adapter, sequentialKeyFactory(), 60);
+
+    fireEvent.click(screen.getByTestId('advance-round'));
+
+    const transition = await screen.findByTestId('round-transition');
+    expect(transition).toHaveTextContent('第 1 回合发生了什么');
+    expect(transition).toHaveTextContent('公开行动');
+    expect(transition).toHaveTextContent('位置保持在 第 3 行，第 2 列');
+    expect(transition).toHaveTextContent('生命值保持 4');
+    expect(transition).toHaveTextContent('生命值 4 → 3（-1）');
+    const advanceButton = screen.getByTestId('advance-round');
+    expect(advanceButton).toBeDisabled();
+    fireEvent.click(advanceButton);
+    expect(calls.advance).toHaveLength(1);
+
+    await waitFor(() => expect(screen.queryByTestId('round-transition')).toBeNull());
+    expect(screen.getByTestId('completed-rounds')).toHaveTextContent('1');
+    expect(advanceButton).not.toBeDisabled();
+  });
+
+  it('reduced-motion 下直接显示 authoritative snapshot，不等待演出', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({ matches: true }),
+    );
+    try {
+      const { adapter } = makeRecordingApi();
+      await startGame(adapter, sequentialKeyFactory(), 1000);
+
+      fireEvent.click(screen.getByTestId('advance-round'));
+
+      await waitFor(() => expect(screen.getByTestId('completed-rounds')).toHaveTextContent('1'));
+      expect(screen.queryByTestId('round-transition')).toBeNull();
+      expect(screen.getByTestId('advance-round')).not.toBeDisabled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('查看回放调用真实 getReplay，而不是从当前 UI 状态反推', async () => {
