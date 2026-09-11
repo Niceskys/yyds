@@ -136,7 +136,10 @@ export class HttpMatchApiAdapter implements MatchApiAdapter {
 
     let response: Response;
     try {
-      response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+      // Keep the callable detached from the adapter instance. Browser-native
+      // fetch throws "Illegal invocation" when called as an object method.
+      const fetchImpl = this.fetchImpl;
+      response = await fetchImpl(`${this.baseUrl}${path}`, {
         ...init,
         headers,
       });
