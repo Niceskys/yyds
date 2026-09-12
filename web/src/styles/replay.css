@@ -61,6 +61,34 @@
   line-height: 1.45;
 }
 
+.replay__detail-stage {
+  min-width: 0;
+}
+
+.replay__transition-context {
+  margin: 0 0 0.5rem;
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+.replay__detail-transition[data-direction='forward'] {
+  animation: replay-detail-forward 220ms ease-out both;
+}
+
+.replay__detail-transition[data-direction='backward'] {
+  animation: replay-detail-backward 220ms ease-out both;
+}
+
+@keyframes replay-detail-forward {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes replay-detail-backward {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 .replay__detail {
   min-width: 0;
   padding: 1rem;
@@ -224,5 +252,11 @@
   .replay__detail-head,
   .replay-team__headline {
     flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .replay__detail-transition[data-direction] {
+    animation: none;
   }
 }

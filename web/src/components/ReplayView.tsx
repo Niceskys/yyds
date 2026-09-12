@@ -17,6 +17,14 @@ interface ReplayViewProps {
   onBack: () => void;
 }
 
+type ReplayTransitionDirection = 'none' | 'forward' | 'backward';
+
+interface ReplaySelection {
+  key: string | null;
+  previousKey: string | null;
+  direction: ReplayTransitionDirection;
+}
+
 function ruleLabel(rule: RuleViewModel | null): string {
   return rule?.playerText ?? '无';
 }
@@ -155,12 +163,38 @@ function ReplayDetail({ entry }: { entry: ReplayEntryViewModel }) {
 }
 
 /**
- * B3：按 authoritative ReplaySnapshot 逐节点浏览公开战局事实。
- * 不重新调用模型、不重新模拟 Engine，也不展示 chain-of-thought / private memory。
+ * B3/B5A：按 authoritative ReplaySnapshot 逐节点浏览公开战局事实。
+ * 节点切换只呈现既有 before/after，不重新调用模型、不重新模拟 Engine。
  */
 export function ReplayView({ replay, onBack }: ReplayViewProps) {
-  const [selectedKey, setSelectedKey] = useState<string | null>(replay.entries[0]?.key ?? null);
-  const selectedEntry = replay.entries.find((entry) => entry.key === selectedKey) ?? replay.entries[0] ?? null;
+  const [selection, setSelection] = useState<ReplaySelection>({
+    key: replay.entries[0]?.key ?? null,
+    previousKey: null,
+    direction: 'none',
+  });
+  const selectedEntry =
+    replay.entries.find((entry) => entry.key === selection.key) ?? replay.entries[0] ?? null;
+  const previousEntry = replay.entries.find((entry) => entry.key === selection.previousKey) ?? null;
+
+  const selectEntry = (nextKey: string) => {
+    setSelection((current) => {
+      if (current.key === nextKey) {
+        return current;
+      }
+
+      const currentIndex = replay.entries.findIndex((entry) => entry.key === current.key);
+      const nextIndex = replay.entries.findIndex((entry) => entry.key === nextKey);
+      if (nextIndex < 0) {
+        return current;
+      }
+
+      return {
+        key: nextKey,
+        previousKey: current.key,
+        direction: currentIndex >= 0 && nextIndex < currentIndex ? 'backward' : 'forward',
+      };
+    });
+  };
 
   return (
     <main className="replay">
@@ -189,7 +223,7 @@ export function ReplayView({ replay, onBack }: ReplayViewProps) {
                     type="button"
                     className={`replay__entry${selected ? ' replay__entry--selected' : ''}`}
                     aria-pressed={selected}
-                    onClick={() => setSelectedKey(entry.key)}
+                    onClick={() => selectEntry(entry.key)}
                   >
                     <span className="replay__entry-head">
                       <span className="replay__entry-kind">{entry.kindLabel}</span>
@@ -204,7 +238,22 @@ export function ReplayView({ replay, onBack }: ReplayViewProps) {
         </nav>
 
         {selectedEntry ? (
-          <ReplayDetail entry={selectedEntry} />
+          <div className="replay__detail-stage">
+            {previousEntry ? (
+              <p className="replay__transition-context" aria-live="polite">
+                回放节点：{previousEntry.headline} → {selectedEntry.headline}
+              </p>
+            ) : null}
+            <div
+              key={selectedEntry.key}
+              className="replay__detail-transition"
+              data-direction={selection.direction}
+              data-entry-key={selectedEntry.key}
+              data-testid="replay-detail-transition"
+            >
+              <ReplayDetail entry={selectedEntry} />
+            </div>
+          </div>
         ) : (
           <section className="replay__detail replay__empty">暂无可回放的公开时间线。</section>
         )}

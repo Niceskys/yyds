@@ -63,6 +63,38 @@ describe('B3 Replay 逐节点浏览', () => {
     expect(detail).toHaveTextContent('红方胜利');
   });
 
+  it('相邻节点切换显示权威节点关系和前后方向', () => {
+    const timeline = renderReplay();
+    const nodes = within(timeline).getAllByRole('button');
+
+    fireEvent.click(nodes[1]);
+    expect(screen.getByText(/回放节点：第 1 回合 → 第 1 回合后 · 玩家决策/)).toBeInTheDocument();
+    expect(screen.getByTestId('replay-detail-transition')).toHaveAttribute('data-direction', 'forward');
+
+    fireEvent.click(nodes[0]);
+    expect(screen.getByTestId('replay-detail-transition')).toHaveAttribute('data-direction', 'backward');
+    expect(nodes[0]).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('快速连续选择时最终只呈现最后选择的 authoritative 节点', () => {
+    const timeline = renderReplay();
+    const nodes = within(timeline).getAllByRole('button');
+
+    fireEvent.click(nodes[1]);
+    fireEvent.click(nodes[3]);
+    fireEvent.click(nodes[2]);
+
+    expect(screen.getByTestId('replay-selected-detail')).toHaveTextContent('继续下一回合');
+    expect(screen.getByTestId('replay-detail-transition')).toHaveAttribute(
+      'data-entry-key',
+      'intermission-1-2',
+    );
+    expect(nodes[2]).toHaveAttribute('aria-pressed', 'true');
+    expect(nodes[0]).toHaveAttribute('aria-pressed', 'false');
+    expect(nodes[1]).toHaveAttribute('aria-pressed', 'false');
+    expect(nodes[3]).toHaveAttribute('aria-pressed', 'false');
+  });
+
   it('回放不展示 chain-of-thought / private memory 或内部机器字段', () => {
     renderReplay();
     const text = document.body.textContent ?? '';
