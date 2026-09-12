@@ -23,7 +23,6 @@ interface ReplaySelection {
   key: string | null;
   previousKey: string | null;
   direction: ReplayTransitionDirection;
-  revision: number;
 }
 
 function ruleLabel(rule: RuleViewModel | null): string {
@@ -103,7 +102,11 @@ function ReplayRoundDetail({ entry }: { entry: ReplayRoundEntryViewModel }) {
   );
 }
 
-function ReplayIntermissionDetail({ entry }: { entry: ReplayIntermissionEntryViewModel }) {
+function ReplayIntermissionDetail({
+  entry,
+}: {
+  entry: ReplayIntermissionEntryViewModel;
+}) {
   return (
     <section className="replay__detail" data-testid="replay-selected-detail">
       <div className="replay__detail-head">
@@ -168,7 +171,6 @@ export function ReplayView({ replay, onBack }: ReplayViewProps) {
     key: replay.entries[0]?.key ?? null,
     previousKey: null,
     direction: 'none',
-    revision: 0,
   });
   const selectedEntry =
     replay.entries.find((entry) => entry.key === selection.key) ?? replay.entries[0] ?? null;
@@ -190,7 +192,6 @@ export function ReplayView({ replay, onBack }: ReplayViewProps) {
         key: nextKey,
         previousKey: current.key,
         direction: currentIndex >= 0 && nextIndex < currentIndex ? 'backward' : 'forward',
-        revision: current.revision + 1,
       };
     });
   };
@@ -244,7 +245,7 @@ export function ReplayView({ replay, onBack }: ReplayViewProps) {
               </p>
             ) : null}
             <div
-              key={`${selectedEntry.key}-${selection.revision}`}
+              key={selectedEntry.key}
               className="replay__detail-transition"
               data-direction={selection.direction}
               data-entry-key={selectedEntry.key}
@@ -260,4 +261,3 @@ export function ReplayView({ replay, onBack }: ReplayViewProps) {
     </main>
   );
 }
-
