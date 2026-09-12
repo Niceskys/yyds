@@ -21,14 +21,8 @@
   padding: 0.9rem;
 }
 
-.replay__timeline-panel h2 {
-  margin: 0 0 0.75rem;
-  font-size: 1rem;
-}
-
-.replay__timeline {
-  margin: 0;
-}
+.replay__timeline-panel h2 { margin: 0 0 0.75rem; font-size: 1rem; }
+.replay__timeline { margin: 0; }
 
 .replay__entry {
   width: 100%;
@@ -39,20 +33,14 @@
   text-align: left;
 }
 
-.replay__entry:hover {
-  border-color: #3b82f6;
-}
-
+.replay__entry:hover { border-color: #3b82f6; }
 .replay__entry--selected {
   border-color: #60a5fa;
   background: rgba(37, 99, 235, 0.16);
   box-shadow: inset 3px 0 0 #60a5fa;
 }
 
-.replay__entry-head {
-  align-items: flex-start;
-}
-
+.replay__entry-head { align-items: flex-start; }
 .replay__entry-preview {
   display: block;
   margin-top: 0.45rem;
@@ -61,168 +49,90 @@
   line-height: 1.45;
 }
 
-.replay__detail {
-  min-width: 0;
-  padding: 1rem;
+.replay__detail-stage { min-width: 0; }
+.replay__transition-context {
+  margin: 0 0 0.5rem;
+  color: #94a3b8;
+  font-size: 0.82rem;
 }
 
+.replay__detail-transition[data-direction='forward'] {
+  animation: replay-detail-forward 220ms ease-out both;
+}
+
+.replay__detail-transition[data-direction='backward'] {
+  animation: replay-detail-backward 220ms ease-out both;
+}
+
+@keyframes replay-detail-forward {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes replay-detail-backward {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.replay__detail { min-width: 0; padding: 1rem; }
 .replay__detail-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 1rem; margin-bottom: 1rem;
 }
-
-.replay__detail-head h2 {
-  margin: 0.25rem 0 0;
-}
-
+.replay__detail-head h2 { margin: 0.25rem 0 0; }
 .replay__result {
-  border-radius: 999px;
-  padding: 0.4rem 0.7rem;
-  color: #dcfce7;
-  background: rgba(22, 163, 74, 0.18);
+  border-radius: 999px; padding: 0.4rem 0.7rem;
+  color: #dcfce7; background: rgba(22, 163, 74, 0.18);
 }
-
 .replay__rule-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  margin-bottom: 1rem;
-  border: 1px solid #334155;
-  border-radius: 10px;
-  padding: 0.8rem;
-  background: #111827;
+  display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 1rem;
+  border: 1px solid #334155; border-radius: 10px; padding: 0.8rem; background: #111827;
 }
-
-.replay__rule-card span,
-.replay__rule-card small {
-  color: #94a3b8;
+.replay__rule-card span, .replay__rule-card small { color: #94a3b8; }
+.replay__rule-card--accepted { border-left: 4px solid #16a34a; }
+.replay__boards, .replay__teams {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem;
 }
-
-.replay__rule-card--accepted {
-  border-left: 4px solid #16a34a;
-}
-
-.replay__boards {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-}
-
 .replay__board-card {
-  min-width: 0;
-  border: 1px solid #263244;
-  border-radius: 12px;
-  padding: 0.8rem;
-  background: rgba(17, 24, 39, 0.78);
+  min-width: 0; border: 1px solid #263244; border-radius: 12px;
+  padding: 0.8rem; background: rgba(17, 24, 39, 0.78);
 }
-
-.replay__board-card h3 {
-  margin: 0;
-}
-
-.replay__board-card p {
-  min-height: 2.8em;
-  color: #cbd5e1;
-  line-height: 1.45;
-}
-
-.replay__board-card .board__grid {
-  width: min(100%, 360px);
-}
-
-.replay__teams {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
+.replay__board-card h3 { margin: 0; }
+.replay__board-card p { min-height: 2.8em; color: #cbd5e1; line-height: 1.45; }
+.replay__board-card .board__grid { width: min(100%, 360px); }
+.replay__teams { margin-top: 1rem; }
 .replay-team {
-  border: 1px solid #263244;
-  border-radius: 12px;
-  padding: 0.9rem;
-  background: #111827;
+  border: 1px solid #263244; border-radius: 12px; padding: 0.9rem; background: #111827;
 }
-
-.replay-team--red {
-  border-top: 3px solid #dc2626;
-}
-
-.replay-team--blue {
-  border-top: 3px solid #2563eb;
-}
-
-.replay-team__headline {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.replay-team p {
-  margin: 0.55rem 0;
-  color: #cbd5e1;
-}
-
-.replay-team__stats {
-  margin-top: 0.75rem;
-}
-
+.replay-team--red { border-top: 3px solid #dc2626; }
+.replay-team--blue { border-top: 3px solid #2563eb; }
+.replay-team__headline { display: flex; justify-content: space-between; gap: 0.75rem; }
+.replay-team p { margin: 0.55rem 0; color: #cbd5e1; }
+.replay-team__stats { margin-top: 0.75rem; }
 .replay__events {
-  margin-top: 1rem;
-  border: 1px solid #263244;
-  border-radius: 12px;
-  padding: 0.9rem;
-  background: #111827;
+  margin-top: 1rem; border: 1px solid #263244; border-radius: 12px;
+  padding: 0.9rem; background: #111827;
 }
-
-.replay__events h3 {
-  margin-top: 0;
-}
-
+.replay__events h3 { margin-top: 0; }
 .replay__decision-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem; margin-bottom: 1rem;
 }
-
-.replay__decision-grid .metric--wide {
-  grid-column: 1 / -1;
-}
-
-.replay__empty {
-  color: #94a3b8;
-  line-height: 1.6;
-}
+.replay__decision-grid .metric--wide { grid-column: 1 / -1; }
+.replay__empty { color: #94a3b8; line-height: 1.6; }
 
 @media (max-width: 1050px) {
-  .replay__workspace {
-    grid-template-columns: 1fr;
-  }
-
-  .replay__timeline-panel {
-    position: static;
-    max-height: none;
-  }
-
-  .replay__timeline {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  .replay__workspace { grid-template-columns: 1fr; }
+  .replay__timeline-panel { position: static; max-height: none; }
+  .replay__timeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 760px) {
-  .replay__boards,
-  .replay__teams,
-  .replay__decision-grid,
-  .replay__timeline {
-    grid-template-columns: 1fr;
-  }
-
-  .replay__detail-head,
-  .replay-team__headline {
-    flex-direction: column;
-  }
+  .replay__boards, .replay__teams, .replay__decision-grid, .replay__timeline { grid-template-columns: 1fr; }
+  .replay__detail-head, .replay-team__headline { flex-direction: column; }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .replay__detail-transition[data-direction] { animation: none; }
+}
+
