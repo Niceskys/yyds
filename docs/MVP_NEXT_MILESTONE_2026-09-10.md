@@ -212,6 +212,8 @@ M1 GATE 1 已通过；B5A 四个增量由 PR #67、#68、#69、#71 完成。最�
 
 # 5. M2 — Agent A/B/C Evidence
 
+冻结实验设计：[`M2_AGENT_ABC_EXPERIMENT_PLAN_2026-09-12.md`](experiments/M2_AGENT_ABC_EXPERIMENT_PLAN_2026-09-12.md)
+
 目标：**回答 LLM Agent 是否真的值得保留，以及当前四分类结构是否足够。**
 
 必须比较三组：
