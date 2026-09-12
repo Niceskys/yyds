@@ -15,8 +15,9 @@ A3_MERGE = b79b1da08a3ff5801b286b5f970f7e371fd85a08
 B4_MERGE = 8769649cf587862b72f241fc64b531e5fdbbdbe6
 CURRENT_APPROVED_BACKEND_TASK = NONE
 LAST_SHARED_GATE = M1 Integrated Playable Acceptance / Issue #64 / PASSED
-CURRENT_FRONTEND_TASK = B5A / Issue #63 / READY_FOR_DEVELOPER_B
+CURRENT_FRONTEND_TASK = B5A Replay transition / Issue #63 / REMAINING
 DEVELOPER_A_ACTION_ON_B5A = NONE
+DEVELOPER_A_PLAYTEST = ALLOWED
 DO_NOT_START = true
 DO_NOT_START_NEW_TASK = true
 ```
@@ -34,14 +35,17 @@ B3 Replay                                             DONE
 B4 real HTTP integration                              DONE — PR #61
 M1 technical HTTP slice                                PASS — Issue #64
 M1 browser/live-provider Gate                          PASS — Issue #64 / PR #65
-B5A core causal-feedback motion / Issue #63            READY_FOR_DEVELOPER_B
+B5A.1 round causal transition / Issue #63              DONE
+B5A.2 rule causal feedback / Issue #63                 DONE
+B5A.3 escalation change feedback / Issue #63           DONE
+B5A Replay before/after transition / Issue #63         REMAINING
 ```
 
 工程纵向切片已经接通。当前阶段不再是继续补 A0–A3 后端功能，而是进入新的 MVP 验收 / 实验阶段。
 
 M1 最终记录见 `docs/experiments/M1_INTEGRATED_PLAYABLE_ACCEPTANCE_2026-09-10.md`。真实 Chromium + live MiMo 已完成规则拒绝、规则接受、5 回合终局与 authoritative Replay；M1 GATE 1 已通过。Developer A 仍保持暂停，因为 B5A 是纯 Developer B 表现层任务，不构成新的后端授权。
 
-Issue #63 已由 Shared Review 放行为 Developer B 当前表现层任务，不是 Developer A 授权。B5A 放行不会自动解锁 Developer A。
+Issue #63 已由 Shared Review 放行为 Developer B 当前表现层任务，不是 Developer A 授权。B5A 放行不会自动解锁 Developer A。Developer A 可以按 `docs/PLAYTEST_QUICKSTART.md` 启动当前 main、完整试玩并提交观察记录；这属于产品验收，不是后端开发授权。
 
 ## Developer A 当前允许
 
@@ -49,6 +53,7 @@ Issue #63 已由 Shared Review 放行为 Developer B 当前表现层任务，不
 读取最新 main
 读取本 Gate / AI_DEVELOPER_START_HERE.md / 当前里程碑文档
 查看 A0–A3 handoff 与 Shared Review 结果
+从最新 main 运行本地试玩并记录玩家视角反馈
 做只读分析
 回答问题
 为新的、尚未批准的任务提供方案评估

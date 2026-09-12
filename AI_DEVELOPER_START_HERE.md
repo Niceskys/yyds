@@ -14,8 +14,12 @@
 
 ```text
 MVP 工程纵向切片已完成
-→ 进入 Integrated Playable Acceptance / AI value validation 阶段
+→ M1 真实可玩验收已通过
+→ B5A.1–B5A.3 已完成，Replay 过渡仍待完成
+→ 准备 AI value validation / 真人试玩
 ```
+
+只想体验当前游戏的开发者直接阅读 [`docs/PLAYTEST_QUICKSTART.md`](docs/PLAYTEST_QUICKSTART.md)。Developer A 可以试玩并记录反馈，但这不会解除 `DEVELOPER_A_GATE.md` 中的后端开发暂停状态。
 
 当前最重要的规范顺序：
 
@@ -66,9 +70,9 @@ Developer B V0.2 umbrella Issue #38 已按 completed 关闭。
 # 3. 当前唯一第一任务
 
 ```text
-B5A — Core Causal-feedback Motion
+B5A — Core Causal-feedback Motion（Replay 过渡剩余）
 Issue #63
-STATUS = READY_FOR_DEVELOPER_B
+STATUS = IN_PROGRESS
 M1_ISSUE_64 = COMPLETE
 M1_GATE_1 = PASSED
 DEVELOPER_A_ACTION = NONE
@@ -99,7 +103,7 @@ backend 启动
 → Replay
 ```
 
-B5A 期间仍默认不要做：
+B5A 剩余工作期间仍默认不要做：
 
 ```text
 新 DSL
@@ -156,18 +160,19 @@ Developer B 新工作必须建立新的 Issue。
 
 当前任务：
 
-- 实现 Issue #63 / B5A 核心因果反馈动画；
+- B5A.1 回合、B5A.2 规则结果、B5A.3 战局升温反馈已完成；
+- 实现 Issue #63 剩余的 Replay before/after 过渡；
 - 保持动画后的 UI 与 authoritative snapshot 完全一致；
 - 保持 contract check、typecheck、tests 与 production build 全绿。
 
 不得借 B5A 顺手加入新玩法或修改公共契约。
 
-B5A 已正式放行：
+B5A 已正式放行并进行中：
 
 ```text
 B5A core causal-feedback motion
 Issue #63
-STATUS = READY
+STATUS = IN_PROGRESS — REPLAY TRANSITION REMAINING
 MAY_START = true
 DEVELOPER_A_ACTION = NONE
 ```
@@ -372,7 +377,7 @@ connectivity evidence
 ```text
 M1 Integrated Playable Acceptance   [DONE / Issue #64 / GATE PASSED]
 ↓ GATE 1 PASSED
-B5A Core Causal-feedback Motion      [CURRENT — Issue #63 / READY]
+B5A Core Causal-feedback Motion      [CURRENT — Issue #63 / REPLAY REMAINING]
 ↓ UI PRESENTATION GATE
 M2 Agent A/B/C Evidence              [NEXT]
 ↓ GATE 2
