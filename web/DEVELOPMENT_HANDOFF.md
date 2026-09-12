@@ -10,7 +10,7 @@
 - B4 merge commit: `8769649cf587862b72f241fc64b531e5fdbbdbe6`
 - current Developer B state: **V0.2 FRONTEND DONE**
 - M1 browser/live-provider acceptance: **PASSED** — Issue #64 / PR #65
-- current Developer B task: **B5A IN PROGRESS** — Issue #63
+- B5A status: **COMPLETE / UI PRESENTATION GATE PASSED** — Issue #63 / PR #71
 - contract version: `mvp-v0.2`
 
 已完成：
@@ -26,16 +26,19 @@ generated TS + API seam          DONE — PR #58 / Issue #55
 B4 real HTTP integration         DONE — PR #61 / Issue #60
 B5A.1 round causal transition    DONE — current increment / Issue #63
 B5A.2 rule causal feedback       DONE — current increment / Issue #63
-B5A.3 escalation change feedback  DONE — current increment / Issue #63
+B5A.3 escalation change feedback DONE — PR #69 / Issue #63
+B5A.4 Replay transition           DONE — PR #71 / Issue #63
 ```
 
-Developer B V0.2 主任务已完成；M1 GATE 1 已通过，当前从最新 main 执行独立的 Issue #63 / B5A，不复用旧 B0–B4 调度语义。
+Developer B V0.2 主任务与 B5A 均已完成；M1 GATE 1、B5A UI PRESENTATION GATE 已通过。下一项实现工作必须来自 M2/M3 证据并建立新的 Issue。
 
 B5A.1 已增加约 1 秒的回合因果过渡：只比较 advance 前后两份公开 authoritative snapshot，展示红蓝公开行动、坐标与生命变化；演出期间继续锁住 mutation，`prefers-reduced-motion` 下直接落到权威结果。
 
 B5A.2 已把 accepted / rejected / MODEL_UNAVAILABLE 分为成功、拒绝、暂时不可用三种克制反馈；accepted 使用提交前后 authoritative snapshot 精确列出公开属性变化，且明确不会自动推进。`RULE_MODIFIER_APPLIED` 现使用公开 modifier payload 生成安全中文文案。
 
-B5A.3 已把战局升温变化接入回合因果过渡：只比较 advance 前后公开 authoritative escalation 的等级与连续无伤害回合，等级或进度变化时显示短暂的橙色边缘脉冲和可读变化行，并在 reduced-motion 下关闭脉冲。修正了 escalation 组件 class 与既有样式选择器不一致的问题；不新增或修改 public contract。Replay 过渡仍属于后续 B5A 增量。
+B5A.3 已把战局升温变化接入回合因果过渡：只比较 advance 前后公开 authoritative escalation 的等级与连续无伤害回合，等级或进度变化时显示短暂的橙色边缘脉冲和可读变化行，并在 reduced-motion 下关闭脉冲。修正了 escalation 组件 class 与既有样式选择器不一致的问题；不新增或修改 public contract。
+
+B5A.4 已完成 Replay 时间线过渡：只切换 ReplaySnapshot 产生的现有节点，显示前一节点到当前节点的关系；快速连续选择同步落到最后选中的 authoritative 节点，`prefers-reduced-motion` 下关闭动画。最终验收见 `docs/experiments/B5A_CORE_CAUSAL_FEEDBACK_ACCEPTANCE_2026-09-12.md`。
 
 ## 公共契约权威链
 
@@ -317,13 +320,13 @@ MockScenarioBar component
 
 ## 后续工作规则
 
-B0–B4 V0.2 前端主线与 M1 Gate 已完成。当前执行 B5A 时：
+B0–B4、M1 与 B5A 已完成。当前先冻结 M2 Agent A/B/C 实验设计：
 
-1. 先读最新 `main`、`DEVELOPER_A_GATE.md` 与本 handoff；
-2. 只在 Issue #63 范围内实现核心因果反馈动画；
+1. 先固定比较组、场景、seed、指标、样本量、失败统计和 Gate 2 判定规则；
+2. 未创建新的 Developer A Issue 并更新 `DEVELOPER_A_GATE.md` 前，不实现实验 harness 或 richer-plan Agent；
 3. 若修改 public contract，先声明 `CONTRACT CHANGE REQUIRED`，不要在前端私自补字段；
 4. 保持 `contract:check` / typecheck / tests / production build 全绿；
-5. 不把代码清理、安全依赖升级和新产品功能混进同一个 PR。
+5. 不把代码清理、安全依赖升级和新产品功能混进实验任务。
 
 ## 下一位 Developer B 必须先读
 
