@@ -255,7 +255,6 @@
   }
 }
 
-
 @media (prefers-reduced-motion: reduce) {
   .replay__detail-transition[data-direction] {
     animation: none;
