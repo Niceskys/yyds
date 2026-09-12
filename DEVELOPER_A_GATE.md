@@ -14,8 +14,9 @@ LAST_COMPLETED_PR = #59
 A3_MERGE = b79b1da08a3ff5801b286b5f970f7e371fd85a08
 B4_MERGE = 8769649cf587862b72f241fc64b531e5fdbbdbe6
 CURRENT_APPROVED_BACKEND_TASK = NONE
-LAST_SHARED_GATE = M1 Integrated Playable Acceptance / Issue #64 / PASSED
-CURRENT_FRONTEND_TASK = B5A Replay transition / Issue #63 / REMAINING
+LAST_SHARED_GATE = B5A UI Presentation / Issue #63 / PASSED
+CURRENT_FRONTEND_TASK = NONE — B5A COMPLETE
+NEXT_SHARED_TASK = M2 experiment design freeze
 DEVELOPER_A_ACTION_ON_B5A = NONE
 DEVELOPER_A_PLAYTEST = ALLOWED
 DO_NOT_START = true
@@ -38,14 +39,15 @@ M1 browser/live-provider Gate                          PASS — Issue #64 / PR #
 B5A.1 round causal transition / Issue #63              DONE
 B5A.2 rule causal feedback / Issue #63                 DONE
 B5A.3 escalation change feedback / Issue #63           DONE
-B5A Replay before/after transition / Issue #63         REMAINING
+B5A.4 Replay before/after transition / Issue #63        DONE — PR #71
+B5A UI PRESENTATION GATE                                 PASSED
 ```
 
-工程纵向切片已经接通。当前阶段不再是继续补 A0–A3 后端功能，而是进入新的 MVP 验收 / 实验阶段。
+工程纵向切片与 B5A UI PRESENTATION GATE 均已完成。当前阶段进入 M2 实验设计冻结；在新的 Developer A Issue 和 gate 放行前，不开始实验 harness 或 Agent 实现。
 
 M1 最终记录见 `docs/experiments/M1_INTEGRATED_PLAYABLE_ACCEPTANCE_2026-09-10.md`。真实 Chromium + live MiMo 已完成规则拒绝、规则接受、5 回合终局与 authoritative Replay；M1 GATE 1 已通过。Developer A 仍保持暂停，因为 B5A 是纯 Developer B 表现层任务，不构成新的后端授权。
 
-Issue #63 已由 Shared Review 放行为 Developer B 当前表现层任务，不是 Developer A 授权。B5A 放行不会自动解锁 Developer A。Developer A 可以按 `docs/PLAYTEST_QUICKSTART.md` 启动当前 main、完整试玩并提交观察记录；这属于产品验收，不是后端开发授权。
+Issue #63 已完成并通过 UI PRESENTATION GATE，但不构成 Developer A 授权。Developer A 可以按 `docs/PLAYTEST_QUICKSTART.md` 启动当前 main、完整试玩并提交观察记录；这属于产品验收，不是后端开发授权。B5A 验收记录见 `docs/experiments/B5A_CORE_CAUSAL_FEEDBACK_ACCEPTANCE_2026-09-12.md`。
 
 ## Developer A 当前允许
 
