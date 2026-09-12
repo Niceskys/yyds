@@ -1,6 +1,6 @@
 # 《规则之外》前端（Developer B）
 
-React + TypeScript + Vite。当前阶段：**B0–B4 已完成，正式 runtime 已接入 FastAPI V0.2；当前第一任务是 M1 Integrated Playable Acceptance。**
+React + TypeScript + Vite。B0–B4 与 M1 已完成，正式 runtime 已接入 FastAPI V0.2；B5A.1–B5A.3 因果反馈已合并，当前剩余 Replay before/after 过渡。
 
 ## 当前状态
 
@@ -10,11 +10,14 @@ B1 fixture-driven product UI             DONE
 B3 Replay UI                             DONE
 OpenAPI generated TypeScript + API seam  DONE
 B4 real HTTP frontend integration        DONE — PR #61
-M1 Integrated Playable Acceptance        CURRENT
-B5A core causal-feedback motion          BLOCKED_BY_M1_GATE — Issue #63
+M1 Integrated Playable Acceptance        PASSED — Issue #64
+B5A.1 round causal transition            DONE — Issue #63
+B5A.2 rule causal feedback               DONE — Issue #63
+B5A.3 escalation change feedback         DONE — Issue #63
+B5A Replay before/after transition       REMAINING — Issue #63
 ```
 
-B5A 不是当前 M1 的一部分。M1 通过并由 Shared Review 在 Issue #63 明确放行以前，不得借动画任务进行 UI 大改版。
+B5A 只改善 authoritative 状态变化的可读性，不改变 Engine、Planner、Rule DSL、revision/idempotency 或 public contract。
 
 ## 开发
 
@@ -27,7 +30,7 @@ npm run test       # vitest run
 npm run build      # tsc --noEmit && vite build
 ```
 
-真实 HTTP 模式还需要启动仓库中的 FastAPI 服务，并按环境配置 API base URL。当前权威启动、验收步骤以根目录 `AI_DEVELOPER_START_HERE.md`、`docs/MVP_NEXT_MILESTONE_2026-09-10.md` 和本目录 `DEVELOPMENT_HANDOFF.md` 为准。
+真实 HTTP 模式还需要启动仓库中的 FastAPI 服务。首次试玩优先使用根目录 [`scripts/start-local-playtest.ps1`](../scripts/start-local-playtest.ps1)；完整说明见 [`docs/PLAYTEST_QUICKSTART.md`](../docs/PLAYTEST_QUICKSTART.md)。开发任务边界仍以根目录 `AI_DEVELOPER_START_HERE.md`、`docs/MVP_NEXT_MILESTONE_2026-09-10.md` 和本目录 `DEVELOPMENT_HANDOFF.md` 为准。
 
 ## 正式数据流
 

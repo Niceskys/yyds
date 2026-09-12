@@ -2,6 +2,20 @@
 
 > 一个以“自然语言动态公共规则 + 双 AI 独立对抗”为核心机制的策略游戏。
 
+## 立即试玩
+
+Windows PowerShell（需要 Python 3.11+、Node.js 20+ 和 MiMo API key）：
+
+```powershell
+git clone https://github.com/Niceskys/yyds.git
+cd yyds
+.\scripts\start-local-playtest.ps1
+```
+
+脚本会安全询问 key、按需安装依赖、启动本地后端和前端，并打开游戏。按 `Ctrl+C` 可停止它启动的两个服务。其他平台、端口覆盖和故障排查见 [`docs/PLAYTEST_QUICKSTART.md`](docs/PLAYTEST_QUICKSTART.md)。
+
+> Developer A 可以使用此入口试玩和记录反馈；这不会解除 `DEVELOPER_A_GATE.md` 中的后端开发暂停状态。
+
 ## 项目一句话说明
 
 真人玩家不直接操控角色，而是观察两个各自以获胜为目标的独立 AI，在**每个完整回合结束后**决定是否替换一条同时约束红蓝双方的公共规则。玩家的当前目标不是帮助红方或蓝方，而是在有限生命值和不断升高的“战局升温”压力下，尽量让对局持续更多回合。
@@ -28,7 +42,7 @@
 
 # 当前阶段
 
-**状态：正式 MVP 产品开发（GO WITH CONDITIONS）。**
+**状态：可真实试玩的 MVP 纵向闭环已完成；B5A 核心因果反馈进行中。**
 
 第二轮独立审计后的行动基线：
 
@@ -44,18 +58,19 @@
 
 V0.1 合同和旧 cadence 文档保留为历史证据，但不再作为新产品实现依据。
 
-最重要的当前结论：
+当前工程状态：
 
 ```text
-Engine / RuleValidator / Agent / Planner 的基础足以继续做 MVP
-
-但：
-当前 DynamicRuleController 仍实现旧的 Phase0 + 每3回合规则阶段
-需要先迁移到 V0.2 每回合玩家决策流程
-
-并且：
-当前 LLM Agent 的“产品必要性”仍未被证明
+A0–A3 后端 V0.2 纵向切片              DONE
+B0–B4 React / HTTP / Replay            DONE
+M1 Chromium + live MiMo 可玩验收       PASSED
+B5A.1 回合因果过渡                     DONE
+B5A.2 规则结果反馈                     DONE
+B5A.3 战局升温反馈                     DONE
+B5A Replay before/after 过渡            REMAINING
 ```
+
+当前 LLM Agent 的产品必要性仍需后续 A/B/C 实验证明；可连通、可完成对局不等于已经证明它优于确定性策略。
 
 ---
 
@@ -307,7 +322,7 @@ DynamicRuleController
                Game Engine
 ```
 
-注意：`DynamicRuleController` 当前 main 实现仍是旧 V0.1 cadence；它是下一项必须迁移的后端任务。
+当前 main 的 `DynamicRuleController`、`MatchApplicationService` 与 FastAPI 五路由已迁移到 V0.2 cadence，并由真实 Chromium + live MiMo 闭环验证。
 
 ---
 
@@ -442,7 +457,7 @@ Sprint 1 仍必须用 A/B/C 验证。
 - deterministic Engine 可运行、可通过 seed 重现；
 - Rule DSL / Validator / Evaluator 可执行；
 - PublicRuleHistory 可确定性更新；
-- 动态公共规则可在旧 cadence 对局中替换并持续生效；
+- 动态公共规则可在 V0.2 每回合玩家决策流程中替换并持续生效；
 - Hard Liveness 能避免已知拖延策略无限拖局；
 - 自然语言 verified pipeline 已建立；
 - MiMo `mimo-v2.5-pro` 在第一次 V0.3 unseen verified holdout 上达到：
@@ -468,26 +483,9 @@ verifier_errors = 0
 
 # 当前仍未解决的问题
 
-## 1. V0.2 Controller cadence 尚未迁移
+## 1. B5A Replay before/after 过渡
 
-这是当前后端第一优先级。
-
-旧实现：
-
-```text
-pre-game phase 0
-rounds 3 / 6 / 9 ... rule phase
-```
-
-目标：
-
-```text
-第1回合无规则
-每个非终局回合后进入 PLAYER_DECISION
-每个 intermission 最多成功换规则一次
-```
-
-在这一步完成前，不继续按旧 cadence 写 MatchApplicationService。
+回合、规则结果与战局升温的核心因果反馈已经合并。Issue #63 仍需完成 Replay 的 before/after 过渡，并保证只播放权威历史、不重新调用模型、不修改历史事实。
 
 ## 2. LLM Agent 是否真的有价值
 
