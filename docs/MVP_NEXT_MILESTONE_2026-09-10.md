@@ -55,16 +55,16 @@ Browser React
 ```text
 M1 — Integrated Playable Acceptance（Issue #64 / DONE）
 ↓ GATE 1 PASSED
-B5A — Core Causal-feedback Motion（Issue #63 / CURRENT）
-↓ UI PRESENTATION GATE
-M2 — Agent A/B/C Evidence
+B5A — Core Causal-feedback Motion（Issue #63 / DONE）
+↓ UI PRESENTATION GATE PASSED
+M2 — Agent A/B/C Evidence（CURRENT — DESIGN FREEZE）
 ↓ GATE 2
 M3 — Human Playtest
 ↓
 B5B — 根据证据决定视觉润色，以及 Agent / 玩法 / UI 下一轮改动
 ```
 
-B5A 只补足玩家理解回合、公共规则与 Replay 所必需的因果反馈，不增加玩法，也不是装饰性大改版。M1 已通过，B5A 已放行。
+B5A 已补足玩家理解回合、公共规则、战局升温与 Replay 所必需的因果反馈，并通过 UI PRESENTATION GATE。当前先冻结 M2 实验设计，不直接开始 Agent 实现。
 
 这条主顺序跑通前，默认不增加新的玩法系统。
 
@@ -165,10 +165,12 @@ Agent richer plan
 
 ```text
 OWNER = Developer B
-STATUS = READY
-MAY_START = true
+STATUS = COMPLETE
+UI_PRESENTATION_GATE = PASSED
+FINAL_PR = #71
+MERGE = 0aed04097a9b25baa9caa25ce4b461823f6cd0ae
 DEVELOPER_A_ACTION = NONE
-CONTRACT_CHANGE = NOT_PLANNED
+CONTRACT_CHANGE = NONE
 ```
 
 目标不是让页面“更炫”，而是让普通玩家能直接看懂：
@@ -204,7 +206,7 @@ WebSocket
 Developer A 后端工作
 ```
 
-M1 GATE 1 已通过；Shared Review 在 Issue #63 留下 `READY — 可以开始` 后，Developer B 从最新 main 开工。
+M1 GATE 1 已通过；B5A 四个增量由 PR #67、#68、#69、#71 完成。最终证据见 [`B5A_CORE_CAUSAL_FEEDBACK_ACCEPTANCE_2026-09-12.md`](experiments/B5A_CORE_CAUSAL_FEEDBACK_ACCEPTANCE_2026-09-12.md)。
 
 ---
 
@@ -361,19 +363,20 @@ B0–B4 已完成。新的前端工作必须建立新 Issue。
 
 M1 已由 Shared Review 完成真实浏览器与 live Provider 验收，integration bug 已由 PR #65 修复。
 
-B5A 已建立 Issue #63，状态为 `READY`。Developer B 可从最新 main 开始表现层实现；Developer A 继续暂停。
+B5A Issue #63 已完成并通过 UI PRESENTATION GATE。Developer A 继续暂停；M2 实现须先建立新的 Issue 并按 gate 解锁。
 
 ---
 
 # 9. 当前第一任务
 
-**现在做 B5A Core Causal-feedback Motion。**
+**现在冻结 M2 Agent A/B/C Evidence 实验设计。**
 
-在 B5A 通过 UI PRESENTATION GATE 以前：
+实现开工前必须明确：
 
-- 不解锁 Developer A 做新 Agent feature；
-- 不实现 C richer plan；
-- 不做 UI 大改版；
-- 不提前做真人玩法扩展。
+- A/B/C 比较组与允许差异；
+- 可比较的场景、seed、样本量和运行预算；
+- provider 失败、fallback、invalid、延迟和成本的统计方式；
+- 行为差异、规则响应和 Replay 可解释性的测量方法；
+- Gate 2 的预注册判定规则。
 
-M1 已完成，Issue #63 不需要 contract 修改并已放行。B5A 的 UI PRESENTATION GATE 通过后再进入 M2。
+设计冻结不自动解锁 Developer A。若实验需要 harness、deterministic A 或 richer-plan C，先创建新的 Developer A Issue，更新 `DEVELOPER_A_GATE.md` 并取得明确 `READY — 可以开始`。
