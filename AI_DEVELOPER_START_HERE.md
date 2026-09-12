@@ -15,8 +15,8 @@
 ```text
 MVP 工程纵向切片已完成
 → M1 真实可玩验收已通过
-→ B5A.1–B5A.3 已完成，Replay 过渡仍待完成
-→ 准备 AI value validation / 真人试玩
+→ B5A Core Causal-feedback Motion 已完成并通过 UI PRESENTATION GATE
+→ 当前冻结 M2 Agent A/B/C 实验设计
 ```
 
 只想体验当前游戏的开发者直接阅读 [`docs/PLAYTEST_QUICKSTART.md`](docs/PLAYTEST_QUICKSTART.md)。Developer A 可以试玩并记录反馈，但这不会解除 `DEVELOPER_A_GATE.md` 中的后端开发暂停状态。
@@ -70,12 +70,11 @@ Developer B V0.2 umbrella Issue #38 已按 completed 关闭。
 # 3. 当前唯一第一任务
 
 ```text
-B5A — Core Causal-feedback Motion（Replay 过渡剩余）
-Issue #63
-STATUS = IN_PROGRESS
-M1_ISSUE_64 = COMPLETE
-M1_GATE_1 = PASSED
-DEVELOPER_A_ACTION = NONE
+M2 — Agent A/B/C Evidence / 实验设计冻结
+STATUS = PLANNING
+B5A_ISSUE_63 = COMPLETE
+UI_PRESENTATION_GATE = PASSED
+DEVELOPER_A_ACTION = NONE — 尚无新的批准 Issue
 ```
 
 M1 最终证据：`docs/experiments/M1_INTEGRATED_PLAYABLE_ACCEPTANCE_2026-09-10.md`。真实 Chromium + live MiMo 纵向闭环已通过；接收器绑定 bug 由 PR #65 修复，GATE 1 已关闭。
@@ -103,7 +102,7 @@ backend 启动
 → Replay
 ```
 
-B5A 剩余工作期间仍默认不要做：
+M2 实验设计冻结期间仍默认不要做：
 
 ```text
 新 DSL
@@ -117,7 +116,7 @@ WebSocket
 UI 大改版
 ```
 
-核心因果反馈动画已由 Shared Review 放行为 Developer B Issue #63。它只改善权威状态变化的可读性，不改变玩法或公共契约。
+核心因果反馈动画已由 PR #67、#68、#69、#71 完成，验收记录见 `docs/experiments/B5A_CORE_CAUSAL_FEEDBACK_ACCEPTANCE_2026-09-12.md`。下一步先固定 M2 的比较组、场景、指标、样本量和判定规则，再决定是否创建实现任务。
 
 ---
 
@@ -158,22 +157,23 @@ FastAPI V0.2
 
 Developer B 新工作必须建立新的 Issue。
 
-当前任务：
+当前状态：
 
-- B5A.1 回合、B5A.2 规则结果、B5A.3 战局升温反馈已完成；
-- 实现 Issue #63 剩余的 Replay before/after 过渡；
-- 保持动画后的 UI 与 authoritative snapshot 完全一致；
-- 保持 contract check、typecheck、tests 与 production build 全绿。
+- B5A.1 回合、B5A.2 规则结果、B5A.3 战局升温、B5A.4 Replay 过渡均已完成；
+- UI PRESENTATION GATE 已通过；
+- 下一项前端工作须由 M2/M3 证据产生新的 Issue；
+- contract check、typecheck、tests 与 production build 保持全绿。
 
 不得借 B5A 顺手加入新玩法或修改公共契约。
 
-B5A 已正式放行并进行中：
+B5A 已完成：
 
 ```text
 B5A core causal-feedback motion
 Issue #63
-STATUS = IN_PROGRESS — REPLAY TRANSITION REMAINING
-MAY_START = true
+STATUS = COMPLETE — UI PRESENTATION GATE PASSED
+FINAL_PR = #71
+MERGE = 0aed04097a9b25baa9caa25ce4b461823f6cd0ae
 DEVELOPER_A_ACTION = NONE
 ```
 
@@ -377,9 +377,9 @@ connectivity evidence
 ```text
 M1 Integrated Playable Acceptance   [DONE / Issue #64 / GATE PASSED]
 ↓ GATE 1 PASSED
-B5A Core Causal-feedback Motion      [CURRENT — Issue #63 / REPLAY REMAINING]
-↓ UI PRESENTATION GATE
-M2 Agent A/B/C Evidence              [NEXT]
+B5A Core Causal-feedback Motion      [DONE — Issue #63 / GATE PASSED]
+↓ UI PRESENTATION GATE PASSED
+M2 Agent A/B/C Evidence              [CURRENT — DESIGN FREEZE]
 ↓ GATE 2
 M3 Human Playtest                    [NEXT]
 ↓
