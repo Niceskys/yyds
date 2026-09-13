@@ -1,0 +1,1810 @@
+{
+  "components": {
+    "schemas": {
+      "ActionPublicView": {
+        "additionalProperties": false,
+        "properties": {
+          "attack": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WeaponPublic"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "move_path": {
+            "items": {
+              "$ref": "#/components/schemas/DirectionPublic"
+            },
+            "title": "Move Path",
+            "type": "array"
+          }
+        },
+        "title": "ActionPublicView",
+        "type": "object"
+      },
+      "AdvanceRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "AdvanceRequest",
+        "type": "object"
+      },
+      "AdvanceResult": {
+        "additionalProperties": false,
+        "properties": {
+          "match": {
+            "$ref": "#/components/schemas/MatchSnapshot"
+          },
+          "round": {
+            "$ref": "#/components/schemas/RoundExecutionPublicView"
+          },
+          "schema_version": {
+            "const": "mvp-v0.2",
+            "default": "mvp-v0.2",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "round",
+          "match"
+        ],
+        "title": "AdvanceResult",
+        "type": "object"
+      },
+      "BattleEscalationSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "hard_liveness_active": {
+            "title": "Hard Liveness Active",
+            "type": "boolean"
+          },
+          "level": {
+            "maximum": 4.0,
+            "minimum": 0.0,
+            "title": "Level",
+            "type": "integer"
+          },
+          "next_level_at_no_damage": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Level At No Damage"
+          },
+          "no_damage_streak": {
+            "minimum": 0.0,
+            "title": "No Damage Streak",
+            "type": "integer"
+          },
+          "rounds_until_next_level": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rounds Until Next Level"
+          }
+        },
+        "required": [
+          "level",
+          "no_damage_streak",
+          "hard_liveness_active"
+        ],
+        "title": "BattleEscalationSnapshot",
+        "type": "object"
+      },
+      "BoardSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "cols": {
+            "minimum": 1.0,
+            "title": "Cols",
+            "type": "integer"
+          },
+          "rows": {
+            "minimum": 1.0,
+            "title": "Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rows",
+          "cols"
+        ],
+        "title": "BoardSnapshot",
+        "type": "object"
+      },
+      "CreateMatchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          }
+        },
+        "title": "CreateMatchRequest",
+        "type": "object"
+      },
+      "DirectionPublic": {
+        "enum": [
+          "UP",
+          "DOWN",
+          "LEFT",
+          "RIGHT"
+        ],
+        "title": "DirectionPublic",
+        "type": "string"
+      },
+      "EffectiveStatsPublicView": {
+        "additionalProperties": false,
+        "properties": {
+          "bow_damage": {
+            "minimum": 0.0,
+            "title": "Bow Damage",
+            "type": "integer"
+          },
+          "bow_hit_floor": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Bow Hit Floor",
+            "type": "number"
+          },
+          "bow_hit_multiplier": {
+            "minimum": 0.0,
+            "title": "Bow Hit Multiplier",
+            "type": "number"
+          },
+          "bow_range": {
+            "minimum": 0.0,
+            "title": "Bow Range",
+            "type": "integer"
+          },
+          "conflict_level": {
+            "maximum": 4.0,
+            "minimum": 0.0,
+            "title": "Conflict Level",
+            "type": "integer"
+          },
+          "cooldown_weapons": {
+            "items": {
+              "$ref": "#/components/schemas/WeaponPublic"
+            },
+            "title": "Cooldown Weapons",
+            "type": "array"
+          },
+          "hard_liveness": {
+            "title": "Hard Liveness",
+            "type": "boolean"
+          },
+          "knife_damage": {
+            "minimum": 0.0,
+            "title": "Knife Damage",
+            "type": "integer"
+          },
+          "knife_range": {
+            "minimum": 0.0,
+            "title": "Knife Range",
+            "type": "integer"
+          },
+          "move_range": {
+            "minimum": 0.0,
+            "title": "Move Range",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "move_range",
+          "knife_range",
+          "bow_range",
+          "knife_damage",
+          "bow_damage",
+          "bow_hit_multiplier",
+          "bow_hit_floor",
+          "conflict_level",
+          "hard_liveness"
+        ],
+        "title": "EffectiveStatsPublicView",
+        "type": "object"
+      },
+      "ErrorCode": {
+        "enum": [
+          "REVISION_CONFLICT",
+          "RULE_SUBMISSION_NOT_ALLOWED",
+          "ADVANCE_NOT_ALLOWED",
+          "MATCH_TERMINAL",
+          "MATCH_NOT_FOUND",
+          "IDEMPOTENCY_KEY_REQUIRED",
+          "INVALID_REQUEST",
+          "MODEL_UNAVAILABLE",
+          "INTERNAL_ERROR"
+        ],
+        "title": "ErrorCode",
+        "type": "string"
+      },
+      "ErrorDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "retryable"
+        ],
+        "title": "ErrorDetail",
+        "type": "object"
+      },
+      "ErrorEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          },
+          "schema_version": {
+            "const": "mvp-v0.2",
+            "default": "mvp-v0.2",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorEnvelope",
+        "type": "object"
+      },
+      "GameConfigPublicView": {
+        "additionalProperties": false,
+        "properties": {
+          "base_bow_range": {
+            "minimum": 0.0,
+            "title": "Base Bow Range",
+            "type": "integer"
+          },
+          "base_knife_range": {
+            "minimum": 0.0,
+            "title": "Base Knife Range",
+            "type": "integer"
+          },
+          "base_move_range": {
+            "minimum": 0.0,
+            "title": "Base Move Range",
+            "type": "integer"
+          },
+          "bow_damage": {
+            "minimum": 0.0,
+            "title": "Bow Damage",
+            "type": "integer"
+          },
+          "cols": {
+            "minimum": 1.0,
+            "title": "Cols",
+            "type": "integer"
+          },
+          "initial_hp": {
+            "minimum": 1.0,
+            "title": "Initial Hp",
+            "type": "integer"
+          },
+          "knife_damage": {
+            "minimum": 0.0,
+            "title": "Knife Damage",
+            "type": "integer"
+          },
+          "late_game_hard_round": {
+            "minimum": 1.0,
+            "title": "Late Game Hard Round",
+            "type": "integer"
+          },
+          "max_rounds": {
+            "minimum": 1.0,
+            "title": "Max Rounds",
+            "type": "integer"
+          },
+          "rows": {
+            "minimum": 1.0,
+            "title": "Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rows",
+          "cols",
+          "initial_hp",
+          "max_rounds",
+          "late_game_hard_round",
+          "base_move_range",
+          "base_knife_range",
+          "base_bow_range",
+          "knife_damage",
+          "bow_damage"
+        ],
+        "title": "GameConfigPublicView",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "IntermissionChoicePublic": {
+        "enum": [
+          "CONTINUE",
+          "RULE_ATTEMPT"
+        ],
+        "title": "IntermissionChoicePublic",
+        "type": "string"
+      },
+      "JsonValue": {},
+      "MatchLifecycle": {
+        "enum": [
+          "RUNNING",
+          "PLAYER_DECISION",
+          "TERMINAL",
+          "FAILED_RECOVERABLE"
+        ],
+        "title": "MatchLifecycle",
+        "type": "string"
+      },
+      "MatchResultPublic": {
+        "enum": [
+          "RED_WIN",
+          "BLUE_WIN",
+          "DRAW_MUTUAL_DEATH",
+          "TIMEOUT"
+        ],
+        "title": "MatchResultPublic",
+        "type": "string"
+      },
+      "MatchSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "active_rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RulePublicView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "battle_escalation": {
+            "$ref": "#/components/schemas/BattleEscalationSnapshot"
+          },
+          "board": {
+            "$ref": "#/components/schemas/BoardSnapshot"
+          },
+          "completed_rounds": {
+            "minimum": 0.0,
+            "title": "Completed Rounds",
+            "type": "integer"
+          },
+          "effective_stats": {
+            "$ref": "#/components/schemas/TeamStatsMap"
+          },
+          "latest_strategy": {
+            "$ref": "#/components/schemas/TeamLatestStrategyMap"
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/MatchLifecycle"
+          },
+          "match_id": {
+            "minLength": 1,
+            "title": "Match Id",
+            "type": "string"
+          },
+          "player_decision": {
+            "$ref": "#/components/schemas/PlayerDecisionSnapshot"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MatchResultPublic"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "minimum": 0.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "round_no": {
+            "minimum": 1.0,
+            "title": "Round No",
+            "type": "integer"
+          },
+          "rule_change_count": {
+            "minimum": 0.0,
+            "title": "Rule Change Count",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": "mvp-v0.2",
+            "default": "mvp-v0.2",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "score_rounds": {
+            "minimum": 0.0,
+            "title": "Score Rounds",
+            "type": "integer"
+          },
+          "seed": {
+            "title": "Seed",
+            "type": "integer"
+          },
+          "units": {
+            "$ref": "#/components/schemas/TeamUnitMap"
+          }
+        },
+        "required": [
+          "match_id",
+          "revision",
+          "lifecycle",
+          "seed",
+          "round_no",
+          "completed_rounds",
+          "score_rounds",
+          "rule_change_count",
+          "board",
+          "units",
+          "active_rule",
+          "player_decision",
+          "effective_stats",
+          "latest_strategy",
+          "battle_escalation",
+          "result"
+        ],
+        "title": "MatchSnapshot",
+        "type": "object"
+      },
+      "PlayerDecisionSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "after_round": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Round"
+          },
+          "can_advance": {
+            "title": "Can Advance",
+            "type": "boolean"
+          },
+          "can_submit_rule": {
+            "title": "Can Submit Rule",
+            "type": "boolean"
+          },
+          "rule_changed_this_intermission": {
+            "title": "Rule Changed This Intermission",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "can_submit_rule",
+          "rule_changed_this_intermission",
+          "can_advance"
+        ],
+        "title": "PlayerDecisionSnapshot",
+        "type": "object"
+      },
+      "PositionSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "col": {
+            "minimum": 1.0,
+            "title": "Col",
+            "type": "integer"
+          },
+          "row": {
+            "minimum": 1.0,
+            "title": "Row",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "row",
+          "col"
+        ],
+        "title": "PositionSnapshot",
+        "type": "object"
+      },
+      "PublicStrategyDecision": {
+        "additionalProperties": false,
+        "properties": {
+          "contingency": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contingency"
+          },
+          "degraded": {
+            "default": false,
+            "title": "Degraded",
+            "type": "boolean"
+          },
+          "horizon_rounds": {
+            "anyOf": [
+              {
+                "maximum": 3.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon Rounds"
+          },
+          "intent": {
+            "$ref": "#/components/schemas/StrategyIntentPublic"
+          },
+          "plan_version": {
+            "default": "intent-v0.1",
+            "minLength": 1,
+            "title": "Plan Version",
+            "type": "string"
+          },
+          "risk_budget": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskBudgetPublic"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "short_term_goal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShortTermGoalPublic"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/StrategyDecisionStatusPublic"
+          },
+          "target_distance": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Distance"
+          },
+          "weapon_preference": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WeaponPreferencePublic"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "intent"
+        ],
+        "title": "PublicStrategyDecision",
+        "type": "object"
+      },
+      "ReplayIntermissionEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted_rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RulePublicView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accepted_rule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted Rule Id"
+          },
+          "active_rule_after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RulePublicView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "active_rule_before": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RulePublicView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "after_round": {
+            "minimum": 1.0,
+            "title": "After Round",
+            "type": "integer"
+          },
+          "choice": {
+            "$ref": "#/components/schemas/IntermissionChoicePublic"
+          },
+          "entry_type": {
+            "const": "INTERMISSION",
+            "default": "INTERMISSION",
+            "title": "Entry Type",
+            "type": "string"
+          },
+          "rule_change_count_after": {
+            "minimum": 0.0,
+            "title": "Rule Change Count After",
+            "type": "integer"
+          },
+          "submission_public_code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleSubmissionCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "submitted_player_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted Player Text"
+          }
+        },
+        "required": [
+          "after_round",
+          "choice",
+          "rule_change_count_after"
+        ],
+        "title": "ReplayIntermissionEntry",
+        "type": "object"
+      },
+      "ReplayRoundEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "actions": {
+            "$ref": "#/components/schemas/TeamActionMap"
+          },
+          "battle_escalation": {
+            "$ref": "#/components/schemas/BattleEscalationSnapshot"
+          },
+          "effective_stats": {
+            "$ref": "#/components/schemas/TeamStatsMap"
+          },
+          "entry_type": {
+            "const": "ROUND",
+            "default": "ROUND",
+            "title": "Entry Type",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/RoundEventPublicView"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "post_round_units": {
+            "$ref": "#/components/schemas/TeamUnitMap"
+          },
+          "pre_round": {
+            "$ref": "#/components/schemas/MatchSnapshot"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MatchResultPublic"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "round_no": {
+            "minimum": 1.0,
+            "title": "Round No",
+            "type": "integer"
+          },
+          "strategies": {
+            "$ref": "#/components/schemas/TeamRoundStrategyMap"
+          }
+        },
+        "required": [
+          "round_no",
+          "pre_round",
+          "strategies",
+          "actions",
+          "events",
+          "post_round_units",
+          "battle_escalation",
+          "effective_stats",
+          "result"
+        ],
+        "title": "ReplayRoundEntry",
+        "type": "object"
+      },
+      "ReplaySnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "initial_config": {
+            "$ref": "#/components/schemas/GameConfigPublicView"
+          },
+          "match_id": {
+            "minLength": 1,
+            "title": "Match Id",
+            "type": "string"
+          },
+          "replay_version": {
+            "const": "replay-v0.2",
+            "default": "replay-v0.2",
+            "title": "Replay Version",
+            "type": "string"
+          },
+          "rule_change_count": {
+            "minimum": 0.0,
+            "title": "Rule Change Count",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": "mvp-v0.2",
+            "default": "mvp-v0.2",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "score_rounds": {
+            "minimum": 0.0,
+            "title": "Score Rounds",
+            "type": "integer"
+          },
+          "seed": {
+            "title": "Seed",
+            "type": "integer"
+          },
+          "terminal_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MatchResultPublic"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timeline": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "INTERMISSION": "#/components/schemas/ReplayIntermissionEntry",
+                  "ROUND": "#/components/schemas/ReplayRoundEntry"
+                },
+                "propertyName": "entry_type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ReplayIntermissionEntry"
+                },
+                {
+                  "$ref": "#/components/schemas/ReplayRoundEntry"
+                }
+              ]
+            },
+            "title": "Timeline",
+            "type": "array"
+          }
+        },
+        "required": [
+          "match_id",
+          "seed",
+          "initial_config",
+          "timeline",
+          "terminal_result",
+          "score_rounds",
+          "rule_change_count"
+        ],
+        "title": "ReplaySnapshot",
+        "type": "object"
+      },
+      "RiskBudgetPublic": {
+        "enum": [
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "title": "RiskBudgetPublic",
+        "type": "string"
+      },
+      "RoundEventPublicView": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeamPublic"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "details": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Details",
+            "type": "object"
+          },
+          "event_version": {
+            "const": "event-v0.1",
+            "default": "event-v0.1",
+            "title": "Event Version",
+            "type": "string"
+          },
+          "kind": {
+            "minLength": 1,
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "RoundEventPublicView",
+        "type": "object"
+      },
+      "RoundExecutionPublicView": {
+        "additionalProperties": false,
+        "properties": {
+          "actions": {
+            "$ref": "#/components/schemas/TeamActionMap"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/RoundEventPublicView"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "round_no": {
+            "minimum": 1.0,
+            "title": "Round No",
+            "type": "integer"
+          },
+          "strategies": {
+            "$ref": "#/components/schemas/TeamRoundStrategyMap"
+          }
+        },
+        "required": [
+          "round_no",
+          "strategies",
+          "actions",
+          "events"
+        ],
+        "title": "RoundExecutionPublicView",
+        "type": "object"
+      },
+      "RuleAstPublicView": {
+        "additionalProperties": false,
+        "properties": {
+          "conditions": {
+            "items": {
+              "$ref": "#/components/schemas/RuleConditionPublicView"
+            },
+            "title": "Conditions",
+            "type": "array"
+          },
+          "duration": {
+            "$ref": "#/components/schemas/RuleDurationPublic"
+          },
+          "effect": {
+            "$ref": "#/components/schemas/RuleEffectPublicView"
+          },
+          "target": {
+            "$ref": "#/components/schemas/RuleTargetPublic"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "target",
+          "conditions",
+          "effect",
+          "duration"
+        ],
+        "title": "RuleAstPublicView",
+        "type": "object"
+      },
+      "RuleConditionPublicView": {
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/RuleConditionTypePublic"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "weapon": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleWeaponPublic"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "RuleConditionPublicView",
+        "type": "object"
+      },
+      "RuleConditionTypePublic": {
+        "enum": [
+          "SELF_HP_LTE",
+          "SELF_HP_GTE",
+          "SELF_HP_LT_OPPONENT",
+          "SELF_HP_GT_OPPONENT",
+          "DISTANCE_LTE",
+          "DISTANCE_GTE",
+          "ROUND_GTE",
+          "DID_NOT_MOVE_LAST_ROUND",
+          "LAST_ATTACK_WEAPON_IS",
+          "CONSECUTIVE_BOW_MISS_GTE",
+          "CONSECUTIVE_SAME_WEAPON_USE_GTE"
+        ],
+        "title": "RuleConditionTypePublic",
+        "type": "string"
+      },
+      "RuleDurationPublic": {
+        "enum": [
+          "UNTIL_REPLACED"
+        ],
+        "title": "RuleDurationPublic",
+        "type": "string"
+      },
+      "RuleEffectPublicView": {
+        "additionalProperties": false,
+        "properties": {
+          "delta": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "multiplier": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multiplier"
+          },
+          "rounds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rounds"
+          },
+          "type": {
+            "$ref": "#/components/schemas/RuleEffectTypePublic"
+          },
+          "weapon": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleWeaponPublic"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "RuleEffectPublicView",
+        "type": "object"
+      },
+      "RuleEffectTypePublic": {
+        "enum": [
+          "MOVE_RANGE_ADD",
+          "KNIFE_RANGE_ADD",
+          "BOW_RANGE_ADD",
+          "KNIFE_DAMAGE_ADD",
+          "BOW_DAMAGE_ADD",
+          "BOW_HIT_MULTIPLIER",
+          "WEAPON_COOLDOWN"
+        ],
+        "title": "RuleEffectTypePublic",
+        "type": "string"
+      },
+      "RulePublicView": {
+        "additionalProperties": false,
+        "properties": {
+          "ast": {
+            "$ref": "#/components/schemas/RuleAstPublicView"
+          },
+          "player_text": {
+            "title": "Player Text",
+            "type": "string"
+          },
+          "rule_id": {
+            "minLength": 1,
+            "title": "Rule Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule_id",
+          "player_text",
+          "ast"
+        ],
+        "title": "RulePublicView",
+        "type": "object"
+      },
+      "RuleSubmissionCode": {
+        "enum": [
+          "ACCEPTED",
+          "NO_CANDIDATE",
+          "RULE_REJECTED",
+          "FAITHFULNESS_REJECTED",
+          "MODEL_UNAVAILABLE",
+          "RULE_SUBMISSION_NOT_ALLOWED",
+          "MATCH_TERMINAL",
+          "REVISION_CONFLICT"
+        ],
+        "title": "RuleSubmissionCode",
+        "type": "string"
+      },
+      "RuleSubmissionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "player_text": {
+            "minLength": 1,
+            "title": "Player Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "player_text"
+        ],
+        "title": "RuleSubmissionRequest",
+        "type": "object"
+      },
+      "RuleSubmissionResult": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "candidate_preview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleAstPublicView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "match": {
+            "$ref": "#/components/schemas/MatchSnapshot"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "public_code": {
+            "$ref": "#/components/schemas/RuleSubmissionCode"
+          },
+          "rule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Id"
+          },
+          "schema_version": {
+            "const": "mvp-v0.2",
+            "default": "mvp-v0.2",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "suggested_rephrase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Rephrase"
+          }
+        },
+        "required": [
+          "accepted",
+          "public_code",
+          "message",
+          "match"
+        ],
+        "title": "RuleSubmissionResult",
+        "type": "object"
+      },
+      "RuleTargetPublic": {
+        "enum": [
+          "ALL_UNITS"
+        ],
+        "title": "RuleTargetPublic",
+        "type": "string"
+      },
+      "RuleWeaponPublic": {
+        "enum": [
+          "KNIFE",
+          "BOW",
+          "NONE"
+        ],
+        "title": "RuleWeaponPublic",
+        "type": "string"
+      },
+      "ShortTermGoalPublic": {
+        "enum": [
+          "DAMAGE",
+          "SURVIVE",
+          "TRIGGER_RULE",
+          "DENY_RULE"
+        ],
+        "title": "ShortTermGoalPublic",
+        "type": "string"
+      },
+      "StrategyDecisionStatusPublic": {
+        "enum": [
+          "ACCEPTED",
+          "FALLBACK_MODEL_ERROR",
+          "FALLBACK_PROTOCOL_ERROR"
+        ],
+        "title": "StrategyDecisionStatusPublic",
+        "type": "string"
+      },
+      "StrategyIntentPublic": {
+        "enum": [
+          "PRESSURE",
+          "KITE",
+          "EVADE",
+          "HOLD"
+        ],
+        "title": "StrategyIntentPublic",
+        "type": "string"
+      },
+      "TeamActionMap": {
+        "additionalProperties": false,
+        "properties": {
+          "BLUE": {
+            "$ref": "#/components/schemas/ActionPublicView"
+          },
+          "RED": {
+            "$ref": "#/components/schemas/ActionPublicView"
+          }
+        },
+        "required": [
+          "RED",
+          "BLUE"
+        ],
+        "title": "TeamActionMap",
+        "type": "object"
+      },
+      "TeamLatestStrategyMap": {
+        "additionalProperties": false,
+        "properties": {
+          "BLUE": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicStrategyDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "RED": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicStrategyDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "RED",
+          "BLUE"
+        ],
+        "title": "TeamLatestStrategyMap",
+        "type": "object"
+      },
+      "TeamPublic": {
+        "enum": [
+          "RED",
+          "BLUE"
+        ],
+        "title": "TeamPublic",
+        "type": "string"
+      },
+      "TeamRoundStrategyMap": {
+        "additionalProperties": false,
+        "properties": {
+          "BLUE": {
+            "$ref": "#/components/schemas/PublicStrategyDecision"
+          },
+          "RED": {
+            "$ref": "#/components/schemas/PublicStrategyDecision"
+          }
+        },
+        "required": [
+          "RED",
+          "BLUE"
+        ],
+        "title": "TeamRoundStrategyMap",
+        "type": "object"
+      },
+      "TeamStatsMap": {
+        "additionalProperties": false,
+        "properties": {
+          "BLUE": {
+            "$ref": "#/components/schemas/EffectiveStatsPublicView"
+          },
+          "RED": {
+            "$ref": "#/components/schemas/EffectiveStatsPublicView"
+          }
+        },
+        "required": [
+          "RED",
+          "BLUE"
+        ],
+        "title": "TeamStatsMap",
+        "type": "object"
+      },
+      "TeamUnitMap": {
+        "additionalProperties": false,
+        "properties": {
+          "BLUE": {
+            "$ref": "#/components/schemas/UnitSnapshot"
+          },
+          "RED": {
+            "$ref": "#/components/schemas/UnitSnapshot"
+          }
+        },
+        "required": [
+          "RED",
+          "BLUE"
+        ],
+        "title": "TeamUnitMap",
+        "type": "object"
+      },
+      "UnitSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "hp": {
+            "minimum": 0.0,
+            "title": "Hp",
+            "type": "integer"
+          },
+          "position": {
+            "$ref": "#/components/schemas/PositionSnapshot"
+          },
+          "team": {
+            "$ref": "#/components/schemas/TeamPublic"
+          }
+        },
+        "required": [
+          "team",
+          "hp",
+          "position"
+        ],
+        "title": "UnitSnapshot",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WeaponPreferencePublic": {
+        "enum": [
+          "KNIFE",
+          "BOW",
+          "ADAPTIVE"
+        ],
+        "title": "WeaponPreferencePublic",
+        "type": "string"
+      },
+      "WeaponPublic": {
+        "enum": [
+          "KNIFE",
+          "BOW"
+        ],
+        "title": "WeaponPublic",
+        "type": "string"
+      }
+    }
+  },
+  "info": {
+    "description": "Frozen MVP V0.2 public HTTP contract for the every-round player-decision flow. Route bodies are implemented by MatchApplicationService later.",
+    "title": "Rules Beyond MVP API",
+    "version": "0.2.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/matches": {
+      "post": {
+        "operationId": "create_match_api_v1_matches_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchSnapshot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Match"
+      }
+    },
+    "/api/v1/matches/{match_id}": {
+      "get": {
+        "operationId": "get_match_api_v1_matches__match_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchSnapshot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Match"
+      }
+    },
+    "/api/v1/matches/{match_id}/advance": {
+      "post": {
+        "operationId": "advance_match_api_v1_matches__match_id__advance_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdvanceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdvanceResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Advance Match"
+      }
+    },
+    "/api/v1/matches/{match_id}/replay": {
+      "get": {
+        "operationId": "get_replay_api_v1_matches__match_id__replay_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaySnapshot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Replay"
+      }
+    },
+    "/api/v1/matches/{match_id}/rules": {
+      "post": {
+        "operationId": "submit_rule_api_v1_matches__match_id__rules_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleSubmissionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSubmissionResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Submit Rule"
+      }
+    }
+  }
+}

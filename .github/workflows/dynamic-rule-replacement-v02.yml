@@ -1,0 +1,27 @@
+name: dynamic-rule-replacement-v02
+
+# Current-cadence deterministic dynamic public-rule replacement experiment.
+# This is a NEW experiment for the V0.2 intermission state machine, not a rerun
+# of the frozen V0.1 dynamic-rule-replacement PASS (2026-09-08).
+
+on:
+  pull_request:
+    paths:
+      - "src/rules_beyond/**"
+      - "tests/**"
+      - ".github/workflows/dynamic-rule-replacement-v02.yml"
+      - "docs/experiments/DYNAMIC_RULE_REPLACEMENT_V0.2.md"
+  workflow_dispatch:
+
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install project
+        run: python -m pip install -e '.[dev]'
+      - name: Run deterministic V0.2 dynamic-rule experiment
+        run: python -m rules_beyond.dynamic_rule_experiment_v02 --matches-per-pair 500

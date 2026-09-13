@@ -1,0 +1,72 @@
+name: live-natural-language-dynamic-match (historical V0.1 FAIL)
+
+# HISTORICAL-ONLY REPRODUCTION ENTRY.
+#
+# Frozen Natural-Language Dynamic Match Gate V0.1 FAIL:
+#   run_id: 34184281670
+#   head:   9239cfa876f5a7fb3d050ad960ceacf851e43324
+#   evidence: docs/experiments/MIMO_V25_PRO_NL_DYNAMIC_MATCH_V01_FAIL_2026-09-08.md
+#
+# This workflow deliberately checks out that frozen commit so the historical
+# FAIL definition can never be replaced by the current V0.2 intermission
+# cadence. Current cadence Gate: .github/workflows/live-natural-language-dynamic-match-v03.yml
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "MiMo model name"
+        required: true
+        default: "mimo-v2.5-pro"
+        type: string
+
+jobs:
+  live-dynamic-match:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 9239cfa876f5a7fb3d050ad960ceacf851e43324
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install project
+        run: python -m pip install -e '.[dev]'
+
+      - name: Verify MiMo Token Plan secret exists
+        run: |
+          if [ -z "$MIMO_API_KEY" ]; then
+            echo "MIMO_API_KEY repository secret is not configured."
+            exit 1
+          fi
+
+      - name: Run historical natural-language dynamic match gate V0.1
+        id: live_gate
+        continue-on-error: true
+        env:
+          MODEL_NAME: ${{ inputs.model }}
+        run: |
+          mkdir -p live-match-output
+          python -m rules_beyond.live_natural_language_dynamic_match \
+            --model "$MODEL_NAME" \
+            > live-match-output/result.json
+
+      - name: Upload live match trace
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-natural-language-dynamic-match
+          path: live-match-output/result.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Enforce live gate result
+        if: steps.live_gate.outcome != 'success'
+        run: exit 1

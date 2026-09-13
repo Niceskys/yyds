@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Local secrets / environment
+.env
+.env.*
+!.env.example
+
+# Local benchmark output
+benchmark-output/
+
+# Local playtest launcher logs
+.local-playtest/
+
+# Local browser verification artifacts
+.playwright-cli/
+/output/

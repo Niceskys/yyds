@@ -1,0 +1,29 @@
+name: dynamic-rule-replacement (historical V0.1 PASS)
+
+# HISTORICAL-ONLY REPRODUCTION ENTRY.
+#
+# Frozen V0.1 "Dynamic Public-Rule Replacement Experiment" PASS:
+#   results commit: d8e5ec00f9e4116bc43d8e05ffdc674dcb064a27
+#   evidence: docs/experiments/DYNAMIC_RULE_REPLACEMENT_2026-09-08.md
+#
+# This workflow deliberately checks out that frozen commit so the historical
+# V0.1 experiment definition can never be replaced by the current V0.2
+# intermission cadence. Current cadence experiment:
+# .github/workflows/dynamic-rule-replacement-v02.yml
+on:
+  workflow_dispatch:
+
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: d8e5ec00f9e4116bc43d8e05ffdc674dcb064a27
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install project
+        run: python -m pip install -e '.[dev]'
+      - name: Run historical deterministic dynamic-rule experiment
+        run: python -m rules_beyond.dynamic_rule_experiment --matches-per-pair 500
