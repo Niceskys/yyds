@@ -547,7 +547,45 @@ def _gate2(by_arm, b_minus_a, c_minus_b, b_ci, c_ci, fallback_rates) -> str:
     return "REDESIGN AI ROLE"
 
 
-def run_experiment(seeds, output_dir: Path, *, api_key: str, model: str = MODEL) -> dict:
+def render_report(summary: Mapping[str, object], *, model: str, phase: str) -> str:
+    by_arm = summary["by_arm"]
+    lines = [
+        "# M2 Agent A/B/C Experiment Report", "",
+        f"- Phase: `{phase}`", f"- Model: `{model}`",
+        f"- Matches: {summary['matches']}",
+        f"- Provider calls: {summary['provider_calls']}",
+        f"- Reserved cost: USD {summary['reserved_cost_usd']:.4f}",
+        f"- Provisional Gate 2: **{summary['gate2_provisional']}**", "",
+        "| Arm | Matches | Capture rate | Fallback rate | Mean rounds |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    for arm in Arm:
+        item = by_arm[arm.value]
+        lines.append(
+            f"| {arm.value} | {item['matches']} | {item['capture_rate']:.3f} | "
+            f"{item['fallback_rate']:.3f} | {item['mean_rounds']:.2f} |"
+        )
+    lines += [
+        "",
+        f"- B−A capture rate: {summary['b_minus_a_capture_rate']:.3f}; "
+        f"bootstrap 95% CI {summary['b_minus_a_bootstrap_95ci']}",
+        f"- C−B capture rate: {summary['c_minus_b_capture_rate']:.3f}; "
+        f"bootstrap 95% CI {summary['c_minus_b_bootstrap_95ci']}",
+        f"- Planner snapshot issues: {summary['planner_snapshot_issues']}",
+        f"- Engine invalid-attack events: {summary['engine_invalid_events']}",
+        f"- Model fallbacks: {summary['model_fallbacks']}",
+        f"- Protocol fallbacks: {summary['protocol_fallbacks']}", "",
+        "Pilot results are provisional. Confirm samples and blinded Replay scoring "
+        "are required before a final product decision. Provider token usage was not "
+        "returned through the current adapter, so the report separates conservative "
+        "reserved cost from the UTF-8 character estimate.",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def run_experiment(
+    seeds, output_dir: Path, *, api_key: str, model: str = MODEL, phase: str = "custom"
+) -> dict:
     meter = BudgetMeter()
     def factory(shared_meter):
         return MeteredModel(MimoStrategyModel(api_key, model_name=model), shared_meter)
@@ -563,8 +601,17 @@ def run_experiment(seeds, output_dir: Path, *, api_key: str, model: str = MODEL)
                 ))
     output_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "model": model, "seeds": list(seeds), "scenarios": list(SCENARIOS),
+        "phase": phase, "provider": "Xiaomi MiMo API", "model": model,
+        "account_plan": "MiMo Pro subscription",
+        "seeds": list(seeds), "scenarios": list(SCENARIOS),
+        "arm_order": "ABC/BCA/CAB deterministic rotation by seed",
+        "config": asdict(M2_CONFIG),
         "max_calls": meter.max_calls, "max_cost_usd": meter.max_cost_usd,
+        "pricing_usd_per_mtok": {
+            "cache_miss_input": INPUT_USD_PER_MTOK, "output": OUTPUT_USD_PER_MTOK,
+        },
+        "provider_usage_available": False,
+        "artifact_policy": "no key, prompt, raw output, raw error, or private memory",
         "thresholds_frozen": True,
     }
     by_arm = {}
@@ -623,15 +670,9 @@ def run_experiment(seeds, output_dir: Path, *, api_key: str, model: str = MODEL)
             for item in items:
                 handle.write(json.dumps(asdict(item), ensure_ascii=False, default=str) + "\n")
     (output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
-    report = [
-        "# M2 Agent A/B/C Experiment Report", "",
-        f"- Model: `{model}`", f"- Matches: {len(records)}",
-        f"- Provider calls: {meter.calls}",
-        f"- Reserved cost: USD {meter.reserved_cost_usd:.4f}",
-        f"- Provisional Gate 2: **{summary['gate2_provisional']}**", "",
-        "Pilot results are provisional. Explainability review and confirm samples are required before a final product decision.",
-    ]
-    (output_dir / "report.md").write_text("\n".join(report) + "\n", encoding="utf-8")
+    (output_dir / "report.md").write_text(
+        render_report(summary, model=model, phase=phase), encoding="utf-8"
+    )
     return summary
 
 
@@ -645,7 +686,9 @@ def main() -> None:
     if not api_key.strip():
         raise SystemExit("MIMO_API_KEY is not set")
     seeds = PILOT_SEEDS if args.phase == "pilot" else CONFIRM_SEEDS
-    print(json.dumps(run_experiment(seeds, args.output, api_key=api_key, model=args.model), indent=2))
+    print(json.dumps(run_experiment(
+        seeds, args.output, api_key=api_key, model=args.model, phase=args.phase
+    ), indent=2))
 
 
 if __name__ == "__main__":
