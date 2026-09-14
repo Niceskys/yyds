@@ -1,0 +1,78 @@
+{
+  "matches": 36,
+  "provider_calls": 462,
+  "reserved_cost_usd": 0.324952,
+  "estimated_cost_usd_usage_missing": 0.036025,
+  "latency_p50_ms": 1257.3913500018534,
+  "latency_p95_ms": 2639.9278999961098,
+  "planner_snapshot_issues": 0,
+  "engine_invalid_events": 261,
+  "model_fallbacks": 5,
+  "protocol_fallbacks": 0,
+  "by_arm": {
+    "A": {
+      "matches": 12,
+      "mean_rounds": 12.916666666666666,
+      "results": {
+        "DRAW_MUTUAL_DEATH": 7,
+        "RED_WIN": 3,
+        "BLUE_WIN": 2
+      },
+      "eligible_opportunities": 154,
+      "captured_opportunities": 61,
+      "capture_rate": 0.3961038961038961,
+      "fallback_rate": 0.0,
+      "planner_snapshot_issues": 0,
+      "unique_action_signatures": 15,
+      "action_signature_entropy": 3.385375528573437
+    },
+    "B": {
+      "matches": 12,
+      "mean_rounds": 8.916666666666666,
+      "results": {
+        "DRAW_MUTUAL_DEATH": 5,
+        "RED_WIN": 4,
+        "BLUE_WIN": 3
+      },
+      "eligible_opportunities": 72,
+      "captured_opportunities": 28,
+      "capture_rate": 0.3888888888888889,
+      "fallback_rate": 0.009345794392523364,
+      "planner_snapshot_issues": 0,
+      "unique_action_signatures": 20,
+      "action_signature_entropy": 3.8063215031936344
+    },
+    "C": {
+      "matches": 12,
+      "mean_rounds": 10.333333333333334,
+      "results": {
+        "RED_WIN": 6,
+        "DRAW_MUTUAL_DEATH": 3,
+        "BLUE_WIN": 3
+      },
+      "eligible_opportunities": 136,
+      "captured_opportunities": 50,
+      "capture_rate": 0.36764705882352944,
+      "fallback_rate": 0.012096774193548387,
+      "planner_snapshot_issues": 0,
+      "unique_action_signatures": 20,
+      "action_signature_entropy": 3.974397934226485
+    }
+  },
+  "b_minus_a_capture_rate": -0.00721500721500723,
+  "b_minus_a_bootstrap_95ci": [
+    -0.4004702194357367,
+    0.47247203334064486
+  ],
+  "c_minus_b_capture_rate": -0.021241830065359457,
+  "c_minus_b_bootstrap_95ci": [
+    -0.4602272727272727,
+    0.425
+  ],
+  "gate2_provisional": "REDESIGN AI ROLE",
+  "cross_team_private_memory_leaks": 0,
+  "public_contract_drift": 0,
+  "replay_reconstructable_matches": 36,
+  "replay_reconstructability": 1.0,
+  "integrity_gate_passed": true
+}

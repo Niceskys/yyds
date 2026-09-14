@@ -1,0 +1,40 @@
+{
+  "model": "mimo-v2.5",
+  "seeds": [
+    1280000,
+    1280001,
+    1280002
+  ],
+  "scenarios": [
+    "S0_control",
+    "S1_mobility",
+    "S2_range",
+    "S3_replacement"
+  ],
+  "max_calls": 4800,
+  "max_cost_usd": 5.0,
+  "thresholds_frozen": true,
+  "phase": "pilot",
+  "provider": "Xiaomi MiMo API",
+  "account_plan": "MiMo Pro subscription",
+  "arm_order": "ABC/BCA/CAB deterministic rotation by seed",
+  "config": {
+    "rows": 5,
+    "cols": 5,
+    "initial_hp": 5,
+    "max_rounds": 30,
+    "late_game_hard_round": 24,
+    "base_move_range": 1,
+    "base_knife_range": 1,
+    "base_bow_range": 3,
+    "knife_damage": 2,
+    "bow_damage": 1
+  },
+  "pricing_usd_per_mtok": {
+    "cache_miss_input": 0.14,
+    "output": 0.28
+  },
+  "provider_usage_available": false,
+  "artifact_policy": "no key, prompt, raw output, raw error, or private memory",
+  "runner_commit": "3b89a3794946bc6a92c3a7a1dbda87cb89ce5062"
+}
