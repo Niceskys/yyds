@@ -7,20 +7,20 @@
 ## CURRENT STATUS
 
 ```text
-DEVELOPER_A_GATE = PAUSED_BY_OWNER
+DEVELOPER_A_GATE = READY
 LAST_COMPLETED_TASK = A3 FastAPI V0.2 five-route vertical slice
 LAST_COMPLETED_ISSUE = #53
 LAST_COMPLETED_PR = #59
 A3_MERGE = b79b1da08a3ff5801b286b5f970f7e371fd85a08
 B4_MERGE = 8769649cf587862b72f241fc64b531e5fdbbdbe6
-CURRENT_APPROVED_BACKEND_TASK = NONE
+CURRENT_APPROVED_BACKEND_TASK = M2 Agent A/B/C evidence harness and run / Issue #73
 LAST_SHARED_GATE = B5A UI Presentation / Issue #63 / PASSED
 CURRENT_FRONTEND_TASK = NONE — B5A COMPLETE
-NEXT_SHARED_TASK = M2 experiment design freeze
+NEXT_SHARED_TASK = M2 pilot evidence run
 DEVELOPER_A_ACTION_ON_B5A = NONE
 DEVELOPER_A_PLAYTEST = ALLOWED
-DO_NOT_START = true
-DO_NOT_START_NEW_TASK = true
+DO_NOT_START = false
+DO_NOT_START_NEW_TASK = false
 ```
 
 ## 当前项目工程状态
@@ -43,11 +43,13 @@ B5A.4 Replay before/after transition / Issue #63        DONE — PR #71
 B5A UI PRESENTATION GATE                                 PASSED
 ```
 
-工程纵向切片与 B5A UI PRESENTATION GATE 均已完成。当前阶段进入 M2 实验设计冻结；在新的 Developer A Issue 和 gate 放行前，不开始实验 harness 或 Agent 实现。
+工程纵向切片与 B5A UI PRESENTATION GATE 均已完成。M2 实验设计已冻结，Issue #73 已登记 provider、model、调用/金额上限和盲审流程；当前只授权实现并运行该 Issue 的实验范围。
 
-M1 最终记录见 `docs/experiments/M1_INTEGRATED_PLAYABLE_ACCEPTANCE_2026-09-10.md`。真实 Chromium + live MiMo 已完成规则拒绝、规则接受、5 回合终局与 authoritative Replay；M1 GATE 1 已通过。Developer A 仍保持暂停，因为 B5A 是纯 Developer B 表现层任务，不构成新的后端授权。
+M1 最终记录见 `docs/experiments/M1_INTEGRATED_PLAYABLE_ACCEPTANCE_2026-09-10.md`。真实 Chromium + live MiMo 已完成规则拒绝、规则接受、5 回合终局与 authoritative Replay；M1 GATE 1 已通过。B5A 本身不构成后端授权；当前授权仅来自完成登记的 Issue #73。
 
 Issue #63 已完成并通过 UI PRESENTATION GATE，但不构成 Developer A 授权。Developer A 可以按 `docs/PLAYTEST_QUICKSTART.md` 启动当前 main、完整试玩并提交观察记录；这属于产品验收，不是后端开发授权。B5A 验收记录见 `docs/experiments/B5A_CORE_CAUSAL_FEEDBACK_ACCEPTANCE_2026-09-12.md`。
+
+M2 登记值：Xiaomi MiMo API / `mimo-v2.5-pro`；最多 4,800 次 provider 调用；硬金额上限 USD 15，两者任一先到即停止。Replay 解释性评分使用两次独立盲审和一次固定 rubric 裁决。碰撞语义按 Issue #77 决定保持当前 main 行为。
 
 ## Developer A 当前允许
 
@@ -55,6 +57,8 @@ Issue #63 已完成并通过 UI PRESENTATION GATE，但不构成 Developer A 授
 读取最新 main
 读取本 Gate / AI_DEVELOPER_START_HERE.md / 当前里程碑文档
 查看 A0–A3 handoff 与 Shared Review 结果
+按 Issue #73 和冻结协议实现 experiment-only M2 harness、A/C arm、instrumentation 与报告
+先运行 3-seed pilot；完整性、费用和产物检查通过后再运行 confirm
 从最新 main 运行本地试玩并记录玩家视角反馈
 做只读分析
 回答问题
@@ -67,10 +71,11 @@ Issue #63 已完成并通过 UI PRESENTATION GATE，但不构成 Developer A 授
 继续向旧 backend/fastapi-v02 等历史分支 push
 重新开始 A0 / A1 / A2 / A3
 开始旧 Day 4 / Day 5
-开始任何新的 backend feature
+开始 Issue #73 范围外的任何 backend feature
 修改 Developer B web/**
 擅自扩大 public schema / OpenAPI
 擅自修改 gameplay / Engine / Controller cadence / Rule DSL / Validator
+把 Issue #74、#75 或 #76 的提案混入 M2 实现
 重写 A1/A2 revision / lock / idempotency
 引入 DB / Redis / Celery / WebSocket / 账号 / leaderboard
 以旧聊天、旧 Issue 或旧 handoff 中的 READY 文案作为授权
