@@ -13,8 +13,8 @@
 | B | 12 | 0.389 | 0.009 | 8.92 |
 | C | 12 | 0.368 | 0.012 | 10.33 |
 
-- B−A capture rate: 0.071; bootstrap 95% CI [-0.10411445279866334, 0.2715247715247715]
-- C−B capture rate: -0.034; bootstrap 95% CI [-0.2635416666666667, 0.21236772486772484]
+- B−A capture rate: -0.007; bootstrap 95% CI [-0.4004702194357367, 0.47247203334064486]
+- C−B capture rate: -0.021; bootstrap 95% CI [-0.4602272727272727, 0.425]
 - Planner snapshot issues: 0
 - Engine invalid-attack events: 261
 - Model fallbacks: 5

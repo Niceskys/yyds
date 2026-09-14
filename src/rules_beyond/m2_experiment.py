@@ -545,29 +545,46 @@ def _entropy(signatures: list[str]) -> float:
     return -sum((count / total) * math.log2(count / total) for count in counts.values())
 
 
-def _paired_capture(records: list[MatchRecord], left: Arm, right: Arm) -> list[float]:
+def _paired_capture_units(
+    records: list[MatchRecord], left: Arm, right: Arm
+) -> list[tuple[int, int, int, int]]:
     indexed = {(r.scenario, r.seed, r.arm): r for r in records}
     values = []
     for scenario in SCENARIOS:
         for seed in sorted({r.seed for r in records}):
             a = indexed[(scenario, seed, left.value)]
             b = indexed[(scenario, seed, right.value)]
-            ar = a.captured_opportunities / a.eligible_opportunities if a.eligible_opportunities else 0.0
-            br = b.captured_opportunities / b.eligible_opportunities if b.eligible_opportunities else 0.0
-            values.append(br - ar)
+            values.append((
+                a.captured_opportunities, a.eligible_opportunities,
+                b.captured_opportunities, b.eligible_opportunities,
+            ))
     return values
 
 
-def _bootstrap_ci(values: list[float], *, samples: int = 10_000) -> list[float] | None:
-    if not values:
+def _capture_difference(values: list[tuple[int, int, int, int]]) -> float:
+    left_captured = sum(item[0] for item in values)
+    left_eligible = sum(item[1] for item in values)
+    right_captured = sum(item[2] for item in values)
+    right_eligible = sum(item[3] for item in values)
+    left_rate = left_captured / left_eligible if left_eligible else 0.0
+    right_rate = right_captured / right_eligible if right_eligible else 0.0
+    return right_rate - left_rate
+
+
+def _bootstrap_ci(
+    values: list[tuple[int, int, int, int]], *, samples: int = 10_000
+) -> list[float] | None:
+    if not values or not any(item[1] or item[3] for item in values):
         return None
     rng = random.Random(2_026_091_2)
     estimates = []
     for _ in range(samples):
         draw = [values[rng.randrange(len(values))] for _ in values]
-        estimates.append(sum(draw) / len(draw))
+        estimates.append(_capture_difference(draw))
     estimates.sort()
-    return [estimates[249], estimates[9749]]
+    lower = max(0, math.ceil(samples * .025) - 1)
+    upper = min(samples - 1, math.ceil(samples * .975) - 1)
+    return [estimates[lower], estimates[upper]]
 
 
 def _gate2(by_arm, b_minus_a, c_minus_b, b_ci, c_ci, fallback_rates) -> str:
@@ -679,10 +696,10 @@ def run_experiment(
             "unique_action_signatures": len(set(signatures)),
             "action_signature_entropy": _entropy(signatures),
         }
-    ba_values = _paired_capture(records, Arm.A, Arm.B)
-    cb_values = _paired_capture(records, Arm.B, Arm.C)
-    ba = sum(ba_values) / len(ba_values)
-    cb = sum(cb_values) / len(cb_values)
+    ba_values = _paired_capture_units(records, Arm.A, Arm.B)
+    cb_values = _paired_capture_units(records, Arm.B, Arm.C)
+    ba = _capture_difference(ba_values)
+    cb = _capture_difference(cb_values)
     ba_ci = _bootstrap_ci(ba_values)
     cb_ci = _bootstrap_ci(cb_values)
     reconstructable = sum(replay_reconstructable(record, rounds) for record in records)

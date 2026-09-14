@@ -59,15 +59,15 @@
       "action_signature_entropy": 3.974397934226485
     }
   },
-  "b_minus_a_capture_rate": 0.07146970962760436,
+  "b_minus_a_capture_rate": -0.00721500721500723,
   "b_minus_a_bootstrap_95ci": [
-    -0.10411445279866334,
-    0.2715247715247715
+    -0.4004702194357367,
+    0.47247203334064486
   ],
-  "c_minus_b_capture_rate": -0.03430886243386244,
+  "c_minus_b_capture_rate": -0.021241830065359457,
   "c_minus_b_bootstrap_95ci": [
-    -0.2635416666666667,
-    0.21236772486772484
+    -0.4602272727272727,
+    0.425
   ],
   "gate2_provisional": "REDESIGN AI ROLE",
   "cross_team_private_memory_leaks": 0,

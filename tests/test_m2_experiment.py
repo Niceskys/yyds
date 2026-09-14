@@ -49,6 +49,13 @@ def test_assignment_rotation_is_deterministic():
     assert arm_order(1_280_002) == (Arm.C, Arm.A, Arm.B)
 
 
+def test_paired_effect_aggregates_opportunity_counts():
+    units = [(1, 2, 1, 4), (0, 0, 3, 4)]
+    # left=1/2, right=4/8; the zero-opportunity left unit is not invented as a zero rate.
+    assert m2._capture_difference(units) == 0.0
+    assert m2._bootstrap_ci(units, samples=100) is not None
+
+
 def test_budget_stops_before_excess_call():
     meter = BudgetMeter(max_calls=1, max_cost_usd=5)
     wrapped = MeteredModel(FakeModel(), meter)
