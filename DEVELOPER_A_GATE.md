@@ -49,7 +49,7 @@ M1 最终记录见 `docs/experiments/M1_INTEGRATED_PLAYABLE_ACCEPTANCE_2026-09-1
 
 Issue #63 已完成并通过 UI PRESENTATION GATE，但不构成 Developer A 授权。Developer A 可以按 `docs/PLAYTEST_QUICKSTART.md` 启动当前 main、完整试玩并提交观察记录；这属于产品验收，不是后端开发授权。B5A 验收记录见 `docs/experiments/B5A_CORE_CAUSAL_FEEDBACK_ACCEPTANCE_2026-09-12.md`。
 
-M2 登记值：Xiaomi MiMo API / `mimo-v2.5-pro`；最多 4,800 次 provider 调用；硬金额上限 USD 15，两者任一先到即停止。Replay 解释性评分使用两次独立盲审和一次固定 rubric 裁决。碰撞语义按 Issue #77 决定保持当前 main 行为。
+M2 登记值：Xiaomi MiMo API / `mimo-v2.5`，账户使用 MiMo Pro 套餐；最多 4,800 次 provider 调用；硬金额上限 USD 5，两者任一先到即停止。Replay 解释性评分使用两次独立盲审和一次固定 rubric 裁决。碰撞语义按 Issue #77 决定保持当前 main 行为。
 
 ## Developer A 当前允许
 
