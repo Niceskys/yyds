@@ -7,7 +7,8 @@ import pytest
 import rules_beyond.m2_experiment as m2
 from rules_beyond.m2_experiment import (
     Arm, BudgetMeter, BudgetStop, FALLBACK_PLAN, MeteredModel, RichPlanner, SCENARIOS,
-    arm_order, parse_rich_plan, play_match, rich_decide, run_experiment,
+    arm_order, parse_rich_plan, play_match, replay_reconstructable, rich_decide,
+    run_experiment,
 )
 from rules_beyond.model import Team
 
@@ -94,6 +95,7 @@ def test_experiment_writes_required_safe_artifacts(monkeypatch, tmp_path):
     summary = run_experiment([1_280_000], tmp_path, api_key="secret-value", model="fake")
     assert summary["matches"] == 12
     assert summary["planner_snapshot_issues"] == 0
+    assert summary["replay_reconstructability"] == 1.0
     assert {path.name for path in tmp_path.iterdir()} == {
         "manifest.json", "matches.jsonl", "decisions.jsonl", "rounds.jsonl",
         "summary.json", "report.md",

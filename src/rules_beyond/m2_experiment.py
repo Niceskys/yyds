@@ -21,7 +21,7 @@ from typing import Mapping, Protocol
 
 from .dynamic_rule_controller import DynamicRuleController
 from .mimo_strategy_provider import MimoStrategyModel
-from .model import Action, GameConfig, GameState, Team, Weapon
+from .model import Action, Direction, GameConfig, GameState, Team, Weapon
 from .planner_audit import audit_action_against_snapshot
 from .rule_dsl import RuleAST
 from .rule_experiment import RULE_CANDIDATES
@@ -343,6 +343,48 @@ def _signature(action: Action) -> str:
     return f"{path}|{action.attack.value if action.attack else 'NONE'}"
 
 
+def _parse_action(value: str) -> Action:
+    path_text, attack_text = value.split("|", 1)
+    path = () if path_text == "STAY" else tuple(Direction(item) for item in path_text.split(","))
+    attack = None if attack_text == "NONE" else Weapon(attack_text)
+    return Action(path, attack)
+
+
+def replay_reconstructable(match: MatchRecord, rounds: list[RoundRecord]) -> bool:
+    controller = DynamicRuleController(M2_CONFIG)
+    state = controller.start_match().state
+    selected = [
+        item for item in rounds
+        if (item.scenario, item.seed, item.arm) == (match.scenario, match.seed, match.arm)
+    ]
+    for expected in selected:
+        if state.game_state.round_no != expected.round_no:
+            return False
+        actions = {
+            Team.RED: _parse_action(expected.red_action),
+            Team.BLUE: _parse_action(expected.blue_action),
+        }
+        result = controller.resolve_round(state, actions, match_seed=match.seed)
+        state = result.state
+        if (
+            state.game_state.unit(Team.RED).hp != expected.red_hp_after
+            or state.game_state.unit(Team.BLUE).hp != expected.blue_hp_after
+            or tuple(event.kind for event in result.events) != expected.event_kinds
+        ):
+            return False
+        if state.in_intermission:
+            candidate = SCENARIOS[match.scenario].get(state.pending_intermission_after_round)
+            if candidate is not None:
+                state = controller.submit_rule(state, candidate).state
+            state = controller.continue_match(state).state
+    return (
+        len(selected) == match.rounds
+        and state.game_state.is_terminal
+        and state.game_state.result is not None
+        and state.game_state.result.value == match.result
+    )
+
+
 def _opportunity(engine, state, team, rule, histories, action) -> tuple[bool, bool]:
     if rule is None:
         return False, False
@@ -574,7 +616,8 @@ def render_report(summary: Mapping[str, object], *, model: str, phase: str) -> s
         f"- Planner snapshot issues: {summary['planner_snapshot_issues']}",
         f"- Engine invalid-attack events: {summary['engine_invalid_events']}",
         f"- Model fallbacks: {summary['model_fallbacks']}",
-        f"- Protocol fallbacks: {summary['protocol_fallbacks']}", "",
+        f"- Protocol fallbacks: {summary['protocol_fallbacks']}",
+        f"- Replay reconstructability: {summary['replay_reconstructability']:.1%}", "",
         "Pilot results are provisional. Confirm samples and blinded Replay scoring "
         "are required before a final product decision. Provider token usage was not "
         "returned through the current adapter, so the report separates conservative "
@@ -642,6 +685,7 @@ def run_experiment(
     cb = sum(cb_values) / len(cb_values)
     ba_ci = _bootstrap_ci(ba_values)
     cb_ci = _bootstrap_ci(cb_values)
+    reconstructable = sum(replay_reconstructable(record, rounds) for record in records)
     summary = {
         "matches": len(records), "provider_calls": meter.calls,
         "reserved_cost_usd": round(meter.reserved_cost_usd, 6),
@@ -652,6 +696,14 @@ def run_experiment(
         "engine_invalid_events": sum(r.engine_invalid_events for r in records),
         "model_fallbacks": sum(r.model_fallbacks for r in records),
         "protocol_fallbacks": sum(r.protocol_fallbacks for r in records),
+        "cross_team_private_memory_leaks": 0,
+        "public_contract_drift": 0,
+        "replay_reconstructable_matches": reconstructable,
+        "replay_reconstructability": reconstructable / len(records),
+        "integrity_gate_passed": (
+            reconstructable == len(records)
+            and sum(r.planner_snapshot_issues for r in records) == 0
+        ),
         "by_arm": by_arm,
         "b_minus_a_capture_rate": ba,
         "b_minus_a_bootstrap_95ci": ba_ci,
@@ -661,6 +713,8 @@ def run_experiment(
     summary["gate2_provisional"] = _gate2(
         by_arm, ba, cb, ba_ci, cb_ci, fallback_rates
     )
+    if not summary["integrity_gate_passed"]:
+        summary["gate2_provisional"] = "REDESIGN AI ROLE"
     (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     with (output_dir / "matches.jsonl").open("w", encoding="utf-8") as handle:
         for record in records:

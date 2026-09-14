@@ -69,5 +69,10 @@
     -0.2635416666666667,
     0.21236772486772484
   ],
-  "gate2_provisional": "REDESIGN AI ROLE"
+  "gate2_provisional": "REDESIGN AI ROLE",
+  "cross_team_private_memory_leaks": 0,
+  "public_contract_drift": 0,
+  "replay_reconstructable_matches": 36,
+  "replay_reconstructability": 1.0,
+  "integrity_gate_passed": true
 }

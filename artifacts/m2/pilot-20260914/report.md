@@ -19,5 +19,6 @@
 - Engine invalid-attack events: 261
 - Model fallbacks: 5
 - Protocol fallbacks: 0
+- Replay reconstructability: 100.0%
 
 Pilot results are provisional. Confirm samples and blinded Replay scoring are required before a final product decision. Provider token usage was not returned through the current adapter, so the report separates conservative reserved cost from the UTF-8 character estimate.
