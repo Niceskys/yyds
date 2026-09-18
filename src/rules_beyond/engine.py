@@ -85,6 +85,7 @@ class GameEngine:
         positions, movement_events = self._resolve_joint_movement(
             state,
             normalized_actions,
+            priority=self._movement_priority(match_seed, state.round_no),
         )
         events.extend(movement_events)
 
@@ -223,6 +224,8 @@ class GameEngine:
         self,
         state: GameState,
         actions: Mapping[Team, Action],
+        *,
+        priority: Team,
     ) -> tuple[dict[Team, Position], list[Event]]:
         positions = {
             Team.RED: state.unit(Team.RED).position,
@@ -255,13 +258,26 @@ class GameEngine:
             if red_dest == blue_dest:
                 stopped[Team.RED] = True
                 stopped[Team.BLUE] = True
+                details: dict[str, object] = {
+                    "substep": index + 1,
+                    "destination": (red_dest.row, red_dest.col),
+                }
+                red_moved = red_dest != current_red
+                blue_moved = blue_dest != current_blue
+                if red_moved and blue_moved:
+                    blocked = priority.opponent
+                    positions[priority] = red_dest
+                    details.update(
+                        {
+                            "winner": priority.value,
+                            "blocked": blocked.value,
+                            "resolution": "PRIORITY_ENTRY",
+                        }
+                    )
                 events.append(
                     Event(
                         "SAME_DESTINATION_CONFLICT",
-                        details={
-                            "substep": index + 1,
-                            "destination": (red_dest.row, red_dest.col),
-                        },
+                        details=details,
                     )
                 )
                 continue
@@ -282,6 +298,12 @@ class GameEngine:
             positions[Team.BLUE] = blue_dest
 
         return positions, events
+
+    @staticmethod
+    def _movement_priority(match_seed: int, round_no: int) -> Team:
+        """Return a replay-stable priority that alternates every round."""
+
+        return Team.RED if (match_seed + round_no) % 2 == 0 else Team.BLUE
 
     @staticmethod
     def _movement_intent(

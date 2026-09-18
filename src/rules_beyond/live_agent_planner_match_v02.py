@@ -20,8 +20,8 @@ from .mimo_strategy_provider import MimoStrategyModel
 from .model import Action, GameConfig, MatchResult, Team
 from .planner_audit import audit_action_against_snapshot
 from .strategy_agent import (
-    DeterministicIntentPlanner,
     IsolatedStrategyAgent,
+    LegacyDeterministicIntentPlanner,
     StrategyDecision,
     StrategyDecisionStatus,
 )
@@ -170,7 +170,7 @@ def play_agent_match(
         raise ValueError("RED and BLUE must use distinct Agent session objects")
 
     controller = DynamicRuleController(config)
-    planner = DeterministicIntentPlanner()
+    planner = LegacyDeterministicIntentPlanner()
     started = controller.start_match()
     state = started.state
     event_counts: Counter[str] = Counter(event.kind for event in started.events)

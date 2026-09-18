@@ -508,6 +508,140 @@
         "title": "MatchSnapshot",
         "type": "object"
       },
+      "ModelCallEntryPublic": {
+        "additionalProperties": false,
+        "properties": {
+          "duration_ms": {
+            "minimum": 0.0,
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "endpoint_origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint Origin"
+          },
+          "model": {
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ModelCallOutcomePublic"
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/ModelCallPurposePublic"
+          },
+          "sequence": {
+            "minimum": 1.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "time": {
+            "minLength": 1,
+            "title": "Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sequence",
+          "time",
+          "purpose",
+          "model",
+          "outcome",
+          "duration_ms"
+        ],
+        "title": "ModelCallEntryPublic",
+        "type": "object"
+      },
+      "ModelCallLogExport": {
+        "additionalProperties": false,
+        "properties": {
+          "attempted_calls": {
+            "minimum": 0.0,
+            "title": "Attempted Calls",
+            "type": "integer"
+          },
+          "confirmed_responses": {
+            "minimum": 0.0,
+            "title": "Confirmed Responses",
+            "type": "integer"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ModelCallEntryPublic"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "failed_attempts": {
+            "minimum": 0.0,
+            "title": "Failed Attempts",
+            "type": "integer"
+          },
+          "log_version": {
+            "const": "model-call-log-v1",
+            "default": "model-call-log-v1",
+            "title": "Log Version",
+            "type": "string"
+          },
+          "match_id": {
+            "minLength": 1,
+            "title": "Match Id",
+            "type": "string"
+          },
+          "retained_entries": {
+            "minimum": 0.0,
+            "title": "Retained Entries",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": "mvp-v0.2",
+            "default": "mvp-v0.2",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "match_id",
+          "attempted_calls",
+          "confirmed_responses",
+          "failed_attempts",
+          "retained_entries",
+          "truncated",
+          "entries"
+        ],
+        "title": "ModelCallLogExport",
+        "type": "object"
+      },
+      "ModelCallOutcomePublic": {
+        "enum": [
+          "RESPONSE_RECEIVED",
+          "CALL_FAILED"
+        ],
+        "title": "ModelCallOutcomePublic",
+        "type": "string"
+      },
+      "ModelCallPurposePublic": {
+        "enum": [
+          "STRATEGY_RED",
+          "STRATEGY_BLUE",
+          "RULE_TRANSLATION",
+          "RULE_FAITHFULNESS"
+        ],
+        "title": "ModelCallPurposePublic",
+        "type": "string"
+      },
       "PlayerDecisionSnapshot": {
         "additionalProperties": false,
         "properties": {
@@ -1677,6 +1811,55 @@
           }
         },
         "summary": "Advance Match"
+      }
+    },
+    "/api/v1/matches/{match_id}/model-calls": {
+      "get": {
+        "operationId": "get_model_calls_api_v1_matches__match_id__model_calls_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelCallLogExport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Model Calls"
       }
     },
     "/api/v1/matches/{match_id}/replay": {

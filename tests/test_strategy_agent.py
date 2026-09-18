@@ -1,6 +1,15 @@
+from collections import Counter
 import json
 
-from rules_beyond.model import Team, Weapon, initial_state
+from rules_beyond.model import (
+    GameState,
+    MatchResult,
+    Position,
+    Team,
+    UnitState,
+    Weapon,
+    initial_state,
+)
 from rules_beyond.rule_engine import RuleAwareGameEngine
 from rules_beyond.rule_runtime import initial_public_rule_histories
 from rules_beyond.rule_validator import RuleValidator
@@ -164,3 +173,122 @@ def test_planner_reads_public_rule_effects_without_model_action_control() -> Non
 
     assert action.move_path == ()
     assert action.attack is Weapon.BOW
+
+
+def test_pressure_planners_resolve_center_contest_without_invalid_attack_loop() -> None:
+    state = GameState(
+        round_no=1,
+        units={
+            Team.RED: UnitState(Team.RED, Position(3, 2), 4),
+            Team.BLUE: UnitState(Team.BLUE, Position(3, 4), 4),
+        },
+    )
+    engine = RuleAwareGameEngine()
+    histories = initial_public_rule_histories()
+    planner = DeterministicIntentPlanner()
+    actions = {
+        team: planner.choose_action(
+            state,
+            team,
+            engine,
+            rule=None,
+            histories=histories,
+            intent=StrategyIntent.PRESSURE,
+        )
+        for team in (Team.RED, Team.BLUE)
+    }
+
+    resolution = engine.resolve_rule_round(
+        state,
+        actions,
+        rule=None,
+        histories=histories,
+        match_seed=1,
+    )
+
+    assert actions[Team.RED].attack is Weapon.KNIFE
+    assert actions[Team.BLUE].attack is Weapon.KNIFE
+    assert resolution.state.unit(Team.RED).position == Position(3, 3)
+    assert resolution.state.unit(Team.BLUE).position == Position(3, 4)
+    conflict = next(
+        event for event in resolution.events if event.kind == "SAME_DESTINATION_CONFLICT"
+    )
+    assert conflict.details["winner"] == "RED"
+    assert not any(event.kind == "INVALID_ATTACK" for event in resolution.events)
+    assert {
+        event.actor for event in resolution.events if event.kind == "ATTACK_RESOLVED"
+    } == {Team.RED, Team.BLUE}
+
+
+def test_pressure_planner_avoids_an_immediate_avoidable_mutual_death() -> None:
+    state = GameState(
+        round_no=3,
+        units={
+            Team.RED: UnitState(Team.RED, Position(3, 3), 2),
+            Team.BLUE: UnitState(Team.BLUE, Position(3, 4), 2),
+        },
+    )
+    engine = RuleAwareGameEngine()
+    histories = initial_public_rule_histories()
+    planner = DeterministicIntentPlanner()
+    actions = {
+        team: planner.choose_action(
+            state,
+            team,
+            engine,
+            rule=None,
+            histories=histories,
+            intent=StrategyIntent.PRESSURE,
+            match_seed=2,
+        )
+        for team in (Team.RED, Team.BLUE)
+    }
+
+    resolution = engine.resolve_rule_round(
+        state,
+        actions,
+        rule=None,
+        histories=histories,
+        match_seed=2,
+    )
+
+    assert not all(action.attack is Weapon.KNIFE for action in actions.values())
+    assert resolution.state.result is not MatchResult.DRAW_MUTUAL_DEATH
+
+
+def test_risk_aware_pressure_batch_reduces_draws_without_color_bias_or_timeouts() -> None:
+    outcomes: Counter[MatchResult] = Counter()
+    planner = DeterministicIntentPlanner()
+
+    for seed in range(80):
+        engine = RuleAwareGameEngine()
+        histories = initial_public_rule_histories()
+        state = initial_state()
+        while not state.is_terminal:
+            actions = {
+                team: planner.choose_action(
+                    state,
+                    team,
+                    engine,
+                    rule=None,
+                    histories=histories,
+                    intent=StrategyIntent.PRESSURE,
+                    match_seed=seed,
+                )
+                for team in (Team.RED, Team.BLUE)
+            }
+            resolution = engine.resolve_rule_round(
+                state,
+                actions,
+                rule=None,
+                histories=histories,
+                match_seed=seed,
+            )
+            state = resolution.state
+            histories = resolution.histories
+        assert state.result is not None
+        outcomes[state.result] += 1
+
+    assert outcomes[MatchResult.DRAW_MUTUAL_DEATH] <= 20
+    assert outcomes[MatchResult.TIMEOUT] == 0
+    assert abs(outcomes[MatchResult.RED_WIN] - outcomes[MatchResult.BLUE_WIN]) <= 10

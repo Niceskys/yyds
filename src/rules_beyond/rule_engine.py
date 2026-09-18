@@ -4,7 +4,17 @@ from dataclasses import dataclass
 from typing import Mapping
 
 from .engine import GameEngine
-from .model import Action, Event, GameConfig, GameState, MatchResult, Team, UnitState, Weapon
+from .model import (
+    Action,
+    Event,
+    GameConfig,
+    GameState,
+    MatchResult,
+    Position,
+    Team,
+    UnitState,
+    Weapon,
+)
 from .rule_dsl import RuleAST
 from .rule_runtime import (
     PublicRuleHistory,
@@ -114,7 +124,11 @@ class RuleAwareGameEngine(GameEngine):
             else:
                 normalized_actions[team] = Action(move_path, action.attack)
 
-        positions, movement_events = self._resolve_joint_movement(state, normalized_actions)
+        positions, movement_events = self._resolve_joint_movement(
+            state,
+            normalized_actions,
+            priority=self._movement_priority(match_seed, state.round_no),
+        )
         events.extend(movement_events)
 
         moved_units = {
@@ -205,6 +219,80 @@ class RuleAwareGameEngine(GameEngine):
             modifiers[team],
             hard_liveness_active=state.hard_liveness_active or late_game_hard,
         )
+
+    def preview_rule_movement(
+        self,
+        state: GameState,
+        actions: Mapping[Team, Action],
+        *,
+        rule: RuleAST | None,
+        histories: Mapping[Team, PublicRuleHistory] | None = None,
+        match_seed: int,
+    ) -> Mapping[Team, Position]:
+        """Preview authoritative joint movement without resolving attacks or RNG."""
+        histories = histories or initial_public_rule_histories()
+        if rule is not None:
+            self._require_valid_rule(rule)
+        modifiers = self.evaluator.evaluate(rule, state, histories)
+        late_game_hard = state.round_no >= self.config.late_game_hard_round
+        stats = {
+            side: self._effective_rule_stats(
+                state.no_damage_streak,
+                modifiers[side],
+                hard_liveness_active=state.hard_liveness_active or late_game_hard,
+            )
+            for side in (Team.RED, Team.BLUE)
+        }
+        normalized: dict[Team, Action] = {}
+        for side in (Team.RED, Team.BLUE):
+            action = actions.get(side, Action())
+            path = self._validate_move_path(
+                state.unit(side).position,
+                action.move_path,
+                stats[side].move_range,
+            )
+            normalized[side] = Action(path or (), action.attack)
+        positions, _ = self._resolve_joint_movement(
+            state,
+            normalized,
+            priority=self._movement_priority(match_seed, state.round_no),
+        )
+        return positions
+
+    @staticmethod
+    def expected_rule_attack(
+        team: Team,
+        weapon: Weapon | None,
+        positions: Mapping[Team, Position],
+        stats: RuleEffectiveStats,
+    ) -> tuple[float, int]:
+        """Return hit probability and damage using resolution's public semantics."""
+        units = {
+            side: UnitState(side, positions[side], 1)
+            for side in (Team.RED, Team.BLUE)
+        }
+        legal = RuleAwareGameEngine._is_rule_attack_legal(team, weapon, units, stats)
+        forced = stats.hard_liveness and not legal
+        if not legal:
+            weapon = Weapon.BOW if forced else None
+        if weapon is None:
+            return (0.0, 0)
+        if weapon is Weapon.KNIFE:
+            return (1.0, stats.knife_damage)
+
+        distance = positions[team].manhattan_distance(positions[team.opponent])
+        if forced:
+            probability = 1.0
+        else:
+            player_probability = (0.5 ** (distance - 1)) * stats.bow_hit_multiplier
+            normal_probability = _clamp_float(player_probability, 0.05, 1.0)
+            probability = _clamp_float(
+                max(normal_probability, stats.bow_hit_floor),
+                0.0,
+                1.0,
+            )
+        damage = max(1, stats.bow_damage) if stats.hard_liveness else stats.bow_damage
+        return (probability, damage)
 
     def _effective_rule_stats(
         self,

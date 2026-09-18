@@ -4,7 +4,7 @@
 
 ## 立即试玩
 
-Windows PowerShell（需要 Python 3.11+、Node.js 20+ 和 MiMo API key）：
+Windows PowerShell（需要 Python 3.11+、Node.js 20+ 和一个兼容 OpenAI Chat Completions 的模型 API）：
 
 ```powershell
 git clone https://github.com/Niceskys/yyds.git
@@ -12,7 +12,9 @@ cd yyds
 .\scripts\start-local-playtest.ps1
 ```
 
-脚本会安全询问 key、按需安装依赖、启动本地后端和前端，并打开游戏。按 `Ctrl+C` 可停止它启动的两个服务。其他平台、端口覆盖和故障排查见 [`docs/PLAYTEST_QUICKSTART.md`](docs/PLAYTEST_QUICKSTART.md)。
+脚本会询问 API 地址、模型名并隐藏输入 key，按需安装依赖、启动本地后端和前端，然后打开游戏。GLM、OpenAI 兼容中转服务及本地兼容服务均可接入。按 `Ctrl+C` 可停止它启动的两个服务。其他平台、兼容选项、端口覆盖和故障排查见 [`docs/PLAYTEST_QUICKSTART.md`](docs/PLAYTEST_QUICKSTART.md)。
+
+进入对局后可点击“导出AI调用日志”下载本局 JSON 凭据。文件只记录调用时间、用途、模型名、接口来源、耗时及是否收到响应；不会保存 API key、请求提示词、模型回答或接口路径与查询参数。
 
 > Developer A 可以使用此入口试玩和记录反馈；这不会解除 `DEVELOPER_A_GATE.md` 中的后端开发暂停状态。
 

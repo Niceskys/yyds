@@ -15,7 +15,7 @@ import {
   buildRuleFeedbackViewModel,
 } from './contract/mockAdapter';
 import { buildReplayViewModel } from './contract/replayAdapter';
-import type { MatchSnapshot } from './contract/types';
+import type { MatchSnapshot, ModelCallLogExport } from './contract/types';
 import type {
   GameErrorViewModel,
   ReplayViewModel,
@@ -79,6 +79,7 @@ export function App({
   const [startLoading, setStartLoading] = useState(false);
   const [mutationPending, setMutationPending] = useState<MutationKind | null>(null);
   const [replayLoading, setReplayLoading] = useState(false);
+  const [modelCallsLoading, setModelCallsLoading] = useState(false);
   const retryMutationRef = useRef<RetryMutation | null>(null);
 
   const match = useMemo(
@@ -246,6 +247,33 @@ export function App({
     }
   };
 
+  const downloadModelCallLog = (log: ModelCallLogExport) => {
+    const blob = new Blob([JSON.stringify(log, null, 2)], {
+      type: 'application/json;charset=utf-8',
+    });
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = `rules-beyond-model-calls-${log.match_id}.json`;
+    link.click();
+    URL.revokeObjectURL(objectUrl);
+  };
+
+  const handleExportModelCalls = async () => {
+    if (!snapshot || modelCallsLoading) return;
+    setModelCallsLoading(true);
+    setError(null);
+    try {
+      const log = await api.getModelCalls(snapshot.match_id);
+      downloadModelCallLog(log);
+      setNotice(`AI调用日志已导出：确认收到 ${log.confirmed_responses} 次模型响应。`);
+    } catch (caught) {
+      setError(toSafeGameError(caught));
+    } finally {
+      setModelCallsLoading(false);
+    }
+  };
+
   const handleRestart = () => {
     setSnapshot(null);
     setLastRound(null);
@@ -256,6 +284,7 @@ export function App({
     setReplay(null);
     setRuleText('');
     setMutationPending(null);
+    setModelCallsLoading(false);
     clearRetryMutation();
     setScreen('start');
   };
@@ -299,9 +328,11 @@ export function App({
         onAdvance={() => void handleAdvance()}
         onRestart={handleRestart}
         onOpenReplay={() => void handleOpenReplay()}
+        onExportModelCalls={() => void handleExportModelCalls()}
         submittingRule={mutationPending === 'rule'}
         advancing={mutationPending === 'advance'}
         replayLoading={replayLoading}
+        modelCallsLoading={modelCallsLoading}
       />
     </div>
   );

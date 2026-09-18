@@ -3,6 +3,7 @@ import type {
   CreateMatchRequest,
   ErrorEnvelope,
   MatchSnapshot,
+  ModelCallLogExport,
   ReplaySnapshot,
   RuleSubmissionResult,
 } from './types';
@@ -72,7 +73,7 @@ async function readJson(response: Response): Promise<unknown> {
 }
 
 /**
- * Real transport for the five frozen V0.2 match operations.
+ * Real transport for the frozen V0.2 match operations and read-only logs.
  *
  * It deliberately does not derive gameplay state. Its only responsibilities are:
  * URL/method/header/body translation, safe response parsing and transport errors.
@@ -126,6 +127,12 @@ export class HttpMatchApiAdapter implements MatchApiAdapter {
   getReplay(matchId: string): Promise<ReplaySnapshot> {
     return this.request<ReplaySnapshot>(
       `/api/v1/matches/${encodeURIComponent(matchId)}/replay`,
+    );
+  }
+
+  getModelCalls(matchId: string): Promise<ModelCallLogExport> {
+    return this.request<ModelCallLogExport>(
+      `/api/v1/matches/${encodeURIComponent(matchId)}/model-calls`,
     );
   }
 
@@ -191,6 +198,7 @@ const SAFE_ERROR_MESSAGES: Record<string, string> = {
   MATCH_TERMINAL: '对局已经结束，不能再执行这个操作。',
   RULE_SUBMISSION_NOT_ALLOWED: '当前阶段不能提交规则。',
   ADVANCE_NOT_ALLOWED: '当前阶段不能继续下一回合。',
+  MODEL_UNAVAILABLE: '模型服务暂时不可用，本回合没有结算，请重试。',
   INTERNAL_ERROR: '本回合未安全完成，请稍后重试。',
   [NETWORK_ERROR_CODE]: '无法连接到游戏服务，请检查连接后重试。',
   [INVALID_RESPONSE_CODE]: '游戏服务返回异常，请稍后重试。',

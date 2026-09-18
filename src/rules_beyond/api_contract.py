@@ -97,6 +97,18 @@ class StrategyDecisionStatusPublic(str, Enum):
     FALLBACK_PROTOCOL_ERROR = "FALLBACK_PROTOCOL_ERROR"
 
 
+class ModelCallPurposePublic(str, Enum):
+    STRATEGY_RED = "STRATEGY_RED"
+    STRATEGY_BLUE = "STRATEGY_BLUE"
+    RULE_TRANSLATION = "RULE_TRANSLATION"
+    RULE_FAITHFULNESS = "RULE_FAITHFULNESS"
+
+
+class ModelCallOutcomePublic(str, Enum):
+    RESPONSE_RECEIVED = "RESPONSE_RECEIVED"
+    CALL_FAILED = "CALL_FAILED"
+
+
 class WeaponPreferencePublic(str, Enum):
     KNIFE = "KNIFE"
     BOW = "BOW"
@@ -378,6 +390,28 @@ class ReplaySnapshot(ContractModel):
     terminal_result: MatchResultPublic | None
     score_rounds: int = Field(ge=0)
     rule_change_count: int = Field(ge=0)
+
+
+class ModelCallEntryPublic(ContractModel):
+    sequence: int = Field(ge=1)
+    time: str = Field(min_length=1)
+    purpose: ModelCallPurposePublic
+    model: str = Field(min_length=1)
+    endpoint_origin: str | None = None
+    outcome: ModelCallOutcomePublic
+    duration_ms: int = Field(ge=0)
+
+
+class ModelCallLogExport(ContractModel):
+    schema_version: Literal[SCHEMA_VERSION] = SCHEMA_VERSION
+    log_version: Literal["model-call-log-v1"] = "model-call-log-v1"
+    match_id: str = Field(min_length=1)
+    attempted_calls: int = Field(ge=0)
+    confirmed_responses: int = Field(ge=0)
+    failed_attempts: int = Field(ge=0)
+    retained_entries: int = Field(ge=0)
+    truncated: bool
+    entries: list[ModelCallEntryPublic]
 
 
 class ErrorDetail(ContractModel):

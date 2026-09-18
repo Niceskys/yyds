@@ -58,6 +58,10 @@ from .api_contract import (
     MatchLifecycle,
     MatchResultPublic,
     MatchSnapshot,
+    ModelCallEntryPublic,
+    ModelCallLogExport,
+    ModelCallOutcomePublic,
+    ModelCallPurposePublic,
     PlayerDecisionSnapshot,
     PositionSnapshot,
     PublicStrategyDecision,
@@ -91,6 +95,7 @@ from .api_contract import (
 )
 from .dynamic_rule_controller import DynamicMatchState
 from .model import Action, Event, GameConfig, MatchResult, Team
+from .model_call_log import ModelCallRecorder
 from .natural_language_dynamic_controller import (
     NaturalLanguageRuleAttempt,
     VerifiedNaturalLanguageDynamicController,
@@ -152,6 +157,12 @@ class RecoverableMatchFailure(MatchApplicationError):
 
     error_code = ErrorCode.INTERNAL_ERROR
     retryable = True
+
+
+class ModelUnavailableMatchFailure(RecoverableMatchFailure):
+    """A strategy call failed or returned an unusable response before resolution."""
+
+    error_code = ErrorCode.MODEL_UNAVAILABLE
 
 
 # ---------------------------------------------------------------------------
@@ -366,6 +377,7 @@ class MatchApplicationService:
         blue_agent: IsolatedStrategyAgent,
         rule_pipeline: VerifiedNaturalLanguageDynamicController,
         planner: DeterministicIntentPlanner | None = None,
+        model_call_recorder: ModelCallRecorder | None = None,
     ) -> None:
         if red_agent.team is not Team.RED or blue_agent.team is not Team.BLUE:
             raise ValueError("MatchApplicationService requires one RED and one BLUE agent")
@@ -375,6 +387,7 @@ class MatchApplicationService:
         self._blue_agent = blue_agent
         self._rules = rule_pipeline
         self._planner = planner or DeterministicIntentPlanner()
+        self._model_call_recorder = model_call_recorder or ModelCallRecorder()
         self._match: _MatchAggregate | None = None
 
     # -- read-only accessors -------------------------------------------------
@@ -422,6 +435,32 @@ class MatchApplicationService:
     def get_match_snapshot(self) -> MatchSnapshot:
         match = self._require_match()
         return _public_copy(self._snapshot(match, match.state))
+
+    def get_model_call_log(self) -> ModelCallLogExport:
+        """Return privacy-safe provider call receipts without touching game state."""
+
+        match = self._require_match()
+        snapshot = self._model_call_recorder.snapshot()
+        return ModelCallLogExport(
+            match_id=match.match_id,
+            attempted_calls=snapshot.attempted_calls,
+            confirmed_responses=snapshot.confirmed_responses,
+            failed_attempts=snapshot.failed_attempts,
+            retained_entries=len(snapshot.entries),
+            truncated=snapshot.truncated,
+            entries=[
+                ModelCallEntryPublic(
+                    sequence=entry.sequence,
+                    time=entry.time,
+                    purpose=ModelCallPurposePublic(entry.purpose.value),
+                    model=entry.model,
+                    endpoint_origin=entry.endpoint_origin,
+                    outcome=ModelCallOutcomePublic(entry.outcome.value),
+                    duration_ms=entry.duration_ms,
+                )
+                for entry in snapshot.entries
+            ],
+        )
 
     def submit_public_rule(self, player_text: str) -> RuleSubmissionResult:
         """Attempt one public-rule replacement inside the open intermission."""
@@ -548,6 +587,18 @@ class MatchApplicationService:
                 histories=working.histories,
                 remember=False,
             )
+            failed_teams = [
+                team.value
+                for team, decision in (
+                    (Team.RED, red_decision),
+                    (Team.BLUE, blue_decision),
+                )
+                if decision.status is not StrategyDecisionStatus.ACCEPTED
+            ]
+            if failed_teams:
+                raise ModelUnavailableMatchFailure(
+                    f"Strategy model unavailable for {', '.join(failed_teams)}"
+                )
             red_action = self._planner.choose_action(
                 working.game_state,
                 Team.RED,
@@ -555,6 +606,7 @@ class MatchApplicationService:
                 rule=working.active_rule,
                 histories=working.histories,
                 intent=red_decision.intent,
+                match_seed=match.seed,
             )
             blue_action = self._planner.choose_action(
                 working.game_state,
@@ -563,12 +615,15 @@ class MatchApplicationService:
                 rule=working.active_rule,
                 histories=working.histories,
                 intent=blue_decision.intent,
+                match_seed=match.seed,
             )
             resolved = self._rules.resolve_round(
                 working,
                 {Team.RED: red_action, Team.BLUE: blue_action},
                 match_seed=match.seed,
             )
+        except ModelUnavailableMatchFailure:
+            raise
         except Exception as exc:  # no aggregate mutation has happened yet
             raise RecoverableMatchFailure(
                 f"Round {played_round} could not be resolved completely: {type(exc).__name__}"

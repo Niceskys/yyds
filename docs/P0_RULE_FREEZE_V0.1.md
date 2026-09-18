@@ -316,7 +316,7 @@ intent_destination = current_position
 
 即 STAY/占位。
 
-## 3.4 冲突类型 A：进入同一目标格
+## 3.4 冲突类型 A：同时争夺同一空格
 
 若：
 
@@ -324,20 +324,25 @@ intent_destination = current_position
 red_destination == blue_destination
 ```
 
-则：
+当双方本子步都发生移动，且目标是同一个原本为空的格子时：
 
-- 两方本子步位置均不改变；
+- 由 `(match_seed + round_no) % 2` 决定本回合移动优先方：结果为 `0` 时红方
+  优先，结果为 `1` 时蓝方优先；
+- 优先方进入目标格，另一方保持当前位置；
 - 两方停止本回合剩余移动；
-- 记录 `SAME_DESTINATION_CONFLICT`。
+- 记录 `SAME_DESTINATION_CONFLICT`，并公开 `winner`、`blocked` 与
+  `resolution=PRIORITY_ENTRY`；
+- 同一种子、回合和动作必须得到完全相同的结果，优先方逐回合交替。
 
-这也覆盖：
+若目标格是其中一方仍然占据的当前位置，例如：
 
 ```text
 Red 想进入 Blue 当前格
 Blue 已经没有剩余移动 / STAY
 ```
 
-因为 Blue 的 destination 就是自己的当前格。
+则占位方保留位置、移动方受阻，双方停止剩余移动。此时不应用移动优先权，
+避免一个单位进入另一个单位仍占据的格子。
 
 ## 3.5 冲突类型 B：直接交换位置
 

@@ -4,7 +4,9 @@ import type { EscalationViewModel, MatchViewModel } from '../contract/viewModel'
 interface TopStatusBarProps {
   match: MatchViewModel;
   onOpenReplay: (() => void) | null;
+  onExportModelCalls?: (() => void) | null;
   replayLoading?: boolean;
+  modelCallsLoading?: boolean;
   previousEscalation?: EscalationViewModel | null;
 }
 
@@ -16,7 +18,9 @@ interface TopStatusBarProps {
 export function TopStatusBar({
   match,
   onOpenReplay,
+  onExportModelCalls = null,
   replayLoading = false,
+  modelCallsLoading = false,
   previousEscalation = null,
 }: TopStatusBarProps) {
   const activeRuleText = match.activeRule
@@ -64,6 +68,16 @@ export function TopStatusBar({
           disabled={replayLoading}
         >
           {replayLoading ? '正在读取回放…' : '查看本局回放'}
+        </button>
+      ) : null}
+      {onExportModelCalls ? (
+        <button
+          type="button"
+          className="btn btn--ghost"
+          onClick={onExportModelCalls}
+          disabled={modelCallsLoading}
+        >
+          {modelCallsLoading ? '正在导出日志…' : '导出AI调用日志'}
         </button>
       ) : null}
       {match.debugRaw ? <p className="debug-raw">调试：{match.debugRaw}</p> : null}

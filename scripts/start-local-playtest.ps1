@@ -21,6 +21,43 @@ $backendProcess = $null
 $frontendProcess = $null
 $previousApiKey = $env:MIMO_API_KEY
 $previousProxyTarget = $env:VITE_BACKEND_PROXY_TARGET
+$modelEnvironmentNames = @(
+    "MODEL_API_KEY",
+    "MODEL_API_MODEL",
+    "MODEL_API_BASE_URL",
+    "MODEL_API_AUTH_HEADER",
+    "MODEL_API_AUTH_SCHEME",
+    "MODEL_API_JSON_MODE",
+    "MODEL_API_TOKEN_FIELD",
+    "MODEL_API_TIMEOUT_SECONDS"
+)
+$previousModelEnvironment = @{}
+foreach ($name in $modelEnvironmentNames) {
+    $previousModelEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
+}
+
+function Read-ValueWithDefault {
+    param(
+        [string]$Prompt,
+        [string]$Default
+    )
+
+    $value = Read-Host "$Prompt [$Default]"
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        return $Default
+    }
+    return $value.Trim()
+}
+
+function Read-HiddenApiKey {
+    $secureKey = Read-Host "Model API key (input is hidden)" -AsSecureString
+    $keyPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureKey)
+    try {
+        return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($keyPointer)
+    } finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($keyPointer)
+    }
+}
 
 function Assert-PortAvailable {
     param([int]$Port)
@@ -87,18 +124,60 @@ try {
     Assert-PortAvailable -Port $BackendPort
     Assert-PortAvailable -Port $FrontendPort
 
-    if ([string]::IsNullOrWhiteSpace($env:MIMO_API_KEY)) {
-        $secureKey = Read-Host "MiMo API key (input is hidden)" -AsSecureString
-        $keyPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureKey)
-        try {
-            $env:MIMO_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($keyPointer)
-        } finally {
-            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($keyPointer)
-        }
-    }
+    $hasCustomConfiguration = -not [string]::IsNullOrWhiteSpace($env:MODEL_API_KEY) `
+        -or -not [string]::IsNullOrWhiteSpace($env:MODEL_API_MODEL) `
+        -or -not [string]::IsNullOrWhiteSpace($env:MODEL_API_BASE_URL)
+    $hasLegacyMimoConfiguration = -not [string]::IsNullOrWhiteSpace($env:MIMO_API_KEY)
 
-    if ([string]::IsNullOrWhiteSpace($env:MIMO_API_KEY)) {
-        throw "MIMO_API_KEY cannot be empty."
+    if ($hasCustomConfiguration -or -not $hasLegacyMimoConfiguration) {
+        if ([string]::IsNullOrWhiteSpace($env:MODEL_API_BASE_URL)) {
+            $env:MODEL_API_BASE_URL = Read-ValueWithDefault `
+                -Prompt "OpenAI-compatible API base URL or full chat/completions URL" `
+                -Default "https://open.bigmodel.cn/api/paas/v4"
+        }
+        if ([string]::IsNullOrWhiteSpace($env:MODEL_API_MODEL)) {
+            $env:MODEL_API_MODEL = Read-ValueWithDefault -Prompt "Model name" -Default "glm-5.1"
+        }
+        if ([string]::IsNullOrWhiteSpace($env:MODEL_API_KEY)) {
+            $env:MODEL_API_KEY = Read-HiddenApiKey
+        }
+        if ([string]::IsNullOrWhiteSpace($env:MODEL_API_KEY)) {
+            throw "MODEL_API_KEY cannot be empty."
+        }
+
+        try {
+            $modelApiUri = [Uri]$env:MODEL_API_BASE_URL
+        } catch {
+            throw "MODEL_API_BASE_URL must be an absolute URL."
+        }
+        if (-not $modelApiUri.IsAbsoluteUri -or [string]::IsNullOrWhiteSpace($modelApiUri.Host)) {
+            throw "MODEL_API_BASE_URL must be an absolute URL."
+        }
+        $isLoopbackEndpoint = $modelApiUri.Host -in @("localhost", "127.0.0.1", "::1")
+        if ($modelApiUri.Scheme -eq "http" -and -not $isLoopbackEndpoint) {
+            Write-Warning "Remote HTTP selected. The API key and model traffic are not encrypted."
+        }
+        $isMimoEndpoint = $modelApiUri.Host -eq "xiaomimimo.com" `
+            -or $modelApiUri.Host.EndsWith(".xiaomimimo.com")
+        if ([string]::IsNullOrWhiteSpace($env:MODEL_API_AUTH_HEADER)) {
+            $env:MODEL_API_AUTH_HEADER = if ($isMimoEndpoint) { "api-key" } else { "Authorization" }
+        }
+        if ([string]::IsNullOrWhiteSpace($env:MODEL_API_AUTH_SCHEME)) {
+            $env:MODEL_API_AUTH_SCHEME = if ($isMimoEndpoint) { "none" } else { "Bearer" }
+        }
+        if ([string]::IsNullOrWhiteSpace($env:MODEL_API_JSON_MODE)) {
+            $env:MODEL_API_JSON_MODE = "false"
+        }
+        if ([string]::IsNullOrWhiteSpace($env:MODEL_API_TOKEN_FIELD)) {
+            $env:MODEL_API_TOKEN_FIELD = if ($isMimoEndpoint) {
+                "max_completion_tokens"
+            } else {
+                "max_tokens"
+            }
+        }
+        if ([string]::IsNullOrWhiteSpace($env:MODEL_API_TIMEOUT_SECONDS)) {
+            $env:MODEL_API_TIMEOUT_SECONDS = "30"
+        }
     }
 
     $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
@@ -207,6 +286,14 @@ try {
         Remove-Item Env:MIMO_API_KEY -ErrorAction SilentlyContinue
     } else {
         $env:MIMO_API_KEY = $previousApiKey
+    }
+
+    foreach ($name in $modelEnvironmentNames) {
+        [Environment]::SetEnvironmentVariable(
+            $name,
+            $previousModelEnvironment[$name],
+            "Process"
+        )
     }
 
     if ($null -eq $previousProxyTarget) {

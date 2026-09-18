@@ -1,4 +1,4 @@
-"""A3 HTTP coverage: the real V0.2 five-route vertical slice.
+"""A3 HTTP coverage: the real V0.2 HTTP vertical slice.
 
 Every provider is a deterministic fake and every match is served by a real A2
 ``InMemoryMatchRepository`` built from those fakes, so no test touches the real MiMo
@@ -185,6 +185,9 @@ class ErrorRepository:
         raise self.error
 
     def get_replay(self, match_id: str):  # noqa: ANN201
+        raise self.error
+
+    def get_model_call_log(self, match_id: str):  # noqa: ANN201
         raise self.error
 
 
@@ -690,6 +693,7 @@ def test_runtime_app_openapi_matches_the_frozen_snapshot() -> None:
         "/api/v1/matches/{match_id}/rules",
         "/api/v1/matches/{match_id}/advance",
         "/api/v1/matches/{match_id}/replay",
+        "/api/v1/matches/{match_id}/model-calls",
     }
     for path in ("/api/v1/matches/{match_id}/rules", "/api/v1/matches/{match_id}/advance"):
         parameters = snapshot["paths"][path]["post"]["parameters"]
@@ -784,7 +788,7 @@ def test_contract_only_app_without_a_repository_returns_a_clean_envelope() -> No
 # 11. sync/async boundary --------------------------------------------------
 
 
-def test_all_five_endpoints_are_synchronous() -> None:
+def test_all_match_endpoints_are_synchronous() -> None:
     app = build_app(None)
     endpoints = [
         route.endpoint
@@ -792,7 +796,7 @@ def test_all_five_endpoints_are_synchronous() -> None:
         if getattr(route, "path", "").startswith("/api/v1/matches")
     ]
 
-    assert len(endpoints) == 5
+    assert len(endpoints) == 6
     assert not any(inspect.iscoroutinefunction(endpoint) for endpoint in endpoints)
 
 

@@ -22,6 +22,7 @@ from .match_application_service import (
     MatchApplicationError,
     MatchNotFoundError,
     MatchTerminalError,
+    ModelUnavailableMatchFailure,
     RecoverableMatchFailure,
     RuleSubmissionNotAllowedError,
 )
@@ -56,6 +57,7 @@ _STATUS_BY_ERROR_TYPE: Mapping[type[MatchApplicationError], int] = {
     IdempotencyConflictError: status.HTTP_400_BAD_REQUEST,
     InvalidRequestError: status.HTTP_400_BAD_REQUEST,
     RecoverableMatchFailure: status.HTTP_503_SERVICE_UNAVAILABLE,
+    ModelUnavailableMatchFailure: status.HTTP_503_SERVICE_UNAVAILABLE,
     RuntimeNotConfiguredError: status.HTTP_503_SERVICE_UNAVAILABLE,
     MatchApplicationError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }

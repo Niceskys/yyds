@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import hashlib
 import json
 from typing import Mapping, Protocol
 
@@ -385,8 +386,18 @@ class _ActionCandidate:
     destination: Position
 
 
+@dataclass(frozen=True, slots=True)
+class _RiskSummary:
+    mean_solo_win: float
+    worst_death: float
+    mean_death: float
+    mean_mutual_death: float
+    mean_damage_margin: float
+    mean_damage_dealt: float
+
+
 class DeterministicIntentPlanner:
-    """Closed-semantics planner mapping one intent to one concrete legal action."""
+    """Independent, public-state planner with one-round simultaneous-action risk."""
 
     def choose_action(
         self,
@@ -397,6 +408,7 @@ class DeterministicIntentPlanner:
         rule: RuleAST | None,
         histories: Mapping[Team, PublicRuleHistory],
         intent: StrategyIntent,
+        match_seed: int = 0,
     ) -> Action:
         stats = engine.effective_stats_for_team(
             state,
@@ -404,13 +416,236 @@ class DeterministicIntentPlanner:
             rule=rule,
             histories=histories,
         )
-        opponent = state.unit(team.opponent).position
         candidates = self._candidate_actions(state, team, engine, stats)
+        opponent_stats = engine.effective_stats_for_team(
+            state,
+            team.opponent,
+            rule=rule,
+            histories=histories,
+        )
+        opponent_candidates = self._candidate_actions(
+            state,
+            team.opponent,
+            engine,
+            opponent_stats,
+        )
+        responses = self._plausible_responses(
+            opponent_candidates,
+            state.unit(team).position,
+            opponent_stats,
+        )
         selected = min(
             candidates,
-            key=lambda item: self._score(item, opponent, stats, intent),
+            key=lambda item: self._risk_aware_score(
+                item,
+                state,
+                team,
+                engine,
+                rule,
+                histories,
+                stats,
+                opponent_stats,
+                responses,
+                intent,
+                match_seed,
+            ),
         )
         return selected.action
+
+    @classmethod
+    def _plausible_responses(
+        cls,
+        candidates: tuple[_ActionCandidate, ...],
+        opponent: Position,
+        stats: RuleEffectiveStats,
+    ) -> tuple[_ActionCandidate, ...]:
+        selected: list[_ActionCandidate] = []
+        for intent in StrategyIntent:
+            candidate = min(
+                candidates,
+                key=lambda item: cls._score(item, opponent, stats, intent),
+            )
+            if candidate.action not in {item.action for item in selected}:
+                selected.append(candidate)
+        return tuple(selected)
+
+    @classmethod
+    def _risk_aware_score(
+        cls,
+        candidate: _ActionCandidate,
+        state: GameState,
+        team: Team,
+        engine: RuleAwareGameEngine,
+        rule: RuleAST | None,
+        histories: Mapping[Team, PublicRuleHistory],
+        stats: RuleEffectiveStats,
+        opponent_stats: RuleEffectiveStats,
+        responses: tuple[_ActionCandidate, ...],
+        intent: StrategyIntent,
+        match_seed: int,
+    ) -> tuple[object, ...]:
+        risk = cls._summarize_risk(
+            candidate,
+            state,
+            team,
+            engine,
+            rule,
+            histories,
+            stats,
+            opponent_stats,
+            responses,
+            match_seed,
+        )
+        progress_penalty = 0
+        if state.no_damage_streak >= 3:
+            progress_penalty = 0 if risk.mean_damage_dealt > 0 else 1
+        intent_score = cls._intent_score(
+            candidate,
+            state.unit(team.opponent).position,
+            stats,
+            intent,
+        )
+        risk_score = (
+            risk.worst_death,
+            risk.mean_death,
+            risk.mean_mutual_death,
+            -risk.mean_solo_win,
+        )
+        if state.no_damage_streak >= 3:
+            prefix = (progress_penalty, *risk_score)
+        else:
+            prefix = (*risk_score, progress_penalty)
+        return (
+            *prefix,
+            *intent_score,
+            -risk.mean_damage_margin,
+            cls._seeded_tie_key(state, team, candidate.action, match_seed),
+        )
+
+    @classmethod
+    def _summarize_risk(
+        cls,
+        candidate: _ActionCandidate,
+        state: GameState,
+        team: Team,
+        engine: RuleAwareGameEngine,
+        rule: RuleAST | None,
+        histories: Mapping[Team, PublicRuleHistory],
+        stats: RuleEffectiveStats,
+        opponent_stats: RuleEffectiveStats,
+        responses: tuple[_ActionCandidate, ...],
+        match_seed: int,
+    ) -> _RiskSummary:
+        solo_wins: list[float] = []
+        deaths: list[float] = []
+        mutual_deaths: list[float] = []
+        margins: list[float] = []
+        dealt: list[float] = []
+        for response in responses:
+            positions = engine.preview_rule_movement(
+                state,
+                {team: candidate.action, team.opponent: response.action},
+                rule=rule,
+                histories=histories,
+                match_seed=match_seed,
+            )
+            own_probability, own_damage = engine.expected_rule_attack(
+                team,
+                candidate.action.attack,
+                positions,
+                stats,
+            )
+            incoming_probability, incoming_damage = engine.expected_rule_attack(
+                team.opponent,
+                response.action.attack,
+                positions,
+                opponent_stats,
+            )
+            kill_probability = (
+                own_probability
+                if own_damage >= state.unit(team.opponent).hp
+                else 0.0
+            )
+            death_probability = (
+                incoming_probability
+                if incoming_damage >= state.unit(team).hp
+                else 0.0
+            )
+            expected_dealt = own_probability * own_damage
+            expected_taken = incoming_probability * incoming_damage
+            solo_wins.append(kill_probability * (1.0 - death_probability))
+            deaths.append(death_probability)
+            mutual_deaths.append(kill_probability * death_probability)
+            margins.append(expected_dealt - expected_taken)
+            dealt.append(expected_dealt)
+
+        count = max(1, len(responses))
+        return _RiskSummary(
+            mean_solo_win=sum(solo_wins) / count,
+            worst_death=max(deaths, default=0.0),
+            mean_death=sum(deaths) / count,
+            mean_mutual_death=sum(mutual_deaths) / count,
+            mean_damage_margin=sum(margins) / count,
+            mean_damage_dealt=sum(dealt) / count,
+        )
+
+    @classmethod
+    def _intent_score(
+        cls,
+        candidate: _ActionCandidate,
+        opponent: Position,
+        stats: RuleEffectiveStats,
+        intent: StrategyIntent,
+    ) -> tuple[object, ...]:
+        """Intent preference without arbitrary path ordering; seed resolves exact ties."""
+        action = candidate.action
+        distance = candidate.destination.manhattan_distance(opponent)
+        expected_damage = cls._expected_damage(action.attack, distance, stats)
+        if intent is StrategyIntent.PRESSURE:
+            return (
+                0 if action.attack is not None else 1,
+                -expected_damage,
+                distance,
+                len(action.move_path),
+            )
+        if intent is StrategyIntent.KITE:
+            preferred = min(3, stats.bow_range)
+            bow_rank = 0 if action.attack is Weapon.BOW else (1 if action.attack is not None else 2)
+            return (bow_rank, abs(distance - preferred), -distance, len(action.move_path))
+        if intent is StrategyIntent.EVADE:
+            return (
+                -distance,
+                0 if action.attack is not None else 1,
+                -expected_damage,
+                len(action.move_path),
+            )
+        return (
+            0 if not action.move_path else 1,
+            0 if action.attack is not None else 1,
+            -expected_damage,
+            distance,
+        )
+
+    @staticmethod
+    def _seeded_tie_key(
+        state: GameState,
+        team: Team,
+        action: Action,
+        match_seed: int,
+    ) -> int:
+        signature = ":".join(
+            (
+                str(match_seed),
+                str(state.round_no),
+                team.value,
+                ",".join(step.value for step in action.move_path),
+                action.attack.value if action.attack is not None else "NONE",
+            )
+        )
+        return int.from_bytes(
+            hashlib.sha256(signature.encode("utf-8")).digest()[:8],
+            "big",
+        )
 
     def _candidate_actions(
         self,
@@ -529,3 +764,32 @@ class DeterministicIntentPlanner:
             attack_key,
             path_key,
         )
+
+
+class LegacyDeterministicIntentPlanner(DeterministicIntentPlanner):
+    """Frozen attack-first planner retained for experiment baselines."""
+
+    def choose_action(
+        self,
+        state: GameState,
+        team: Team,
+        engine: RuleAwareGameEngine,
+        *,
+        rule: RuleAST | None,
+        histories: Mapping[Team, PublicRuleHistory],
+        intent: StrategyIntent,
+        match_seed: int = 0,
+    ) -> Action:
+        del match_seed
+        stats = engine.effective_stats_for_team(
+            state,
+            team,
+            rule=rule,
+            histories=histories,
+        )
+        opponent = state.unit(team.opponent).position
+        candidates = self._candidate_actions(state, team, engine, stats)
+        return min(
+            candidates,
+            key=lambda item: self._score(item, opponent, stats, intent),
+        ).action

@@ -26,9 +26,11 @@ export interface GameScreenProps {
   onAdvance: () => void;
   onRestart: () => void;
   onOpenReplay: (() => void) | null;
+  onExportModelCalls?: (() => void) | null;
   submittingRule?: boolean;
   advancing?: boolean;
   replayLoading?: boolean;
+  modelCallsLoading?: boolean;
 }
 
 export function GameScreen({
@@ -44,9 +46,11 @@ export function GameScreen({
   onAdvance,
   onRestart,
   onOpenReplay,
+  onExportModelCalls = null,
   submittingRule = false,
   advancing = false,
   replayLoading = false,
+  modelCallsLoading = false,
 }: GameScreenProps) {
   const settlingRound = roundTransition !== null;
   return (
@@ -54,7 +58,9 @@ export function GameScreen({
       <TopStatusBar
         match={match}
         onOpenReplay={onOpenReplay}
+        onExportModelCalls={onExportModelCalls}
         replayLoading={replayLoading}
+        modelCallsLoading={modelCallsLoading}
         previousEscalation={roundTransition?.before.escalation ?? null}
       />
       <div className="game__board-row">

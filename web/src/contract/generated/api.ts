@@ -55,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/matches/{match_id}/model-calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Model Calls */
+        get: operations["get_model_calls_api_v1_matches__match_id__model_calls_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/matches/{match_id}/replay": {
         parameters: {
             query?: never;
@@ -267,6 +284,60 @@ export interface components {
             seed: number;
             units: components["schemas"]["TeamUnitMap"];
         };
+        /** ModelCallEntryPublic */
+        ModelCallEntryPublic: {
+            /** Duration Ms */
+            duration_ms: number;
+            /** Endpoint Origin */
+            endpoint_origin?: string | null;
+            /** Model */
+            model: string;
+            outcome: components["schemas"]["ModelCallOutcomePublic"];
+            purpose: components["schemas"]["ModelCallPurposePublic"];
+            /** Sequence */
+            sequence: number;
+            /** Time */
+            time: string;
+        };
+        /** ModelCallLogExport */
+        ModelCallLogExport: {
+            /** Attempted Calls */
+            attempted_calls: number;
+            /** Confirmed Responses */
+            confirmed_responses: number;
+            /** Entries */
+            entries: components["schemas"]["ModelCallEntryPublic"][];
+            /** Failed Attempts */
+            failed_attempts: number;
+            /**
+             * Log Version
+             * @default model-call-log-v1
+             * @constant
+             */
+            log_version: "model-call-log-v1";
+            /** Match Id */
+            match_id: string;
+            /** Retained Entries */
+            retained_entries: number;
+            /**
+             * Schema Version
+             * @default mvp-v0.2
+             * @constant
+             */
+            schema_version: "mvp-v0.2";
+            /** Truncated */
+            truncated: boolean;
+        };
+        /**
+         * ModelCallOutcomePublic
+         * @enum {string}
+         */
+        ModelCallOutcomePublic: "RESPONSE_RECEIVED" | "CALL_FAILED";
+        /**
+         * ModelCallPurposePublic
+         * @enum {string}
+         */
+        ModelCallPurposePublic: "STRATEGY_RED" | "STRATEGY_BLUE" | "RULE_TRANSLATION" | "RULE_FAITHFULNESS";
         /** PlayerDecisionSnapshot */
         PlayerDecisionSnapshot: {
             /** After Round */
@@ -718,6 +789,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_model_calls_api_v1_matches__match_id__model_calls_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCallLogExport"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -1,4 +1,4 @@
-"""A3 FastAPI application: the real V0.2 five-route HTTP vertical slice.
+"""A3 FastAPI application: the real V0.2 HTTP vertical slice.
 
 Layering is unchanged from the frozen contract::
 
@@ -34,6 +34,7 @@ from .api_contract import (
     CreateMatchRequest,
     ErrorEnvelope,
     MatchSnapshot,
+    ModelCallLogExport,
     ReplaySnapshot,
     RuleSubmissionRequest,
     RuleSubmissionResult,
@@ -66,6 +67,8 @@ class MatchRepositoryPort(Protocol):
     ) -> AdvanceResult: ...
 
     def get_replay(self, match_id: str) -> ReplaySnapshot: ...
+
+    def get_model_call_log(self, match_id: str) -> ModelCallLogExport: ...
 
 
 def build_app(repository: MatchRepositoryPort | None = None) -> FastAPI:
@@ -159,5 +162,14 @@ def build_app(repository: MatchRepositoryPort | None = None) -> FastAPI:
     def get_replay(match_id: str) -> ReplaySnapshot:
         # Replay is projected from stored public state: zero model calls.
         return repository_port().get_replay(match_id)
+
+    @app.get(
+        "/api/v1/matches/{match_id}/model-calls",
+        response_model=ModelCallLogExport,
+        responses={404: {"model": ErrorEnvelope}},
+    )
+    def get_model_calls(match_id: str) -> ModelCallLogExport:
+        # Read-only proof of provider calls: no model call and no revision change.
+        return repository_port().get_model_call_log(match_id)
 
     return app

@@ -57,3 +57,7 @@ export type ReplayRoundEntry = Schemas['ReplayRoundEntry'];
 export type ReplayIntermissionEntry = Schemas['ReplayIntermissionEntry'];
 export type ReplayEntry = ReplayRoundEntry | ReplayIntermissionEntry;
 export type ReplaySnapshot = Schemas['ReplaySnapshot'];
+export type ModelCallPurpose = Schemas['ModelCallPurposePublic'];
+export type ModelCallOutcome = Schemas['ModelCallOutcomePublic'];
+export type ModelCallEntry = Schemas['ModelCallEntryPublic'];
+export type ModelCallLogExport = Schemas['ModelCallLogExport'];

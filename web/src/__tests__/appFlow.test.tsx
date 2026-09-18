@@ -17,6 +17,7 @@ import type {
   AdvanceResult,
   CreateMatchRequest,
   MatchSnapshot,
+  ModelCallLogExport,
   PublicStrategyDecision,
   ReplaySnapshot,
   RuleSubmissionResult,
@@ -28,6 +29,7 @@ interface ApiBehavior {
   submitRule?: (command: SubmitRuleCommand) => Promise<RuleSubmissionResult>;
   advance?: (command: AdvanceMatchCommand) => Promise<AdvanceResult>;
   replay?: (matchId: string) => Promise<ReplaySnapshot>;
+  modelCalls?: (matchId: string) => Promise<ModelCallLogExport>;
 }
 
 function makeRecordingApi(behavior: ApiBehavior = {}) {
@@ -37,6 +39,7 @@ function makeRecordingApi(behavior: ApiBehavior = {}) {
     submitRule: [] as SubmitRuleCommand[],
     advance: [] as AdvanceMatchCommand[],
     replay: [] as string[],
+    modelCalls: [] as string[],
   };
 
   const adapter: MatchApiAdapter = {
@@ -59,6 +62,20 @@ function makeRecordingApi(behavior: ApiBehavior = {}) {
     async getReplay(matchId) {
       calls.replay.push(matchId);
       return behavior.replay?.(matchId) ?? loadReplay();
+    },
+    async getModelCalls(matchId) {
+      calls.modelCalls.push(matchId);
+      return behavior.modelCalls?.(matchId) ?? {
+        schema_version: 'mvp-v0.2',
+        log_version: 'model-call-log-v1',
+        match_id: matchId,
+        attempted_calls: 2,
+        confirmed_responses: 2,
+        failed_attempts: 0,
+        retained_entries: 2,
+        truncated: false,
+        entries: [],
+      };
     },
   };
 
@@ -169,7 +186,7 @@ describe('真实 API 游玩流程', () => {
         attempts += 1;
         if (attempts === 1) {
           throw new MatchApiRequestError({
-            code: 'INTERNAL_ERROR',
+            code: 'MODEL_UNAVAILABLE',
             message: 'raw provider detail must stay hidden',
             retryable: true,
             status: 503,
@@ -183,7 +200,9 @@ describe('真实 API 游玩流程', () => {
     fireEvent.click(screen.getByTestId('advance-round'));
     await screen.findByTestId('game-error');
     expect(screen.getByTestId('completed-rounds')).toHaveTextContent('0');
-    expect(screen.getByTestId('game-error')).toHaveTextContent('本回合未安全完成，请稍后重试');
+    expect(screen.getByTestId('game-error')).toHaveTextContent(
+      '模型服务暂时不可用，本回合没有结算，请重试',
+    );
     expect(document.body.textContent).not.toContain('raw provider detail');
 
     fireEvent.click(screen.getByTestId('advance-round'));
@@ -383,5 +402,27 @@ describe('真实 API 游玩流程', () => {
     await screen.findByRole('heading', { name: '本局回放' });
     expect(calls.replay).toEqual(['match_fixture_001']);
     expect(screen.getByTestId('replay-timeline')).toBeInTheDocument();
+  });
+
+  it('导出AI调用日志读取专用接口并触发 JSON 下载', async () => {
+    const createObjectURL = vi.fn(() => 'blob:model-call-log');
+    const revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+    try {
+      const { adapter, calls } = makeRecordingApi();
+      await startGame(adapter);
+
+      fireEvent.click(screen.getByRole('button', { name: '导出AI调用日志' }));
+
+      await waitFor(() => expect(calls.modelCalls).toEqual(['match_fixture_001']));
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+      expect(click).toHaveBeenCalledTimes(1);
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:model-call-log');
+      expect(screen.getByTestId('game-notice')).toHaveTextContent('确认收到 2 次模型响应');
+    } finally {
+      click.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 });

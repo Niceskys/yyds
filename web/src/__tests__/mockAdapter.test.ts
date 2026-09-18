@@ -118,6 +118,38 @@ describe('fixture → ViewModel adapter', () => {
     expect(event.isUnknown).toBe(false);
   });
 
+  it('同格争抢展示优先方并兼容旧事件', () => {
+    const decided = presentEvent(
+      {
+        event_version: 'event-v0.1',
+        kind: 'SAME_DESTINATION_CONFLICT',
+        actor: null,
+        details: {
+          destination: [3, 3],
+          winner: 'RED',
+          blocked: 'BLUE',
+          resolution: 'PRIORITY_ENTRY',
+        },
+      },
+      0,
+      false,
+    );
+    expect(decided.label).toBe('同格争抢已裁定');
+    expect(decided.detail).toBe('红方取得本回合移动优先权，蓝方停留原位');
+
+    const legacy = presentEvent(
+      {
+        event_version: 'event-v0.1',
+        kind: 'SAME_DESTINATION_CONFLICT',
+        actor: null,
+        details: { destination: [3, 3] },
+      },
+      0,
+      false,
+    );
+    expect(legacy.label).toBe('同格争抢冲突');
+  });
+
   it('终局禁止提交与推进，并给出玩家成绩', () => {
     const view = buildMatchViewModel(loadMatchSnapshot('match_terminal'));
     expect(view.lifecycle).toBe('TERMINAL');

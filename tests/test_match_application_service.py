@@ -24,6 +24,7 @@ from rules_beyond.match_application_service import (
     MatchApplicationService,
     MatchNotFoundError,
     MatchTerminalError,
+    ModelUnavailableMatchFailure,
     RecoverableMatchFailure,
     RuleSubmissionNotAllowedError,
 )
@@ -609,23 +610,21 @@ def test_timeline_order_and_active_rule_before_after_are_factual() -> None:
 # 15/16. failure containment ------------------------------------------------
 
 
-def test_provider_failure_uses_agent_fallback_without_half_round() -> None:
+def test_provider_failure_pauses_without_half_round() -> None:
     service, _, _, _ = _service(
         red_agent=IsolatedStrategyAgent(Team.RED, CountingStrategyModel("PRESSURE", fail=True)),
         blue_agent=IsolatedStrategyAgent(Team.BLUE, CountingStrategyModel("KITE", fail=True)),
     )
     service.create_match(seed=1_270_000)
 
-    first = service.advance_match()
-    assert first.match.completed_rounds == 1
-    assert first.round.strategies.RED.status is StrategyDecisionStatusPublic.FALLBACK_MODEL_ERROR
-    assert first.round.strategies.BLUE.status is StrategyDecisionStatusPublic.FALLBACK_MODEL_ERROR
-    assert first.round.strategies.RED.degraded is True
+    with pytest.raises(ModelUnavailableMatchFailure):
+        service.advance_match()
 
-    second = service.advance_match()
-    assert second.match.completed_rounds == 2
-    assert second.match.lifecycle is MatchLifecycle.PLAYER_DECISION
-    assert second.round.strategies.RED.status is StrategyDecisionStatusPublic.FALLBACK_MODEL_ERROR
+    snapshot = service.get_match_snapshot()
+    assert snapshot.completed_rounds == 0
+    assert snapshot.revision == 0
+    assert snapshot.lifecycle is MatchLifecycle.RUNNING
+    assert service.get_replay().timeline == []
 
 
 def test_agent_failure_leaves_aggregate_and_memory_unchanged() -> None:
@@ -729,7 +728,7 @@ def test_retry_after_failure_commits_round_memory_once() -> None:
     ]
 
 
-def test_fallback_strategy_is_committed_after_successful_round() -> None:
+def test_model_failure_does_not_commit_fallback_memory() -> None:
     red_agent = IsolatedStrategyAgent(Team.RED, CountingStrategyModel("PRESSURE", fail=True))
     blue_agent = IsolatedStrategyAgent(
         Team.BLUE,
@@ -739,13 +738,11 @@ def test_fallback_strategy_is_committed_after_successful_round() -> None:
     service, *_ = _service(red_agent=red_agent, blue_agent=blue_agent)
     service.create_match(seed=1_270_000)
 
-    result = service.advance_match()
+    with pytest.raises(ModelUnavailableMatchFailure):
+        service.advance_match()
 
-    assert result.round.strategies.RED.status is StrategyDecisionStatusPublic.FALLBACK_MODEL_ERROR
-    assert [entry.round_no for entry in red_agent.private_memory] == [1]
-    assert [entry.round_no for entry in blue_agent.private_memory] == [1]
-    assert red_agent.private_memory[0].intent is StrategyIntent.PRESSURE
-    assert blue_agent.private_memory[0].intent is StrategyIntent.KITE
+    assert red_agent.private_memory == ()
+    assert blue_agent.private_memory == ()
 
 
 # defensive-copy boundary ---------------------------------------------------

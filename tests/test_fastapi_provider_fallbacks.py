@@ -80,24 +80,21 @@ def _advance(client: TestClient, match_id: str, revision: int, key: str):
     )
 
 
-def test_strategy_provider_failure_is_200_degraded_fallback() -> None:
+def test_strategy_provider_failure_is_retryable_without_resolving_round() -> None:
     client = _client(fail_strategy=True)
     created = _create(client)
 
     response = _advance(client, created["match_id"], 0, "adv-fallback")
 
-    assert response.status_code == 200
+    assert response.status_code == 503
     payload = response.json()
-    assert payload["round"]["round_no"] == 1
-    assert payload["match"]["revision"] == 1
-    assert payload["match"]["completed_rounds"] == 1
-    assert payload["match"]["lifecycle"] == "PLAYER_DECISION"
+    assert payload["error"]["code"] == "MODEL_UNAVAILABLE"
+    assert payload["error"]["retryable"] is True
 
-    red = payload["round"]["strategies"]["RED"]
-    assert red["status"] == "FALLBACK_MODEL_ERROR"
-    assert red["degraded"] is True
-    assert payload["match"]["latest_strategy"]["RED"]["status"] == "FALLBACK_MODEL_ERROR"
-    assert payload["match"]["latest_strategy"]["RED"]["degraded"] is True
+    unchanged = client.get(f"/api/v1/matches/{created['match_id']}").json()
+    assert unchanged["revision"] == 0
+    assert unchanged["completed_rounds"] == 0
+    assert unchanged["round_no"] == 1
 
     response_text = response.text.lower()
     assert RAW_STRATEGY_FAILURE.lower() not in response_text

@@ -41,6 +41,10 @@ from .natural_language_rule_adapter import (
     RuleCandidateModel,
     TranslationStatus,
 )
+from .openai_compatible_provider import (
+    OpenAICompatibleModel,
+    OpenAICompatibleProviderError,
+)
 from .rule_dsl import (
     RuleAST,
     RuleCondition,
@@ -97,6 +101,8 @@ __all__ = [
     "NaturalLanguageRuleAdapter",
     "NaturalLanguageTranslation",
     "NoCandidateReason",
+    "OpenAICompatibleModel",
+    "OpenAICompatibleProviderError",
     "Position",
     "PublicRuleHistory",
     "RoundResolution",

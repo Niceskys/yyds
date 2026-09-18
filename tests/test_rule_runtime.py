@@ -94,7 +94,7 @@ def test_history_conditions_are_false_on_round_one() -> None:
         assert modifiers[Team.BLUE].bow_range_add == 0
 
 
-def test_actual_stay_and_collision_count_as_did_not_move() -> None:
+def test_priority_entry_records_winner_as_moved_and_blocked_team_as_stayed() -> None:
     engine = GameEngine()
     histories = initial_public_rule_histories()
     before = state(red=(3, 2), blue=(3, 4))
@@ -111,7 +111,7 @@ def test_actual_stay_and_collision_count_as_did_not_move() -> None:
 
     assert updated[Team.RED].has_previous_round
     assert updated[Team.BLUE].has_previous_round
-    assert updated[Team.RED].moved_last_round is False
+    assert updated[Team.RED].moved_last_round is True
     assert updated[Team.BLUE].moved_last_round is False
 
     rule = validated_rule(
@@ -119,7 +119,7 @@ def test_actual_stay_and_collision_count_as_did_not_move() -> None:
         effect={"type": "BOW_RANGE_ADD", "delta": 1},
     )
     modifiers = RuleEvaluator().evaluate(rule, resolution.state, updated)
-    assert modifiers[Team.RED].bow_range_add == 1
+    assert modifiers[Team.RED].bow_range_add == 0
     assert modifiers[Team.BLUE].bow_range_add == 1
 
 

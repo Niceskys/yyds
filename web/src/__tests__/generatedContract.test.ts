@@ -5,6 +5,7 @@ import type {
   AdvanceResult,
   MatchSnapshot,
   ReplaySnapshot,
+  ModelCallLogExport,
   RuleSubmissionResult,
 } from '../contract/types';
 import type {
@@ -39,7 +40,7 @@ describe('generated OpenAPI contract boundary', () => {
     expect(generatedReplay.replay_version).toBe('replay-v0.2');
   });
 
-  it('adapter seam 保留五个操作与 mutation revision/idempotency 参数', async () => {
+  it('adapter seam 保留比赛操作、日志导出与 mutation revision/idempotency 参数', async () => {
     let lastRuleCommand: SubmitRuleCommand | null = null;
     let lastAdvanceCommand: AdvanceMatchCommand | null = null;
 
@@ -61,6 +62,20 @@ describe('generated OpenAPI contract boundary', () => {
       async getReplay() {
         return loadReplay();
       },
+      async getModelCalls(matchId) {
+        const result: ModelCallLogExport = {
+          schema_version: 'mvp-v0.2',
+          log_version: 'model-call-log-v1',
+          match_id: matchId,
+          attempted_calls: 0,
+          confirmed_responses: 0,
+          failed_attempts: 0,
+          retained_entries: 0,
+          truncated: false,
+          entries: [],
+        };
+        return result;
+      },
     };
 
     const created = await adapter.createMatch(123);
@@ -77,6 +92,7 @@ describe('generated OpenAPI contract boundary', () => {
       idempotencyKey: 'advance-test-key',
     });
     const replay = await adapter.getReplay(advanced.match.match_id);
+    const modelCalls = await adapter.getModelCalls(advanced.match.match_id);
 
     expect(lastRuleCommand).toEqual({
       matchId: current.match_id,
@@ -90,5 +106,6 @@ describe('generated OpenAPI contract boundary', () => {
       idempotencyKey: 'advance-test-key',
     });
     expect(replay.replay_version).toBe('replay-v0.2');
+    expect(modelCalls.match_id).toBe(advanced.match.match_id);
   });
 });

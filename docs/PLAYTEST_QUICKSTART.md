@@ -4,12 +4,14 @@
 
 ## Windows：推荐单命令启动
 
+试玩对局使用标准战斗数值。具体行动规划器会先预演双方同回合移动和攻击风险，避免在存在生存选择时机械换血；连续无伤达到阈值后则优先推动有效攻击，防止双方无限回避。选择在相同输入和对局种子下可复现。
+
 前置条件：
 
 - Git；
 - Python 3.11 或更新版本；
 - Node.js 20 或更新版本；
-- 一个有效的 MiMo API key。
+- 一个支持 OpenAI Chat Completions 格式的模型服务、模型名和 API key。
 
 ```powershell
 git clone https://github.com/Niceskys/yyds.git
@@ -19,13 +21,48 @@ cd yyds
 
 脚本会：
 
-1. 以隐藏输入方式询问 MiMo API key（如果当前进程未设置 `MIMO_API_KEY`）；
+1. 询问模型 API 地址和模型名，并以隐藏方式读取 API key；
 2. 创建本地 `.venv` 并按需安装 Python / npm 依赖；
 3. 只在 `127.0.0.1` 启动 FastAPI 和 Vite；
 4. 打开 `http://127.0.0.1:5173/`；
 5. 在按下 `Ctrl+C` 后停止本次脚本启动的两个服务。
 
 密钥不会写入仓库、日志或 `.env`。运行日志只保存在被 `.gitignore` 排除的 `.local-playtest/`。
+
+游戏中的“导出AI调用日志”会下载当前对局的精简 JSON 调用凭据，用于证明模型接口确实被请求并返回。该文件不会包含 API key、提示词、模型原文、鉴权头或接口路径和查询参数。日志只存在于当前后端进程的内存中，重启服务后不会保留。
+
+地址既可以填写 API 基础地址，例如智谱 GLM 的
+`https://open.bigmodel.cn/api/paas/v4`，也可以填写以 `/chat/completions` 结尾的完整地址。
+接口地址可以使用 HTTP 或 HTTPS，也可以填写远程 IP、自定义端口和路径。
+HTTP 连接不会加密 API key、请求或响应，启动脚本会给出提醒，但不会阻止连接。
+
+脚本默认使用 `Authorization: Bearer <key>`。需要不同兼容参数时，可以在启动前设置：
+
+```powershell
+$env:MODEL_API_BASE_URL = "https://example.com/v1"
+$env:MODEL_API_MODEL = "model-name"
+$env:MODEL_API_KEY = "your-key"
+$env:MODEL_API_AUTH_HEADER = "Authorization" # MiMo 等服务可改为 api-key
+$env:MODEL_API_AUTH_SCHEME = "Bearer"         # 原样传 key 时设为 none
+$env:MODEL_API_JSON_MODE = "false"            # 服务支持 JSON mode 时可设为 true
+$env:MODEL_API_TOKEN_FIELD = "max_tokens"     # 也可设 max_completion_tokens 或 none
+$env:MODEL_API_TIMEOUT_SECONDS = "30"
+\.\scripts\start-local-playtest.ps1
+```
+
+远程 HTTP 服务直接作为模型地址填写即可，不需要额外配置白名单：
+
+```powershell
+$env:MODEL_API_BASE_URL = "http://你的IP:32592/mgate/v1/chat/completions"
+\.\scripts\start-local-playtest.ps1
+```
+
+启动后端前会发送一次简短的模型连接检查，同时验证网络、鉴权、模型名和响应格式。
+检查失败时服务不会进入游戏；修正配置后重新启动即可。为避免把 API key 转发到意外
+服务，跨主机或端口的 HTTP 重定向仍会被拒绝，请直接填写最终接口地址。
+
+若仍使用旧版 MiMo 环境变量且未设置任何 `MODEL_API_*` 变量，原来的
+`MIMO_API_KEY`、`MIMO_RULE_MODEL` 和 `MIMO_BASE_URL` 配置仍然生效。
 
 如果端口已被占用：
 
@@ -60,7 +97,9 @@ Set-ExecutionPolicy -Scope Process Bypass
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
-export MIMO_API_KEY='your-key'
+export MODEL_API_BASE_URL='https://open.bigmodel.cn/api/paas/v4'
+export MODEL_API_MODEL='glm-5.1'
+export MODEL_API_KEY='your-key'
 python -m rules_beyond.api_server --host 127.0.0.1 --port 8000
 ```
 
@@ -73,6 +112,9 @@ npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```
 
 然后打开 `http://127.0.0.1:5173/`。
+
+所选模型需要可靠地遵循提示并返回 JSON。接口虽然兼容，但能力过弱或无法生成结构化内容的模型仍可能在开始回合或提交规则时被游戏拒绝。
+`glm-5.1` 已内置专用参数：关闭 Thinking、启用 JSON 模式，并为每次策略决策预留至少 1024 个输出 tokens。
 
 ## 试玩路径
 
@@ -98,7 +140,7 @@ npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 .local-playtest/frontend.stderr.log
 ```
 
-常见原因是 Python / Node.js 未安装、端口占用、MiMo key 无效或无法访问 MiMo endpoint。
+常见原因是 Python / Node.js 未安装、端口占用、API key 无效、模型名错误或无法访问模型接口。
 
 ### 前端能打开，但开始游戏失败
 

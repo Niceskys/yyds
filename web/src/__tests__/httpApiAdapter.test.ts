@@ -42,13 +42,24 @@ describe('HttpMatchApiAdapter', () => {
     expect(receiver).toBeUndefined();
   });
 
-  it('把五个 frozen operation 映射到正确 URL / method / body / Idempotency-Key', async () => {
+  it('把比赛操作和日志导出映射到正确 URL / method / body / Idempotency-Key', async () => {
     const payloads: unknown[] = [
       loadMatchSnapshot('match_initial'),
       loadMatchSnapshot('match_initial'),
       loadRuleSubmission('rule_accepted'),
       loadAdvanceResult(),
       loadReplay(),
+      {
+        schema_version: 'mvp-v0.2',
+        log_version: 'model-call-log-v1',
+        match_id: 'match/a b',
+        attempted_calls: 0,
+        confirmed_responses: 0,
+        failed_attempts: 0,
+        retained_entries: 0,
+        truncated: false,
+        entries: [],
+      },
     ];
     const requests: RecordedRequest[] = [];
     const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -76,6 +87,7 @@ describe('HttpMatchApiAdapter', () => {
     };
     await api.advanceMatch(advance);
     await api.getReplay('match/a b');
+    await api.getModelCalls('match/a b');
 
     expect(requests.map((request) => String(request.input))).toEqual([
       'https://game.example/api/v1/matches',
@@ -83,12 +95,14 @@ describe('HttpMatchApiAdapter', () => {
       'https://game.example/api/v1/matches/match%2Fa%20b/rules',
       'https://game.example/api/v1/matches/match%2Fa%20b/advance',
       'https://game.example/api/v1/matches/match%2Fa%20b/replay',
+      'https://game.example/api/v1/matches/match%2Fa%20b/model-calls',
     ]);
     expect(requests.map((request) => request.init?.method ?? 'GET')).toEqual([
       'POST',
       'GET',
       'POST',
       'POST',
+      'GET',
       'GET',
     ]);
 

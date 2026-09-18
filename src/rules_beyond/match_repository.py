@@ -8,6 +8,7 @@ multi-match application registry that A3 can call directly:
     submit_public_rule(match_id, *, expected_revision, idempotency_key, player_text)
     advance_match(match_id, *, expected_revision, idempotency_key) -> AdvanceResult
     get_replay(match_id) -> ReplaySnapshot
+    get_model_call_log(match_id) -> ModelCallLogExport
 
 It owns **only** registry concerns:
 
@@ -55,6 +56,7 @@ from .api_contract import (
     ContractModel,
     ErrorCode,
     MatchSnapshot,
+    ModelCallLogExport,
     ReplaySnapshot,
     RuleSubmissionResult,
 )
@@ -64,6 +66,7 @@ from .match_application_service import (
     MatchNotFoundError,
 )
 from .model import GameConfig, Team
+from .model_call_log import LoggedModel, ModelCallPurpose, ModelCallRecorder
 from .natural_language_dynamic_controller import VerifiedNaturalLanguageDynamicController
 from .natural_language_rule_adapter import NaturalLanguageRuleAdapter, RuleCandidateModel
 from .rule_faithfulness import NaturalLanguageRuleFaithfulnessVerifier
@@ -135,11 +138,15 @@ class MatchServiceFactory:
         red_strategy_model_factory: Callable[[], StrategyModel],
         blue_strategy_model_factory: Callable[[], StrategyModel],
         rule_model_factory: Callable[[], RuleCandidateModel],
+        model_name: str = "unknown",
+        endpoint_url: str | None = None,
     ) -> None:
         self._config = config or GameConfig()
         self._red_strategy_model_factory = red_strategy_model_factory
         self._blue_strategy_model_factory = blue_strategy_model_factory
         self._rule_model_factory = rule_model_factory
+        self._model_name = model_name
+        self._endpoint_url = endpoint_url
 
     @property
     def config(self) -> GameConfig:
@@ -147,18 +154,52 @@ class MatchServiceFactory:
 
     def __call__(self) -> MatchApplicationService:
         config = self._config
+        recorder = ModelCallRecorder()
         rule_model = self._rule_model_factory()
+        translation_model = LoggedModel(
+            rule_model,
+            recorder,
+            purpose=ModelCallPurpose.RULE_TRANSLATION,
+            model_name=self._model_name,
+            endpoint_url=self._endpoint_url,
+        )
+        faithfulness_model = LoggedModel(
+            rule_model,
+            recorder,
+            purpose=ModelCallPurpose.RULE_FAITHFULNESS,
+            model_name=self._model_name,
+            endpoint_url=self._endpoint_url,
+        )
         validator = RuleValidator(config)
-        base = NaturalLanguageRuleAdapter(rule_model, validator)
+        base = NaturalLanguageRuleAdapter(translation_model, validator)
         verified = VerifiedNaturalLanguageRuleAdapter(
             base,
-            NaturalLanguageRuleFaithfulnessVerifier(rule_model),
+            NaturalLanguageRuleFaithfulnessVerifier(faithfulness_model),
         )
         rules = VerifiedNaturalLanguageDynamicController(verified, config)
         return MatchApplicationService(
-            red_agent=IsolatedStrategyAgent(Team.RED, self._red_strategy_model_factory()),
-            blue_agent=IsolatedStrategyAgent(Team.BLUE, self._blue_strategy_model_factory()),
+            red_agent=IsolatedStrategyAgent(
+                Team.RED,
+                LoggedModel(
+                    self._red_strategy_model_factory(),
+                    recorder,
+                    purpose=ModelCallPurpose.STRATEGY_RED,
+                    model_name=self._model_name,
+                    endpoint_url=self._endpoint_url,
+                ),
+            ),
+            blue_agent=IsolatedStrategyAgent(
+                Team.BLUE,
+                LoggedModel(
+                    self._blue_strategy_model_factory(),
+                    recorder,
+                    purpose=ModelCallPurpose.STRATEGY_BLUE,
+                    model_name=self._model_name,
+                    endpoint_url=self._endpoint_url,
+                ),
+            ),
             rule_pipeline=rules,
+            model_call_recorder=recorder,
         )
 
 
@@ -231,6 +272,11 @@ class InMemoryMatchRepository:
         record = self._require_record(match_id)
         with record.lock:
             return record.service.get_replay()
+
+    def get_model_call_log(self, match_id: str) -> ModelCallLogExport:
+        record = self._require_record(match_id)
+        with record.lock:
+            return record.service.get_model_call_log().model_copy(deep=True)
 
     # -- mutations -----------------------------------------------------------
 

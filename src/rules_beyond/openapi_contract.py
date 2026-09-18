@@ -5,10 +5,9 @@
 (``web/src/contract/generated/api.ts``). ``tests/test_openapi_snapshot.py`` and the
 frontend ``contract:check`` job both fail if this app and the snapshot drift.
 
-A3 therefore wires the real five routes (see :mod:`rules_beyond.api_app`) into the
-same frozen OpenAPI surface: title / version / description / paths / methods /
-request bodies / response models / required ``Idempotency-Key`` header are
-unchanged. Any real schema change must be raised as ``CONTRACT CHANGE REQUIRED``.
+A3 therefore wires the real routes (see :mod:`rules_beyond.api_app`) into the
+same OpenAPI surface. Contract changes, including the read-only model-call receipt
+route, must update the checked-in snapshot and generated frontend types together.
 """
 
 from __future__ import annotations
@@ -23,7 +22,7 @@ from .api_app import build_app
 
 
 def build_contract_app() -> FastAPI:
-    """OpenAPI/contract app: the real five routes without runtime provider wiring."""
+    """OpenAPI/contract app: the real routes without runtime provider wiring."""
 
     return build_app()
 

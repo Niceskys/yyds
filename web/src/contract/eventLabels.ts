@@ -107,10 +107,21 @@ const KNOWN_PRESENTERS: Record<
     label: '强制使用弓箭',
     detail: '战局升温导致本回合强制远程攻击',
   }),
-  SAME_DESTINATION_CONFLICT: () => ({
-    label: '同格争抢冲突',
-    detail: '双方试图移动到同一格，动作被重新结算',
-  }),
+  SAME_DESTINATION_CONFLICT: (event) => {
+    const details = event.details ?? {};
+    const winner = asTeam(details.winner);
+    const blocked = asTeam(details.blocked);
+    if (winner && blocked && details.resolution === 'PRIORITY_ENTRY') {
+      return {
+        label: '同格争抢已裁定',
+        detail: `${labelTeam(winner)}取得本回合移动优先权，${labelTeam(blocked)}停留原位`,
+      };
+    }
+    return {
+      label: '同格争抢冲突',
+      detail: '双方试图移动到同一格，动作被重新结算',
+    };
+  },
   SWAP_CONFLICT: () => ({
     label: '换位冲突',
     detail: '双方试图互换位置，动作被重新结算',

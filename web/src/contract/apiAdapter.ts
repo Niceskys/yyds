@@ -4,6 +4,7 @@ import type {
   CreateMatchRequest,
   MatchSnapshot,
   ReplaySnapshot,
+  ModelCallLogExport,
   RuleSubmissionRequest,
   RuleSubmissionResult,
 } from './types';
@@ -30,7 +31,7 @@ export interface AdvanceMatchCommand {
 }
 
 /**
- * Stable frontend seam for the five frozen V0.2 match operations.
+ * Stable frontend seam for the frozen V0.2 match operations and read-only logs.
  *
  * Current fixture/mock flows may implement or adapt to this boundary later.
  * The real HTTP implementation is intentionally blocked until Developer A A3
@@ -42,4 +43,5 @@ export interface MatchApiAdapter {
   submitRule(command: SubmitRuleCommand): Promise<RuleSubmissionResult>;
   advanceMatch(command: AdvanceMatchCommand): Promise<AdvanceResult>;
   getReplay(matchId: string): Promise<ReplaySnapshot>;
+  getModelCalls(matchId: string): Promise<ModelCallLogExport>;
 }

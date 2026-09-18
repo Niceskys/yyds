@@ -67,7 +67,7 @@ def test_v02_lifecycle_removes_old_rule_phase_states() -> None:
     assert "AWAITING_RULE" not in _values(MatchLifecycle)
 
 
-def test_openapi_contains_exactly_the_five_mvp_routes() -> None:
+def test_openapi_contains_match_routes_and_model_call_export() -> None:
     schema = contract_app.openapi()
     assert set(schema["paths"]) == {
         "/api/v1/matches",
@@ -75,12 +75,14 @@ def test_openapi_contains_exactly_the_five_mvp_routes() -> None:
         "/api/v1/matches/{match_id}/rules",
         "/api/v1/matches/{match_id}/advance",
         "/api/v1/matches/{match_id}/replay",
+        "/api/v1/matches/{match_id}/model-calls",
     }
     assert "post" in schema["paths"]["/api/v1/matches"]
     assert "get" in schema["paths"]["/api/v1/matches/{match_id}"]
     assert "post" in schema["paths"]["/api/v1/matches/{match_id}/rules"]
     assert "post" in schema["paths"]["/api/v1/matches/{match_id}/advance"]
     assert "get" in schema["paths"]["/api/v1/matches/{match_id}/replay"]
+    assert "get" in schema["paths"]["/api/v1/matches/{match_id}/model-calls"]
 
 
 def test_write_routes_require_idempotency_header() -> None:
