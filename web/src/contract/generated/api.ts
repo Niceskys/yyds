@@ -298,6 +298,10 @@ export interface components {
             sequence: number;
             /** Time */
             time: string;
+            /** Time Beijing */
+            time_beijing: string;
+            /** Time Beijing Text */
+            time_beijing_text: string;
         };
         /** ModelCallLogExport */
         ModelCallLogExport: {
@@ -305,16 +309,28 @@ export interface components {
             attempted_calls: number;
             /** Confirmed Responses */
             confirmed_responses: number;
+            /**
+             * Display Timezone
+             * @default Asia/Shanghai
+             * @constant
+             */
+            display_timezone: "Asia/Shanghai";
+            /**
+             * Display Utc Offset
+             * @default +08:00
+             * @constant
+             */
+            display_utc_offset: "+08:00";
             /** Entries */
             entries: components["schemas"]["ModelCallEntryPublic"][];
             /** Failed Attempts */
             failed_attempts: number;
             /**
              * Log Version
-             * @default model-call-log-v1
+             * @default model-call-log-v2
              * @constant
              */
-            log_version: "model-call-log-v1";
+            log_version: "model-call-log-v2";
             /** Match Id */
             match_id: string;
             /** Retained Entries */

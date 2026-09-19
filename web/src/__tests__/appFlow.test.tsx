@@ -67,7 +67,9 @@ function makeRecordingApi(behavior: ApiBehavior = {}) {
       calls.modelCalls.push(matchId);
       return behavior.modelCalls?.(matchId) ?? {
         schema_version: 'mvp-v0.2',
-        log_version: 'model-call-log-v1',
+        log_version: 'model-call-log-v2',
+        display_timezone: 'Asia/Shanghai',
+        display_utc_offset: '+08:00',
         match_id: matchId,
         attempted_calls: 2,
         confirmed_responses: 2,

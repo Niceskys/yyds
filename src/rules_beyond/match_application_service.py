@@ -95,7 +95,7 @@ from .api_contract import (
 )
 from .dynamic_rule_controller import DynamicMatchState
 from .model import Action, Event, GameConfig, MatchResult, Team
-from .model_call_log import ModelCallRecorder
+from .model_call_log import ModelCallEntry, ModelCallRecorder, beijing_time_strings
 from .natural_language_dynamic_controller import (
     NaturalLanguageRuleAttempt,
     VerifiedNaturalLanguageDynamicController,
@@ -240,6 +240,21 @@ def _action_public(action: Action) -> ActionPublicView:
     return ActionPublicView(
         move_path=[DirectionPublic(step.value) for step in action.move_path],
         attack=WeaponPublic(action.attack.value) if action.attack is not None else None,
+    )
+
+
+def _model_call_entry_public(entry: ModelCallEntry) -> ModelCallEntryPublic:
+    time_beijing, time_beijing_text = beijing_time_strings(entry.time)
+    return ModelCallEntryPublic(
+        sequence=entry.sequence,
+        time=entry.time,
+        time_beijing=time_beijing,
+        time_beijing_text=time_beijing_text,
+        purpose=ModelCallPurposePublic(entry.purpose.value),
+        model=entry.model,
+        endpoint_origin=entry.endpoint_origin,
+        outcome=ModelCallOutcomePublic(entry.outcome.value),
+        duration_ms=entry.duration_ms,
     )
 
 
@@ -448,18 +463,7 @@ class MatchApplicationService:
             failed_attempts=snapshot.failed_attempts,
             retained_entries=len(snapshot.entries),
             truncated=snapshot.truncated,
-            entries=[
-                ModelCallEntryPublic(
-                    sequence=entry.sequence,
-                    time=entry.time,
-                    purpose=ModelCallPurposePublic(entry.purpose.value),
-                    model=entry.model,
-                    endpoint_origin=entry.endpoint_origin,
-                    outcome=ModelCallOutcomePublic(entry.outcome.value),
-                    duration_ms=entry.duration_ms,
-                )
-                for entry in snapshot.entries
-            ],
+            entries=[_model_call_entry_public(entry) for entry in snapshot.entries],
         )
 
     def submit_public_rule(self, player_text: str) -> RuleSubmissionResult:

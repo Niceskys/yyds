@@ -51,7 +51,9 @@ describe('HttpMatchApiAdapter', () => {
       loadReplay(),
       {
         schema_version: 'mvp-v0.2',
-        log_version: 'model-call-log-v1',
+        log_version: 'model-call-log-v2',
+        display_timezone: 'Asia/Shanghai',
+        display_utc_offset: '+08:00',
         match_id: 'match/a b',
         attempted_calls: 0,
         confirmed_responses: 0,

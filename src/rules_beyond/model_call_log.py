@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from threading import Lock
 from time import perf_counter
@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 
 MAX_RETAINED_MODEL_CALLS = 256
+BEIJING_TIMEZONE = timezone(timedelta(hours=8), name="Asia/Shanghai")
 
 
 class ModelCallPurpose(str, Enum):
@@ -67,6 +68,20 @@ def safe_endpoint_origin(url: str | None) -> str | None:
         return f"{parsed.scheme.lower()}://{host.lower()}{suffix}"
     except (TypeError, ValueError):
         return None
+
+
+def beijing_time_strings(utc_time: str) -> tuple[str, str]:
+    """Convert one ISO-8601 UTC timestamp to machine and human Beijing time."""
+
+    normalized = utc_time[:-1] + "+00:00" if utc_time.endswith("Z") else utc_time
+    parsed = datetime.fromisoformat(normalized)
+    if parsed.tzinfo is None:
+        raise ValueError("Model call time must include a UTC offset")
+    beijing = parsed.astimezone(BEIJING_TIMEZONE)
+    return (
+        beijing.isoformat(),
+        beijing.strftime("%Y年%m月%d日 %H:%M:%S"),
+    )
 
 
 class ModelCallRecorder:

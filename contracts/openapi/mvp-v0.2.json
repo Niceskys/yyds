@@ -547,11 +547,23 @@
             "minLength": 1,
             "title": "Time",
             "type": "string"
+          },
+          "time_beijing": {
+            "minLength": 1,
+            "title": "Time Beijing",
+            "type": "string"
+          },
+          "time_beijing_text": {
+            "minLength": 1,
+            "title": "Time Beijing Text",
+            "type": "string"
           }
         },
         "required": [
           "sequence",
           "time",
+          "time_beijing",
+          "time_beijing_text",
           "purpose",
           "model",
           "outcome",
@@ -573,6 +585,18 @@
             "title": "Confirmed Responses",
             "type": "integer"
           },
+          "display_timezone": {
+            "const": "Asia/Shanghai",
+            "default": "Asia/Shanghai",
+            "title": "Display Timezone",
+            "type": "string"
+          },
+          "display_utc_offset": {
+            "const": "+08:00",
+            "default": "+08:00",
+            "title": "Display Utc Offset",
+            "type": "string"
+          },
           "entries": {
             "items": {
               "$ref": "#/components/schemas/ModelCallEntryPublic"
@@ -586,8 +610,8 @@
             "type": "integer"
           },
           "log_version": {
-            "const": "model-call-log-v1",
-            "default": "model-call-log-v1",
+            "const": "model-call-log-v2",
+            "default": "model-call-log-v2",
             "title": "Log Version",
             "type": "string"
           },

@@ -13,6 +13,7 @@ from rules_beyond.model_call_log import (
     ModelCallOutcome,
     ModelCallPurpose,
     ModelCallRecorder,
+    beijing_time_strings,
     safe_endpoint_origin,
 )
 
@@ -210,6 +211,13 @@ def test_endpoint_origin_removes_path_query_fragment_and_credentials() -> None:
     assert safe_endpoint_origin("not a url") is None
 
 
+def test_utc_timestamp_is_converted_to_beijing_time() -> None:
+    machine, readable = beijing_time_strings("2026-09-19T02:06:21.060122Z")
+
+    assert machine == "2026-09-19T10:06:21.060122+08:00"
+    assert readable == "2026年09月19日 10:06:21"
+
+
 def test_http_export_contains_only_safe_receipts_and_unknown_match_is_404() -> None:
     secret = "secret-must-not-appear"
     repo = repository()
@@ -226,8 +234,14 @@ def test_http_export_contains_only_safe_receipts_and_unknown_match_is_404() -> N
     assert response.status_code == 200
     payload = response.json()
     assert payload["schema_version"] == "mvp-v0.2"
-    assert payload["log_version"] == "model-call-log-v1"
+    assert payload["log_version"] == "model-call-log-v2"
+    assert payload["display_timezone"] == "Asia/Shanghai"
+    assert payload["display_utc_offset"] == "+08:00"
     assert payload["confirmed_responses"] == 2
+    for entry in payload["entries"]:
+        assert entry["time"].endswith("Z")
+        assert entry["time_beijing"].endswith("+08:00")
+        assert "年" in entry["time_beijing_text"]
     serialized = response.text.lower()
     assert secret not in serialized
     assert "authorization" not in serialized

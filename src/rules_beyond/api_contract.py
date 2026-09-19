@@ -395,6 +395,8 @@ class ReplaySnapshot(ContractModel):
 class ModelCallEntryPublic(ContractModel):
     sequence: int = Field(ge=1)
     time: str = Field(min_length=1)
+    time_beijing: str = Field(min_length=1)
+    time_beijing_text: str = Field(min_length=1)
     purpose: ModelCallPurposePublic
     model: str = Field(min_length=1)
     endpoint_origin: str | None = None
@@ -404,7 +406,9 @@ class ModelCallEntryPublic(ContractModel):
 
 class ModelCallLogExport(ContractModel):
     schema_version: Literal[SCHEMA_VERSION] = SCHEMA_VERSION
-    log_version: Literal["model-call-log-v1"] = "model-call-log-v1"
+    log_version: Literal["model-call-log-v2"] = "model-call-log-v2"
+    display_timezone: Literal["Asia/Shanghai"] = "Asia/Shanghai"
+    display_utc_offset: Literal["+08:00"] = "+08:00"
     match_id: str = Field(min_length=1)
     attempted_calls: int = Field(ge=0)
     confirmed_responses: int = Field(ge=0)
